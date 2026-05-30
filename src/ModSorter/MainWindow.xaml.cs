@@ -27,8 +27,15 @@ public partial class MainWindow : Window
             PathBox.Text = _instancePath;
         }
 
+        if (!string.IsNullOrEmpty(_settings.CurseForgeKeyEnc))
+        {
+            CfKeyBox.Password = "";
+            SettingsStatus.Text = "CurseForge APIキー: 保存済み(変更する場合のみ再入力)";
+        }
+
         Log("ModSorter v0.1 を起動しました。");
     }
+
 
     private void Log(string msg)
     {
@@ -66,9 +73,14 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(DeepLKeyBox.Password))
             _settings.DeepLKeyEnc = Settings.Encrypt(DeepLKeyBox.Password);
         _settings.Save();
-        SettingsStatus.Text = "保存しました。";
+
+        var cfState = string.IsNullOrEmpty(_settings.CurseForgeKeyEnc) ? "未設定" : "保存済み";
+        SettingsStatus.Text = $"保存しました。(CurseForge APIキー: {cfState})";
         Log("設定を保存しました。");
+        CfKeyBox.Password = "";
+        DeepLKeyBox.Password = "";
     }
+
 
     // ===== Mods スキャン =====
     private async void Scan_Click(object sender, RoutedEventArgs e)
@@ -143,13 +155,13 @@ public partial class MainWindow : Window
         }
 
         CurseForgeClient.Init(cfKey);
-        var unmatched = _mods.Where(m => string.IsNullOrEmpty(m.ModrinthUrl)).ToList();
-        Log($"CurseForge照合を開始します... 対象 {unmatched.Count} 件");
+        var cfTargets = _mods;
+        Log($"CurseForge照合を開始します... 対象 {cfTargets.Count} 件");
         ScanProgress.Value = 0;
 
         int cfDone = 0, cfMatched = 0;
-        var cfSem = new SemaphoreSlim(5);
-        var cfTasks = unmatched.Select(async mod =>
+        var cfSem = new SemaphoreSlim(3);
+        var cfTasks = cfTargets.Select(async mod =>
         {
             await cfSem.WaitAsync();
             try
@@ -180,8 +192,8 @@ public partial class MainWindow : Window
                 lock (lockObj) cur = ++cfDone;
                 Dispatcher.Invoke(() =>
                 {
-                    ScanProgress.Value = unmatched.Count == 0 ? 100 : (cur * 100.0 / unmatched.Count);
-                    ScanStatus.Text = $"CurseForge照合中... {cur}/{unmatched.Count}";
+                    ScanProgress.Value = cfTargets.Count == 0 ? 100 : (cur * 100.0 / cfTargets.Count);
+                    ScanStatus.Text = $"CurseForge照合中... {cur}/{cfTargets.Count}";
                 });
             }
         });
@@ -236,9 +248,10 @@ public partial class MainWindow : Window
         _mrUrl = mod.ModrinthUrl;
         _cfUrl = mod.CurseForgeUrl;
         UrlModrinth.Text = string.IsNullOrEmpty(mod.ModrinthUrl)
-            ? "Modrinth: (見つかりません)" : $"Modrinth: {mod.ModrinthUrl}";
+            ? "Modrinth: ―" : $"Modrinth: {mod.ModrinthUrl}";
         UrlCurseForge.Text = string.IsNullOrEmpty(mod.CurseForgeUrl)
-            ? "CurseForge: (Day 3後半)" : $"CurseForge: {mod.CurseForgeUrl}";
+            ? "CurseForge: ―" : $"CurseForge: {mod.CurseForgeUrl}";
+
         Log($"選択: {mod.FileName}");
     }
 
