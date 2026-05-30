@@ -131,10 +131,66 @@ public partial class MainWindow : Window
         });
 
         await Task.WhenAll(tasks);
-
-        ScanStatus.Text = $"完了: {matched}/{total} 件ヒット";
-        ScanProgress.Value = 100;
         Log($"Modrinth照合完了: {matched}/{total} 件ヒットしました。");
+
+        // ===== CurseForge照合(Modrinthで未ヒットのみ) =====
+        var cfKey = Settings.Decrypt(_settings.CurseForgeKeyEnc);
+        if (string.IsNullOrEmpty(cfKey))
+        {
+            ScanStatus.Text = $"完了(Modrinthのみ): {matched}/{total} 件";
+            Log("CurseForge APIキー未設定のため、CurseForge照合はスキップしました。");
+            return;
+        }
+
+        CurseForgeClient.Init(cfKey);
+        var unmatched = _mods.Where(m => string.IsNullOrEmpty(m.ModrinthUrl)).ToList();
+        Log($"CurseForge照合を開始します... 対象 {unmatched.Count} 件");
+        ScanProgress.Value = 0;
+
+        int cfDone = 0, cfMatched = 0;
+        var cfSem = new SemaphoreSlim(5);
+        var cfTasks = unmatched.Select(async mod =>
+        {
+            await cfSem.WaitAsync();
+            try
+            {
+                var r = await CurseForgeClient.GetByFingerprintAsync(mod.FilePath);
+                if (r != null && !string.IsNullOrEmpty(r.Url))
+                {
+                    mod.CurseForgeUrl = r.Url;
+                    if (string.IsNullOrEmpty(mod.Body)) mod.Body = r.Summary;
+                    lock (lockObj) cfMatched++;
+                }
+                else
+                {
+                    // 最初の5件だけ理由をログ
+                    int n;
+                    lock (lockObj) n = cfDone;
+                    if (n < 5)
+                    {
+                        var err = CurseForgeClient.LastError;
+                        Dispatcher.Invoke(() => Log($"CF未ヒット [{mod.FileName}]: {err}"));
+                    }
+                }
+            }
+            finally
+            {
+                cfSem.Release();
+                int cur;
+                lock (lockObj) cur = ++cfDone;
+                Dispatcher.Invoke(() =>
+                {
+                    ScanProgress.Value = unmatched.Count == 0 ? 100 : (cur * 100.0 / unmatched.Count);
+                    ScanStatus.Text = $"CurseForge照合中... {cur}/{unmatched.Count}";
+                });
+            }
+        });
+        await Task.WhenAll(cfTasks);
+
+        int totalMatched = matched + cfMatched;
+        ScanStatus.Text = $"完了: {totalMatched}/{total} 件ヒット(MR:{matched} CF:{cfMatched})";
+        ScanProgress.Value = 100;
+        Log($"CurseForge照合完了: {cfMatched} 件追加ヒット。合計 {totalMatched}/{total} 件。");
     }
 
 
