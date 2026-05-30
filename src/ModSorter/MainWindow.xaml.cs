@@ -67,22 +67,24 @@ public partial class MainWindow : Window
         }
 
         var jars = Directory.GetFiles(modsDir, "*.jar");
+        var entries = jars.Select(JarReader.Read).ToList();
+
         ModTree.Items.Clear();
-        var root = new TreeViewItem { Header = $"全 {jars.Length} 件", IsExpanded = true };
-        foreach (var j in jars)
+        var root = new TreeViewItem { Header = $"全 {entries.Count} 件", IsExpanded = true };
+        foreach (var mod in entries)
         {
             root.Items.Add(new TreeViewItem
             {
-                Header = Path.GetFileName(j),
-                Tag = new ModEntry { FileName = Path.GetFileName(j) }
+                Header = $"{mod.DisplayName} ({mod.Loader})",
+                Tag = mod
             });
         }
         ModTree.Items.Add(root);
 
-        var entries = jars.Select(j => new ModEntry { FileName = Path.GetFileName(j) }).ToList();
         CardList.ItemsSource = entries;
-        Log($"{jars.Length} 個の .jar を検出しました。");
+        Log($"{entries.Count} 個の .jar を読み取りました。");
     }
+
 
     private void ModTree_SelectedItemChanged(object sender,
         RoutedPropertyChangedEventArgs<object> e)
