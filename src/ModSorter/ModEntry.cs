@@ -17,4 +17,9 @@ public class ModEntry
 
     // 旧コードとの互換用
     public string Url { get; set; } = "";
+
+    //アイコンURLと、本文の形式を追加
+    public string IconUrl { get; set; } = "";
+    public bool BodyIsHtml { get; set; } = false; // true=HTML(CurseForge), false=Markdown(Modrinth)
+
 }

@@ -1,6 +1,7 @@
 ﻿<Window x:Class="ModSorter.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="ModSorter v0.1" Height="720" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgDark}">
@@ -105,12 +106,18 @@
                                             <DockPanel>
                                                 <Border DockPanel.Dock="Top" Height="70"
                                                         Background="{StaticResource StoneDark}">
-                                                    <TextBlock Text="MOD" FontSize="22"
-                                                               Style="{StaticResource PixelText}"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Foreground="{StaticResource TextDim}"/>
+                                                    <Grid>
+                                                        <TextBlock Text="MOD" FontSize="22"
+                                                                   Style="{StaticResource PixelText}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{StaticResource TextDim}"/>
+                                                        <Image Stretch="Uniform"
+                                                               Source="{Binding IconUrl}"
+                                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    </Grid>
                                                 </Border>
+                                                
                                                 <TextBlock Text="{Binding DisplayName}"
                                                            Style="{StaticResource PixelText}"
                                                            TextWrapping="Wrap" Margin="0,6,0,0"
@@ -140,12 +147,10 @@
                                 <TextBlock x:Name="DetailLoader" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" Margin="0,4,0,12"/>
 
-                                <TextBlock Text="説明(翻訳)" Style="{StaticResource PixelText}"
+                                <TextBlock Text="説明" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
-                                <TextBlock x:Name="DetailBody" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource TextMain}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,4,0,12"
-                                           Text="(MODページ本文をDeepLで翻訳して表示)"/>
+                                <wv2:WebView2 x:Name="DetailWeb" Height="320"
+                                              Margin="0,4,0,12"/>
 
                                 <TextBlock Text="MODページ" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>

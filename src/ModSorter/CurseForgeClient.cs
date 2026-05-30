@@ -13,7 +13,10 @@ public class CurseForgeResult
     public string Slug { get; set; } = "";
     public string Summary { get; set; } = "";
     public string Url { get; set; } = "";
+    public string IconUrl { get; set; } = "";
+    public string DescriptionHtml { get; set; } = "";
 }
+
 
 public static class CurseForgeClient
 {
@@ -114,16 +117,38 @@ public static class CurseForgeClient
             using var modDoc = JsonDocument.Parse(await modResp.Content.ReadAsStringAsync());
             var d = modDoc.RootElement.GetProperty("data");
 
+            string iconUrl = "";
+            if (d.TryGetProperty("logo", out var logo) &&
+                logo.ValueKind == JsonValueKind.Object &&
+                logo.TryGetProperty("url", out var lu))
+                iconUrl = lu.GetString() ?? "";
+
+            // フル説明(HTML)を取得
+            string descHtml = "";
+            try
+            {
+                using var descResp = await _http.GetAsync($"v1/mods/{modId}/description");
+                if (descResp.IsSuccessStatusCode)
+                {
+                    using var descDoc = JsonDocument.Parse(await descResp.Content.ReadAsStringAsync());
+                    descHtml = descDoc.RootElement.GetProperty("data").GetString() ?? "";
+                }
+            }
+            catch { }
+
             return new CurseForgeResult
             {
                 ModId = modId,
                 Name = d.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
                 Slug = d.TryGetProperty("slug", out var s) ? s.GetString() ?? "" : "",
                 Summary = d.TryGetProperty("summary", out var sm) ? sm.GetString() ?? "" : "",
+                IconUrl = iconUrl,
+                DescriptionHtml = descHtml,
                 Url = d.TryGetProperty("links", out var links) &&
                       links.TryGetProperty("websiteUrl", out var w)
                           ? w.GetString() ?? "" : ""
             };
+
         }
         catch (Exception ex)
         {

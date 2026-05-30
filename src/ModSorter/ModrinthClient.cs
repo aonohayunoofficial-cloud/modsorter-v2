@@ -11,8 +11,10 @@ public class ModrinthResult
     public string Title { get; set; } = "";
     public string Body { get; set; } = "";
     public string Slug { get; set; } = "";
+    public string IconUrl { get; set; } = "";
     public string Url => string.IsNullOrEmpty(Slug) ? "" : $"https://modrinth.com/mod/{Slug}";
 }
+
 
 public static class ModrinthClient
 {
@@ -62,8 +64,10 @@ public static class ModrinthClient
                 ProjectId = projectId,
                 Title = root.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "",
                 Body = root.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "",
-                Slug = root.TryGetProperty("slug", out var s) ? s.GetString() ?? "" : ""
+                Slug = root.TryGetProperty("slug", out var s) ? s.GetString() ?? "" : "",
+                IconUrl = root.TryGetProperty("icon_url", out var ic) ? ic.GetString() ?? "" : ""
             };
+
         }
         catch
         {

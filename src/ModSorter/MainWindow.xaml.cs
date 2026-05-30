@@ -4,6 +4,8 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using Markdig;
+
 
 namespace ModSorter;
 
@@ -125,6 +127,8 @@ public partial class MainWindow : Window
                 {
                     mod.ModrinthUrl = r.Url;
                     mod.Body = r.Body;
+                    mod.BodyIsHtml = false; // ModrinthはMarkdown
+                    if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
                     lock (lockObj) matched++;
                 }
             }
@@ -145,12 +149,13 @@ public partial class MainWindow : Window
         await Task.WhenAll(tasks);
         Log($"Modrinth照合完了: {matched}/{total} 件ヒットしました。");
 
-        // ===== CurseForge照合(Modrinthで未ヒットのみ) =====
+        // ===== CurseForge照合 =====
         var cfKey = Settings.Decrypt(_settings.CurseForgeKeyEnc);
         if (string.IsNullOrEmpty(cfKey))
         {
             ScanStatus.Text = $"完了(Modrinthのみ): {matched}/{total} 件";
             Log("CurseForge APIキー未設定のため、CurseForge照合はスキップしました。");
+            RefreshModViews();
             return;
         }
 
@@ -170,7 +175,21 @@ public partial class MainWindow : Window
                 if (r != null && !string.IsNullOrEmpty(r.Url))
                 {
                     mod.CurseForgeUrl = r.Url;
-                    if (string.IsNullOrEmpty(mod.Body)) mod.Body = r.Summary;
+                    if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
+                    // Modrinthで本文が取れていなければCurseForgeのHTML説明を使う
+                    if (string.IsNullOrEmpty(mod.Body))
+                    {
+                        if (!string.IsNullOrEmpty(r.DescriptionHtml))
+                        {
+                            mod.Body = r.DescriptionHtml;
+                            mod.BodyIsHtml = true; // CurseForgeはHTML
+                        }
+                        else
+                        {
+                            mod.Body = r.Summary;
+                            mod.BodyIsHtml = false;
+                        }
+                    }
                     lock (lockObj) cfMatched++;
                 }
                 else
@@ -203,6 +222,7 @@ public partial class MainWindow : Window
         ScanStatus.Text = $"完了: {totalMatched}/{total} 件ヒット(MR:{matched} CF:{cfMatched})";
         ScanProgress.Value = 100;
         Log($"CurseForge照合完了: {cfMatched} 件追加ヒット。合計 {totalMatched}/{total} 件。");
+        RefreshModViews();
     }
 
 
@@ -236,15 +256,13 @@ public partial class MainWindow : Window
             ShowDetail(mod);
     }
 
-    private void ShowDetail(ModEntry mod)
+    private async void ShowDetail(ModEntry mod)
     {
         DetailName.Text = mod.DisplayName;
         DetailId.Text = $"ID: {mod.ModId}";
         DetailVersion.Text = $"バージョン: {mod.Version}";
         DetailLoader.Text = $"ローダー: {mod.Loader}";
-        DetailBody.Text = string.IsNullOrEmpty(mod.Body)
-            ? "(説明なし / 未照合)"
-            : (mod.Body.Length > 800 ? mod.Body.Substring(0, 800) + "..." : mod.Body);
+
         _mrUrl = mod.ModrinthUrl;
         _cfUrl = mod.CurseForgeUrl;
         UrlModrinth.Text = string.IsNullOrEmpty(mod.ModrinthUrl)
@@ -252,8 +270,54 @@ public partial class MainWindow : Window
         UrlCurseForge.Text = string.IsNullOrEmpty(mod.CurseForgeUrl)
             ? "CurseForge: ―" : $"CurseForge: {mod.CurseForgeUrl}";
 
+        await ShowBodyAsync(mod);
         Log($"選択: {mod.FileName}");
+        Log($"IconUrl: {mod.IconUrl}");
+
     }
+
+    private async Task ShowBodyAsync(ModEntry mod)
+    {
+        try
+        {
+            await DetailWeb.EnsureCoreWebView2Async();
+
+            string innerHtml;
+            if (string.IsNullOrEmpty(mod.Body))
+            {
+                innerHtml = "<p style='color:#9A8F7E'>(説明なし / 未照合)</p>";
+            }
+            else if (mod.BodyIsHtml)
+            {
+                innerHtml = mod.Body;
+            }
+            else
+            {
+                // Markdown を HTML に変換
+                innerHtml = Markdown.ToHtml(mod.Body);
+            }
+
+            // ダークテーマに合わせたページ全体
+            string html = $@"<!DOCTYPE html>
+                <html><head><meta charset='utf-8'>
+                <style>
+                body {{ background:#1E1B17; color:#E8E0D4; font-family:sans-serif;
+                font-size:13px; padding:10px; margin:0; }}
+                a {{ color:#6FA8DC; }}
+                img {{ max-width:100%; height:auto; }}
+                h1,h2,h3 {{ color:#7FB238; }}
+                code,pre {{ background:#2B2620; padding:2px 4px; border-radius:3px; }}
+                </style></head>
+                <body>{innerHtml}</body></html>";
+
+            DetailWeb.NavigateToString(html);
+        }
+        catch (Exception ex)
+        {
+            Log($"説明の表示に失敗: {ex.Message}");
+        }
+    }
+
 
     private void UrlCf_Click(object sender, RoutedEventArgs e) => OpenUrl(_cfUrl);
     private void UrlMr_Click(object sender, RoutedEventArgs e) => OpenUrl(_mrUrl);
