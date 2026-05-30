@@ -12,6 +12,7 @@ public static class JarReader
         var entry = new ModEntry
         {
             FileName = Path.GetFileName(jarPath),
+            FilePath = jarPath,
             ModId = "",
             Version = "-",
             Loader = "-"

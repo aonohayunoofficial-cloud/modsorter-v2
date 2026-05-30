@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -11,11 +12,21 @@ public partial class MainWindow : Window
     private string? _instancePath;
     private string _cfUrl = "";
     private string _mrUrl = "";
+    private Settings _settings = new();
+    private List<ModEntry> _mods = new();
 
     public MainWindow()
     {
         InitializeComponent();
         MainTabs.SelectedIndex = 0;
+
+        _settings = Settings.Load();
+        if (!string.IsNullOrEmpty(_settings.InstancePath))
+        {
+            _instancePath = _settings.InstancePath;
+            PathBox.Text = _instancePath;
+        }
+
         Log("ModSorter v0.1 を起動しました。");
     }
 
@@ -25,6 +36,7 @@ public partial class MainWindow : Window
         LogBox.ScrollToEnd();
     }
 
+    // ===== ナビゲーション =====
     private void NavMods_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 1;
     private void NavCrash_Click(object sender, RoutedEventArgs e)
     {
@@ -34,6 +46,7 @@ public partial class MainWindow : Window
     private void NavSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 3;
     private void Back_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 0;
 
+    // ===== フォルダ・設定 =====
     private void SelectFolder_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFolderDialog { Title = ".minecraft フォルダを選択" };
@@ -47,11 +60,18 @@ public partial class MainWindow : Window
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
-        SettingsStatus.Text = "保存しました(暗号化保存は Day 4 で実装)";
-        Log("設定を保存しました(仮)。");
+        _settings.InstancePath = _instancePath ?? "";
+        if (!string.IsNullOrEmpty(CfKeyBox.Password))
+            _settings.CurseForgeKeyEnc = Settings.Encrypt(CfKeyBox.Password);
+        if (!string.IsNullOrEmpty(DeepLKeyBox.Password))
+            _settings.DeepLKeyEnc = Settings.Encrypt(DeepLKeyBox.Password);
+        _settings.Save();
+        SettingsStatus.Text = "保存しました。";
+        Log("設定を保存しました。");
     }
 
-    private void Scan_Click(object sender, RoutedEventArgs e)
+    // ===== Mods スキャン =====
+    private async void Scan_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_instancePath))
         {
@@ -67,11 +87,62 @@ public partial class MainWindow : Window
         }
 
         var jars = Directory.GetFiles(modsDir, "*.jar");
-        var entries = jars.Select(JarReader.Read).ToList();
+        _mods = jars.Select(JarReader.Read).ToList();
+        RefreshModViews();
+        Log($"{_mods.Count} 個の .jar を読み取りました。Modrinth照合を開始します...");
 
+        // 進捗UIを表示
+        ScanProgress.Visibility = Visibility.Visible;
+        ScanProgress.Value = 0;
+        ScanStatus.Text = "照合中...";
+
+        int total = _mods.Count;
+        int done = 0;
+        int matched = 0;
+        var lockObj = new object();
+
+        // 同時実行数を5に制限
+        var semaphore = new SemaphoreSlim(5);
+        var tasks = _mods.Select(async mod =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                var r = await ModrinthClient.GetByHashAsync(mod.FilePath);
+                if (r != null)
+                {
+                    mod.ModrinthUrl = r.Url;
+                    mod.Body = r.Body;
+                    lock (lockObj) matched++;
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+                int currentDone;
+                lock (lockObj) currentDone = ++done;
+                // UIスレッドで進捗更新
+                Dispatcher.Invoke(() =>
+                {
+                    ScanProgress.Value = total == 0 ? 100 : (currentDone * 100.0 / total);
+                    ScanStatus.Text = $"照合中... {currentDone}/{total}";
+                });
+            }
+        });
+
+        await Task.WhenAll(tasks);
+
+        ScanStatus.Text = $"完了: {matched}/{total} 件ヒット";
+        ScanProgress.Value = 100;
+        Log($"Modrinth照合完了: {matched}/{total} 件ヒットしました。");
+    }
+
+
+    private void RefreshModViews()
+    {
         ModTree.Items.Clear();
-        var root = new TreeViewItem { Header = $"全 {entries.Count} 件", IsExpanded = true };
-        foreach (var mod in entries)
+        var root = new TreeViewItem { Header = $"全 {_mods.Count} 件", IsExpanded = true };
+        foreach (var mod in _mods)
         {
             root.Items.Add(new TreeViewItem
             {
@@ -80,11 +151,9 @@ public partial class MainWindow : Window
             });
         }
         ModTree.Items.Add(root);
-
-        CardList.ItemsSource = entries;
-        Log($"{entries.Count} 個の .jar を読み取りました。");
+        CardList.ItemsSource = null;
+        CardList.ItemsSource = _mods;
     }
-
 
     private void ModTree_SelectedItemChanged(object sender,
         RoutedPropertyChangedEventArgs<object> e)
@@ -105,10 +174,15 @@ public partial class MainWindow : Window
         DetailId.Text = $"ID: {mod.ModId}";
         DetailVersion.Text = $"バージョン: {mod.Version}";
         DetailLoader.Text = $"ローダー: {mod.Loader}";
-        DetailBody.Text = "(MODページ本文をDeepLで翻訳して表示 — Day 3)";
-        _cfUrl = mod.Url;
-        UrlCurseForge.Text = "CurseForge: (Day 3で取得)";
-        UrlModrinth.Text = "Modrinth: (Day 3で取得)";
+        DetailBody.Text = string.IsNullOrEmpty(mod.Body)
+            ? "(説明なし / 未照合)"
+            : (mod.Body.Length > 800 ? mod.Body.Substring(0, 800) + "..." : mod.Body);
+        _mrUrl = mod.ModrinthUrl;
+        _cfUrl = mod.CurseForgeUrl;
+        UrlModrinth.Text = string.IsNullOrEmpty(mod.ModrinthUrl)
+            ? "Modrinth: (見つかりません)" : $"Modrinth: {mod.ModrinthUrl}";
+        UrlCurseForge.Text = string.IsNullOrEmpty(mod.CurseForgeUrl)
+            ? "CurseForge: (Day 3後半)" : $"CurseForge: {mod.CurseForgeUrl}";
         Log($"選択: {mod.FileName}");
     }
 
@@ -121,6 +195,7 @@ public partial class MainWindow : Window
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
+    // ===== クラッシュレポート =====
     private void LoadCrashFiles()
     {
         CrashFileList.Items.Clear();

@@ -68,6 +68,18 @@
                             <Button DockPanel.Dock="Top" Content="スキャン"
                                     Style="{StaticResource McButton}"
                                     Margin="10,0,10,10" Click="Scan_Click"/>
+                            <ProgressBar DockPanel.Dock="Top" x:Name="ScanProgress"
+                                         Height="14" Margin="10,0,10,4"
+                                         Minimum="0" Maximum="100" Value="0"
+                                         Foreground="{StaticResource GrassGreen}"
+                                         Background="{StaticResource StoneDark}"
+                                         Visibility="Collapsed"/>
+                            <TextBlock DockPanel.Dock="Top" x:Name="ScanStatus"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}"
+                                       FontSize="11" Margin="10,0,10,8"
+                                       TextWrapping="Wrap" Text=""/>
+
                             <TreeView x:Name="ModTree" Background="Transparent"
                                       BorderThickness="0"
                                       Foreground="{StaticResource TextMain}"
