@@ -241,6 +241,33 @@ public partial class MainWindow : Window
         ModTree.Items.Add(root);
         CardList.ItemsSource = null;
         CardList.ItemsSource = _mods;
+        SetViewMode("medium");
+    }
+
+
+    private void ViewLarge_Click(object sender, RoutedEventArgs e) => SetViewMode("large");
+    private void ViewMedium_Click(object sender, RoutedEventArgs e) => SetViewMode("medium");
+    private void ViewList_Click(object sender, RoutedEventArgs e) => SetViewMode("list");
+
+    private void SetViewMode(string mode)
+    {
+        if (mode == "list")
+        {
+            CardList.ItemTemplate = (DataTemplate)FindResource("ListTemplate");
+            var panel = new ItemsPanelTemplate();
+            panel.VisualTree = new System.Windows.FrameworkElementFactory(typeof(StackPanel));
+            CardList.ItemsPanel = panel;
+        }
+        else
+        {
+            CardList.ItemTemplate = (DataTemplate)FindResource(
+                mode == "large" ? "CardLargeTemplate" : "CardMediumTemplate");
+            var panel = new ItemsPanelTemplate();
+            var f = new System.Windows.FrameworkElementFactory(typeof(WrapPanel));
+            f.SetValue(WrapPanel.OrientationProperty, Orientation.Horizontal);
+            panel.VisualTree = f;
+            CardList.ItemsPanel = panel;
+        }
     }
 
     private void ModTree_SelectedItemChanged(object sender,
@@ -249,10 +276,9 @@ public partial class MainWindow : Window
         if (e.NewValue is TreeViewItem item && item.Tag is ModEntry mod)
             ShowDetail(mod);
     }
-
-    private void Card_Click(object sender, RoutedEventArgs e)
+    private void CardList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (sender is FrameworkElement fe && fe.Tag is ModEntry mod)
+        if (CardList.SelectedItem is ModEntry mod)
             ShowDetail(mod);
     }
 
@@ -272,7 +298,6 @@ public partial class MainWindow : Window
 
         await ShowBodyAsync(mod);
         Log($"選択: {mod.FileName}");
-        Log($"IconUrl: {mod.IconUrl}");
 
     }
 

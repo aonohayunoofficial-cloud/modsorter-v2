@@ -92,42 +92,26 @@
                                   Background="{StaticResource StoneDark}"/>
 
                     <Border Grid.Column="2" Background="{StaticResource BgDark}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6">
-                            <ItemsControl x:Name="CardList">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource ModCard}"
-                                                MouseLeftButtonUp="Card_Click" Tag="{Binding}">
-                                            <DockPanel>
-                                                <Border DockPanel.Dock="Top" Height="70"
-                                                        Background="{StaticResource StoneDark}">
-                                                    <Grid>
-                                                        <TextBlock Text="MOD" FontSize="22"
-                                                                   Style="{StaticResource PixelText}"
-                                                                   HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center"
-                                                                   Foreground="{StaticResource TextDim}"/>
-                                                        <Image Stretch="Uniform"
-                                                               Source="{Binding IconUrl}"
-                                                               RenderOptions.BitmapScalingMode="HighQuality"/>
-                                                    </Grid>
-                                                </Border>
-                                                
-                                                <TextBlock Text="{Binding DisplayName}"
-                                                           Style="{StaticResource PixelText}"
-                                                           TextWrapping="Wrap" Margin="0,6,0,0"
-                                                           FontSize="12"/>
-                                            </DockPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                        Margin="8,8,8,4">
+                                <Button Content="大" Style="{StaticResource McButtonGray}"
+                                        Margin="0,0,6,0" Click="ViewLarge_Click"/>
+                                <Button Content="中" Style="{StaticResource McButtonGray}"
+                                        Margin="0,0,6,0" Click="ViewMedium_Click"/>
+                                <Button Content="一覧" Style="{StaticResource McButtonGray}"
+                                        Click="ViewList_Click"/>
+                            </StackPanel>
+                            <ListBox x:Name="CardList" Background="Transparent"
+                                     BorderThickness="0" Padding="6"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     SelectionChanged="CardList_SelectionChanged"
+                                     ItemContainerStyle="{StaticResource TransparentListBoxItem}"
+                                     HorizontalContentAlignment="Stretch"/>
+
+
+                        </DockPanel>
                     </Border>
 
                     <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch"
