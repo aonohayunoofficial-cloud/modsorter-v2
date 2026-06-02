@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         MainTabs.SelectedIndex = 0;
 
         _settings = Settings.Load();
+        ModCache.Load();
         if (!string.IsNullOrEmpty(_settings.InstancePath))
         {
             _instancePath = _settings.InstancePath;
@@ -103,23 +104,80 @@ public partial class MainWindow : Window
         var jars = Directory.GetFiles(modsDir, "*.jar");
         _mods = jars.Select(JarReader.Read).ToList();
         RefreshModViews();
-        Log($"{_mods.Count} 個の .jar を読み取りました。Modrinth照合を開始します...");
+        Log($"{_mods.Count} 個の .jar を読み取りました。オンライン照合を開始します...");
+
+        // SHA1を先に計算してModEntryに保持
+        foreach (var mod in _mods)
+            mod.Sha1 = ModrinthClient.Sha1(mod.FilePath);
+
+        // キャッシュ適用: ヒットしたものはAPI対象から外す
+        var toFetch = new List<ModEntry>();
+        int fromCache = 0;
+        foreach (var mod in _mods)
+        {
+            var c = ModCache.Get(mod.Sha1);
+            if (c != null)
+            {
+                mod.ModrinthUrl = c.ModrinthUrl;
+                mod.CurseForgeUrl = c.CurseForgeUrl;
+                mod.Body = c.Body;
+                mod.BodyIsHtml = c.BodyIsHtml;
+                mod.IconUrl = c.IconUrl;
+                mod.IconFile = (!string.IsNullOrEmpty(c.IconFile) && File.Exists(c.IconFile))
+                    ? c.IconFile : "";
+                fromCache++;
+            }
+            else
+            {
+                toFetch.Add(mod);
+            }
+        }
+        RefreshModViews();
+        Log($"キャッシュ適用: {fromCache} 件。新規照合対象: {toFetch.Count} 件。");
+
+        if (toFetch.Count == 0)
+        {
+            ScanStatus.Text = $"完了(全てキャッシュ): {_mods.Count} 件";
+            ScanProgress.Visibility = Visibility.Collapsed;
+            ModCache.Save();
+            return;
+        }
 
         // 進捗UIを表示
         ScanProgress.Visibility = Visibility.Visible;
         ScanProgress.Value = 0;
         ScanStatus.Text = "照合中...";
 
-        int total = _mods.Count;
-        int done = 0;
-        int matched = 0;
+        int total = toFetch.Count;
         var lockObj = new object();
+        int mrMatched = 0, cfMatched = 0, done = 0;
 
-        // 同時実行数を5に制限
-        var semaphore = new SemaphoreSlim(5);
-        var tasks = _mods.Select(async mod =>
+        var cfKey = Settings.Decrypt(_settings.CurseForgeKeyEnc);
+        bool useCf = !string.IsNullOrEmpty(cfKey);
+        if (useCf) CurseForgeClient.Init(cfKey);
+        else Log("CurseForge APIキー未設定のため、Modrinthのみ照合します。");
+
+        int grandTotal = total + (useCf ? total : 0);
+
+        void Bump()
         {
-            await semaphore.WaitAsync();
+            int cur;
+            lock (lockObj) cur = ++done;
+            Dispatcher.Invoke(() =>
+            {
+                ScanProgress.Value = grandTotal == 0 ? 100 : (cur * 100.0 / grandTotal);
+                int shown = useCf ? (cur + 1) / 2 : cur;
+                if (shown > total) shown = total;
+                ScanStatus.Text = $"照合中... {shown}/{total}";
+            });
+        }
+
+        var mrSem = new SemaphoreSlim(5);
+        var cfSem = new SemaphoreSlim(3);
+
+        var mrTasks = toFetch.Select(async mod =>
+        {
+            await mrSem.WaitAsync();
             try
             {
                 var r = await ModrinthClient.GetByHashAsync(mod.FilePath);
@@ -127,104 +185,81 @@ public partial class MainWindow : Window
                 {
                     mod.ModrinthUrl = r.Url;
                     mod.Body = r.Body;
-                    mod.BodyIsHtml = false; // ModrinthはMarkdown
+                    mod.BodyIsHtml = false;
                     if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
-                    lock (lockObj) matched++;
+                    lock (lockObj) mrMatched++;
                 }
             }
-            finally
-            {
-                semaphore.Release();
-                int currentDone;
-                lock (lockObj) currentDone = ++done;
-                // UIスレッドで進捗更新
-                Dispatcher.Invoke(() =>
-                {
-                    ScanProgress.Value = total == 0 ? 100 : (currentDone * 100.0 / total);
-                    ScanStatus.Text = $"照合中... {currentDone}/{total}";
-                });
-            }
+            finally { mrSem.Release(); Bump(); }
         });
 
-        await Task.WhenAll(tasks);
-        Log($"Modrinth照合完了: {matched}/{total} 件ヒットしました。");
-
-        // ===== CurseForge照合 =====
-        var cfKey = Settings.Decrypt(_settings.CurseForgeKeyEnc);
-        if (string.IsNullOrEmpty(cfKey))
+        IEnumerable<Task> cfTasks = Array.Empty<Task>();
+        if (useCf)
         {
-            ScanStatus.Text = $"完了(Modrinthのみ): {matched}/{total} 件";
-            Log("CurseForge APIキー未設定のため、CurseForge照合はスキップしました。");
-            RefreshModViews();
-            return;
+            cfTasks = toFetch.Select(async mod =>
+            {
+                await cfSem.WaitAsync();
+                try
+                {
+                    var r = await CurseForgeClient.GetByFingerprintAsync(mod.FilePath);
+                    if (r != null && !string.IsNullOrEmpty(r.Url))
+                    {
+                        mod.CurseForgeUrl = r.Url;
+                        if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
+                        if (string.IsNullOrEmpty(mod.Body))
+                        {
+                            if (!string.IsNullOrEmpty(r.DescriptionHtml))
+                            {
+                                mod.Body = r.DescriptionHtml;
+                                mod.BodyIsHtml = true;
+                            }
+                            else
+                            {
+                                mod.Body = r.Summary;
+                                mod.BodyIsHtml = false;
+                            }
+                        }
+                        lock (lockObj) cfMatched++;
+                    }
+                }
+                finally { cfSem.Release(); Bump(); }
+            });
         }
 
-        CurseForgeClient.Init(cfKey);
-        var cfTargets = _mods;
-        Log($"CurseForge照合を開始します... 対象 {cfTargets.Count} 件");
-        ScanProgress.Value = 0;
+        await Task.WhenAll(mrTasks.Concat(cfTasks));
 
-        int cfDone = 0, cfMatched = 0;
-        var cfSem = new SemaphoreSlim(3);
-        var cfTasks = cfTargets.Select(async mod =>
+        // アイコンをローカル保存
+        ScanStatus.Text = "アイコンを保存中...";
+        foreach (var mod in toFetch)
         {
-            await cfSem.WaitAsync();
-            try
-            {
-                var r = await CurseForgeClient.GetByFingerprintAsync(mod.FilePath);
-                if (r != null && !string.IsNullOrEmpty(r.Url))
-                {
-                    mod.CurseForgeUrl = r.Url;
-                    if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
-                    // Modrinthで本文が取れていなければCurseForgeのHTML説明を使う
-                    if (string.IsNullOrEmpty(mod.Body))
-                    {
-                        if (!string.IsNullOrEmpty(r.DescriptionHtml))
-                        {
-                            mod.Body = r.DescriptionHtml;
-                            mod.BodyIsHtml = true; // CurseForgeはHTML
-                        }
-                        else
-                        {
-                            mod.Body = r.Summary;
-                            mod.BodyIsHtml = false;
-                        }
-                    }
-                    lock (lockObj) cfMatched++;
-                }
-                else
-                {
-                    // 最初の5件だけ理由をログ
-                    int n;
-                    lock (lockObj) n = cfDone;
-                    if (n < 5)
-                    {
-                        var err = CurseForgeClient.LastError;
-                        Dispatcher.Invoke(() => Log($"CF未ヒット [{mod.FileName}]: {err}"));
-                    }
-                }
-            }
-            finally
-            {
-                cfSem.Release();
-                int cur;
-                lock (lockObj) cur = ++cfDone;
-                Dispatcher.Invoke(() =>
-                {
-                    ScanProgress.Value = cfTargets.Count == 0 ? 100 : (cur * 100.0 / cfTargets.Count);
-                    ScanStatus.Text = $"CurseForge照合中... {cur}/{cfTargets.Count}";
-                });
-            }
-        });
-        await Task.WhenAll(cfTasks);
+            if (!string.IsNullOrEmpty(mod.IconUrl))
+                mod.IconFile = await ModCache.EnsureIconAsync(mod.Sha1, mod.IconUrl);
+        }
 
-        int totalMatched = matched + cfMatched;
-        ScanStatus.Text = $"完了: {totalMatched}/{total} 件ヒット(MR:{matched} CF:{cfMatched})";
+        // キャッシュに保存
+        foreach (var mod in toFetch)
+        {
+            ModCache.Put(new CacheEntry
+            {
+                Sha1 = mod.Sha1,
+                ModId = mod.ModId,
+                Version = mod.Version,
+                Loader = mod.Loader,
+                ModrinthUrl = mod.ModrinthUrl,
+                CurseForgeUrl = mod.CurseForgeUrl,
+                Body = mod.Body,
+                BodyIsHtml = mod.BodyIsHtml,
+                IconUrl = mod.IconUrl,
+                IconFile = mod.IconFile
+            });
+        }
+        ModCache.Save();
+
+        ScanStatus.Text = $"完了: MR {mrMatched} / CF {cfMatched}(新規 {total} 件)";
         ScanProgress.Value = 100;
-        Log($"CurseForge照合完了: {cfMatched} 件追加ヒット。合計 {totalMatched}/{total} 件。");
+        Log($"照合完了: Modrinth {mrMatched} 件、CurseForge {cfMatched} 件。キャッシュ保存済み。");
         RefreshModViews();
     }
-
 
     private void RefreshModViews()
     {

@@ -22,4 +22,9 @@ public class ModEntry
     public string IconUrl { get; set; } = "";
     public bool BodyIsHtml { get; set; } = false; // true=HTML(CurseForge), false=Markdown(Modrinth)
 
+    public string Sha1 { get; set; } = "";
+    public string IconFile { get; set; } = "";
+    // 画像表示用: ローカルファイルがあればそれを、なければURLを使う
+    public string IconSource => string.IsNullOrEmpty(IconFile) ? IconUrl : IconFile;
+
 }
