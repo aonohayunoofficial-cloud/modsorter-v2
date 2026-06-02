@@ -131,8 +131,19 @@
                                 <TextBlock x:Name="DetailLoader" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" Margin="0,4,0,12"/>
 
-                                <TextBlock Text="説明" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource GrassGreen}"/>
+                                <Grid Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="説明"
+                                               Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource GrassGreen}"
+                                               VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" x:Name="TranslateBtn" Content="翻訳"
+                                            Style="{StaticResource McButtonGray}"
+                                            Click="Translate_Click"/>
+                                </Grid>
                                 <wv2:WebView2 x:Name="DetailWeb" Height="320"
                                               Margin="0,4,0,12"/>
 

@@ -26,5 +26,6 @@ public class ModEntry
     public string IconFile { get; set; } = "";
     // 画像表示用: ローカルファイルがあればそれを、なければURLを使う
     public string IconSource => string.IsNullOrEmpty(IconFile) ? IconUrl : IconFile;
+    public string TranslatedHtml { get; set; } = ""; // 翻訳済みHTMLのキャッシュ(セッション内)
 
 }

@@ -16,6 +16,9 @@ public partial class MainWindow : Window
     private string _mrUrl = "";
     private Settings _settings = new();
     private List<ModEntry> _mods = new();
+    private ModEntry? _currentMod;
+    private bool _showingTranslation = false;
+
 
     public MainWindow()
     {
@@ -32,8 +35,9 @@ public partial class MainWindow : Window
 
         if (!string.IsNullOrEmpty(_settings.CurseForgeKeyEnc))
         {
-            CfKeyBox.Password = "";
-            SettingsStatus.Text = "CurseForge APIキー: 保存済み(変更する場合のみ再入力)";
+            var cf = string.IsNullOrEmpty(_settings.CurseForgeKeyEnc) ? "未設定" : "保存済み";
+            var dl = string.IsNullOrEmpty(_settings.DeepLKeyEnc) ? "未設定" : "保存済み";
+            SettingsStatus.Text = $"CurseForge: {cf} / DeepL: {dl}(変更する場合のみ再入力)";
         }
 
         Log("ModSorter v0.1 を起動しました。");
@@ -78,10 +82,12 @@ public partial class MainWindow : Window
         _settings.Save();
 
         var cfState = string.IsNullOrEmpty(_settings.CurseForgeKeyEnc) ? "未設定" : "保存済み";
-        SettingsStatus.Text = $"保存しました。(CurseForge APIキー: {cfState})";
+        var dlState = string.IsNullOrEmpty(_settings.DeepLKeyEnc) ? "未設定" : "保存済み";
+        SettingsStatus.Text = $"保存しました。(CurseForge: {cfState} / DeepL: {dlState})";
         Log("設定を保存しました。");
         CfKeyBox.Password = "";
         DeepLKeyBox.Password = "";
+
     }
 
 
@@ -319,6 +325,9 @@ public partial class MainWindow : Window
 
     private async void ShowDetail(ModEntry mod)
     {
+        _currentMod = mod;
+        _showingTranslation = false;
+        TranslateBtn.Content = "翻訳";
         DetailName.Text = mod.DisplayName;
         DetailId.Text = $"ID: {mod.ModId}";
         DetailVersion.Text = $"バージョン: {mod.Version}";
@@ -376,6 +385,83 @@ public partial class MainWindow : Window
         {
             Log($"説明の表示に失敗: {ex.Message}");
         }
+    }
+
+    private async void Translate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentMod == null) return;
+        var mod = _currentMod;
+
+        // 既に翻訳表示中なら原文に戻す
+        if (_showingTranslation)
+        {
+            _showingTranslation = false;
+            TranslateBtn.Content = "翻訳";
+            await ShowBodyAsync(mod);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(mod.Body))
+        {
+            Log("翻訳対象の本文がありません。");
+            return;
+        }
+
+        // DeepL初期化
+        var key = Settings.Decrypt(_settings.DeepLKeyEnc);
+        if (string.IsNullOrEmpty(key))
+        {
+            MessageBox.Show("設定でDeepL APIキーを保存してください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (!DeepLClient.IsReady) DeepLClient.Init(key);
+
+        // キャッシュ済みならそれを使う
+        string? translated = !string.IsNullOrEmpty(mod.TranslatedHtml)
+            ? mod.TranslatedHtml
+            : null;
+
+        if (translated == null)
+        {
+            TranslateBtn.Content = "翻訳中...";
+            TranslateBtn.IsEnabled = false;
+
+            // 表示用HTML(本文部分)を作って翻訳に投げる
+            string innerHtml = mod.BodyIsHtml ? mod.Body : Markdig.Markdown.ToHtml(mod.Body);
+            translated = await DeepLClient.TranslateHtmlAsync(innerHtml);
+
+            TranslateBtn.IsEnabled = true;
+
+            if (translated == null)
+            {
+                Log($"翻訳失敗: {DeepLClient.LastError}");
+                TranslateBtn.Content = "翻訳";
+                MessageBox.Show($"翻訳に失敗しました。\n{DeepLClient.LastError}", "ModSorter",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            mod.TranslatedHtml = translated; // セッション内キャッシュ
+        }
+
+        // 翻訳HTMLをダークテーマで表示
+        string page = $@"<!DOCTYPE html>
+<html><head><meta charset='utf-8'>
+<style>
+  body {{ background:#1E1B17; color:#E8E0D4; font-family:sans-serif;
+          font-size:13px; padding:10px; margin:0; }}
+  a {{ color:#6FA8DC; }}
+  img {{ max-width:100%; height:auto; }}
+  h1,h2,h3 {{ color:#7FB238; }}
+  code,pre {{ background:#2B2620; padding:2px 4px; border-radius:3px; }}
+</style></head>
+<body>{translated}</body></html>";
+
+        await DetailWeb.EnsureCoreWebView2Async();
+        DetailWeb.NavigateToString(page);
+        _showingTranslation = true;
+        TranslateBtn.Content = "原文";
+        Log($"翻訳表示: {mod.FileName}");
     }
 
 
