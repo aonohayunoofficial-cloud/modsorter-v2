@@ -12,6 +12,7 @@ public class ModrinthResult
     public string Body { get; set; } = "";
     public string Slug { get; set; } = "";
     public string IconUrl { get; set; } = "";
+    public List<string> Categories { get; set; } = new();
     public string Url => string.IsNullOrEmpty(Slug) ? "" : $"https://modrinth.com/mod/{Slug}";
 }
 
@@ -59,13 +60,26 @@ public static class ModrinthClient
             using var projDoc = JsonDocument.Parse(await projResp.Content.ReadAsStringAsync());
             var root = projDoc.RootElement;
 
+            // categories配列を取り出す
+            var cats = new List<string>();
+            if (root.TryGetProperty("categories", out var catArr) &&
+                catArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var c in catArr.EnumerateArray())
+                {
+                    var name = c.GetString();
+                    if (!string.IsNullOrEmpty(name)) cats.Add(name);
+                }
+            }
+
             return new ModrinthResult
             {
                 ProjectId = projectId,
                 Title = root.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "",
                 Body = root.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "",
                 Slug = root.TryGetProperty("slug", out var s) ? s.GetString() ?? "" : "",
-                IconUrl = root.TryGetProperty("icon_url", out var ic) ? ic.GetString() ?? "" : ""
+                IconUrl = root.TryGetProperty("icon_url", out var ic) ? ic.GetString() ?? "" : "",
+                Categories = cats
             };
 
         }

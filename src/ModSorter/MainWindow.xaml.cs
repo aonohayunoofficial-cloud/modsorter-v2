@@ -112,9 +112,19 @@ public partial class MainWindow : Window
         RefreshModViews();
         Log($"{_mods.Count} 個の .jar を読み取りました。オンライン照合を開始します...");
 
-        // SHA1を先に計算してModEntryに保持
+        // SHA1とファイル情報を先に取得してModEntryに保持
         foreach (var mod in _mods)
+        {
             mod.Sha1 = ModrinthClient.Sha1(mod.FilePath);
+            try
+            {
+                var fi = new FileInfo(mod.FilePath);
+                mod.FileSize = fi.Length;
+                mod.FileCreated = fi.CreationTime;
+                mod.FileModified = fi.LastWriteTime;
+            }
+            catch { }
+        }
 
         // キャッシュ適用: ヒットしたものはAPI対象から外す
         var toFetch = new List<ModEntry>();
@@ -131,6 +141,8 @@ public partial class MainWindow : Window
                 mod.IconUrl = c.IconUrl;
                 mod.IconFile = (!string.IsNullOrEmpty(c.IconFile) && File.Exists(c.IconFile))
                     ? c.IconFile : "";
+                mod.Categories = c.Categories ?? new();
+                mod.CategorySource = c.CategorySource;
                 fromCache++;
             }
             else
@@ -193,8 +205,15 @@ public partial class MainWindow : Window
                     mod.Body = r.Body;
                     mod.BodyIsHtml = false;
                     if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
+                    // カテゴリはCurseForge優先。CFがまだ設定していなければModrinthで埋める
+                    if (mod.Categories.Count == 0 && r.Categories.Count > 0)
+                    {
+                        mod.Categories = r.Categories;
+                        mod.CategorySource = "Modrinth";
+                    }
                     lock (lockObj) mrMatched++;
                 }
+
             }
             finally { mrSem.Release(); Bump(); }
         });
@@ -225,8 +244,15 @@ public partial class MainWindow : Window
                                 mod.BodyIsHtml = false;
                             }
                         }
+                        // CurseForgeのカテゴリを優先採用(Modrinthが設定済みでも上書き)
+                        if (r.Categories.Count > 0)
+                        {
+                            mod.Categories = r.Categories;
+                            mod.CategorySource = "CurseForge";
+                        }
                         lock (lockObj) cfMatched++;
                     }
+
                 }
                 finally { cfSem.Release(); Bump(); }
             });
@@ -256,7 +282,9 @@ public partial class MainWindow : Window
                 Body = mod.Body,
                 BodyIsHtml = mod.BodyIsHtml,
                 IconUrl = mod.IconUrl,
-                IconFile = mod.IconFile
+                IconFile = mod.IconFile,
+                Categories = mod.Categories,
+                CategorySource = mod.CategorySource
             });
         }
         ModCache.Save();
@@ -267,11 +295,15 @@ public partial class MainWindow : Window
         RefreshModViews();
     }
 
+    private string _viewMode = "medium";
+
     private void RefreshModViews()
     {
+        var sorted = GetSortedMods();
+
         ModTree.Items.Clear();
         var root = new TreeViewItem { Header = $"全 {_mods.Count} 件", IsExpanded = true };
-        foreach (var mod in _mods)
+        foreach (var mod in sorted)
         {
             root.Items.Add(new TreeViewItem
             {
@@ -281,9 +313,10 @@ public partial class MainWindow : Window
         }
         ModTree.Items.Add(root);
         CardList.ItemsSource = null;
-        CardList.ItemsSource = _mods;
-        SetViewMode("medium");
+        CardList.ItemsSource = sorted;
+        SetViewMode(_viewMode);
     }
+
 
 
     private void ViewLarge_Click(object sender, RoutedEventArgs e) => SetViewMode("large");
@@ -292,6 +325,7 @@ public partial class MainWindow : Window
 
     private void SetViewMode(string mode)
     {
+        _viewMode = mode;
         if (mode == "list")
         {
             CardList.ItemTemplate = (DataTemplate)FindResource("ListTemplate");
@@ -310,6 +344,33 @@ public partial class MainWindow : Window
             CardList.ItemsPanel = panel;
         }
     }
+    private void SortCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // 初期化中(_modsが空)は何もしない
+        if (_mods.Count == 0) return;
+        RefreshModViews();
+    }
+
+    // 現在のComboBox選択に応じて並べ替えたリストを返す
+    private List<ModEntry> GetSortedMods()
+    {
+        int idx = SortCombo?.SelectedIndex ?? 0;
+        return idx switch
+        {
+            0 => _mods.OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(),
+            1 => _mods.OrderByDescending(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(),
+            2 => _mods.OrderBy(m => m.Categories.Count == 0 ? "\uFFFF" : m.Categories[0],
+                                StringComparer.OrdinalIgnoreCase)
+                      .ThenBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(),
+            3 => _mods.OrderByDescending(m => m.FileModified).ToList(),
+            4 => _mods.OrderByDescending(m => m.FileSize).ToList(),
+            5 => _mods.OrderByDescending(m => m.FileCreated).ToList(),
+            6 => _mods.OrderBy(m => m.Loader, StringComparer.OrdinalIgnoreCase)
+                      .ThenBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(),
+            _ => _mods.OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(),
+        };
+    }
+
 
     private void ModTree_SelectedItemChanged(object sender,
         RoutedPropertyChangedEventArgs<object> e)
@@ -332,6 +393,10 @@ public partial class MainWindow : Window
         DetailId.Text = $"ID: {mod.ModId}";
         DetailVersion.Text = $"バージョン: {mod.Version}";
         DetailLoader.Text = $"ローダー: {mod.Loader}";
+        DetailCategory.Text = mod.Categories.Count == 0
+            ? "カテゴリ: ―"
+            : $"カテゴリ ({mod.CategorySource}): {mod.CategoryText}";
+
 
         _mrUrl = mod.ModrinthUrl;
         _cfUrl = mod.CurseForgeUrl;

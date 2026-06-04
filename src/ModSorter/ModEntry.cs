@@ -28,4 +28,17 @@ public class ModEntry
     public string IconSource => string.IsNullOrEmpty(IconFile) ? IconUrl : IconFile;
     public string TranslatedHtml { get; set; } = ""; // 翻訳済みHTMLのキャッシュ(セッション内)
 
+    // API由来のカテゴリ(CurseForgeまたはModrinth)
+    public List<string> Categories { get; set; } = new();
+    // カテゴリの出所表示用 ("CurseForge" または "Modrinth")
+    public string CategorySource { get; set; } = "";
+    // 詳細パネル等で1行表示するための文字列
+    public string CategoryText => Categories.Count == 0
+        ? "(未分類)"
+        : string.Join(", ", Categories);
+
+    // ソート用のファイル情報
+    public long FileSize { get; set; }
+    public DateTime FileCreated { get; set; }
+    public DateTime FileModified { get; set; }
 }

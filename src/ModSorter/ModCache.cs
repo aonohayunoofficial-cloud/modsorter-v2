@@ -16,7 +16,10 @@ public class CacheEntry
     public bool BodyIsHtml { get; set; }
     public string IconUrl { get; set; } = "";
     public string IconFile { get; set; } = ""; // ローカル保存したアイコンの絶対パス
+    public List<string> Categories { get; set; } = new(); // API由来のカテゴリ
+    public string CategorySource { get; set; } = "";       // "CurseForge" / "Modrinth"
     public DateTime CachedAt { get; set; }
+
 }
 
 public static class ModCache
@@ -26,7 +29,6 @@ public static class ModCache
             "ModSorter", "cache");
     private static readonly string IconDir = Path.Combine(Dir, "icons");
     private static readonly string FilePath = Path.Combine(Dir, "mod_cache.json");
-    private static readonly TimeSpan Ttl = TimeSpan.FromDays(5);
 
     private static Dictionary<string, CacheEntry> _entries = new();
 
@@ -58,14 +60,11 @@ public static class ModCache
         catch { }
     }
 
-    // 有効な(TTL内の)キャッシュを返す。無ければnull
+    // キャッシュエントリを返す。無ければnull(TTLは廃止: 一度取得したら無期限保持)
     public static CacheEntry? Get(string sha1)
     {
         if (_entries.TryGetValue(sha1, out var e))
-        {
-            if (DateTime.UtcNow - e.CachedAt < Ttl)
-                return e;
-        }
+            return e;
         return null;
     }
 

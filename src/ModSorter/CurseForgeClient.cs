@@ -15,6 +15,7 @@ public class CurseForgeResult
     public string Url { get; set; } = "";
     public string IconUrl { get; set; } = "";
     public string DescriptionHtml { get; set; } = "";
+    public List<string> Categories { get; set; } = new();
 }
 
 
@@ -123,6 +124,21 @@ public static class CurseForgeClient
                 logo.TryGetProperty("url", out var lu))
                 iconUrl = lu.GetString() ?? "";
 
+            // categories配列を取り出す(各要素はオブジェクトで name を持つ)
+            var cats = new List<string>();
+            if (d.TryGetProperty("categories", out var catArr) &&
+                catArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var c in catArr.EnumerateArray())
+                {
+                    if (c.TryGetProperty("name", out var cn))
+                    {
+                        var name = cn.GetString();
+                        if (!string.IsNullOrEmpty(name)) cats.Add(name);
+                    }
+                }
+            }
+
             // フル説明(HTML)を取得
             string descHtml = "";
             try
@@ -144,6 +160,7 @@ public static class CurseForgeClient
                 Summary = d.TryGetProperty("summary", out var sm) ? sm.GetString() ?? "" : "",
                 IconUrl = iconUrl,
                 DescriptionHtml = descHtml,
+                Categories = cats,
                 Url = d.TryGetProperty("links", out var links) &&
                       links.TryGetProperty("websiteUrl", out var w)
                           ? w.GetString() ?? "" : ""

@@ -101,6 +101,29 @@
                                         Margin="0,0,6,0" Click="ViewMedium_Click"/>
                                 <Button Content="一覧" Style="{StaticResource McButtonGray}"
                                         Click="ViewList_Click"/>
+
+                                <TextBlock Text="並び順:" Style="{StaticResource PixelText}"
+                                           VerticalAlignment="Center" Margin="16,0,4,0"/>
+                                <ComboBox x:Name="SortCombo" Width="160"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource McComboBox}"
+                                          SelectionChanged="SortCombo_SelectionChanged">
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="名称順（昇順）" IsSelected="True"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="名称順（降順）"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="カテゴリ順"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="ファイル更新日順"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="ファイルサイズ順"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="追加日順"/>
+                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                  Content="ローダー順"/>
+                                </ComboBox>
+
                             </StackPanel>
                             <ListBox x:Name="CardList" Background="Transparent"
                                      BorderThickness="0" Padding="6"
@@ -130,6 +153,8 @@
                                            Foreground="{StaticResource TextDim}" Margin="0,4,0,0"/>
                                 <TextBlock x:Name="DetailLoader" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" Margin="0,4,0,12"/>
+                                <TextBlock x:Name="DetailCategory" Style="{StaticResource PixelText}"
+                                           TextWrapping="Wrap" Margin="0,2,0,0"/>
 
                                 <Grid Margin="0,0,0,0">
                                     <Grid.ColumnDefinitions>
