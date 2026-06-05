@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using Markdig;
+using System.Windows.Threading;
+
 
 
 namespace ModSorter;
@@ -612,12 +614,25 @@ public partial class MainWindow : Window
         ApplyCardFilter();
     }
 
-
-    // 検索ボックスの入力変更
+    // 検索ボックスの入力変更(デバウンス: 入力が止まって250ms後に実行)
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        ApplyCardFilter();
+        if (_searchTimer == null)
+        {
+            _searchTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _searchTimer.Tick += (_, __) =>
+            {
+                _searchTimer!.Stop();
+                ApplyCardFilter();
+            };
+        }
+        _searchTimer.Stop();
+        _searchTimer.Start();
     }
+
 
     // AND/ORトグルの変更
     private void SearchMode_Changed(object sender, RoutedEventArgs e)
@@ -675,19 +690,18 @@ public partial class MainWindow : Window
                 return andMode ? terms.All(MatchTerm) : terms.Any(MatchTerm);
             });
         }
-
         var result = baseList.ToList();
-        CardList.ItemsSource = null;
         CardList.ItemsSource = result;
-        SetViewMode(_viewMode);
     }
-
 
     private bool _selectionMode = false;
     // ツリー表示モード: false=すべて表示(フラット), true=カテゴリ表示
     private bool _categoryView = false;
     // 現在のカテゴリ絞り込み(カテゴリ表示でカテゴリ名クリック中のみ非null)
     private string? _activeCategory = null;
+    // 検索入力のデバウンス用タイマー
+    private System.Windows.Threading.DispatcherTimer? _searchTimer;
+
 
 
     private void CardList_SelectionChanged(object sender, SelectionChangedEventArgs e)
