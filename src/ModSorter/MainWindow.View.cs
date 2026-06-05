@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using ModSorter.Models;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 

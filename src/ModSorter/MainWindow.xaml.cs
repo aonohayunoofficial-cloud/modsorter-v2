@@ -7,6 +7,7 @@ using Microsoft.Win32;
 using Markdig;
 using System.Windows.Threading;
 using ModSorter.Services;
+using ModSorter.Models;
 
 
 

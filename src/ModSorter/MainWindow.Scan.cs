@@ -1,4 +1,5 @@
 ﻿using ModSorter.Clients;
+using ModSorter.Models;
 using ModSorter.Services;
 using System.IO;
 using System.Windows;

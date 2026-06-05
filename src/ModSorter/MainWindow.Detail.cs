@@ -2,6 +2,7 @@
 using System.Windows;
 using Markdig;
 using ModSorter.Clients;
+using ModSorter.Models;
 
 namespace ModSorter;
 

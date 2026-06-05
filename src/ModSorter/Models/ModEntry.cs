@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace ModSorter;
+namespace ModSorter.Models;
 
 public class ModEntry : INotifyPropertyChanged
 {

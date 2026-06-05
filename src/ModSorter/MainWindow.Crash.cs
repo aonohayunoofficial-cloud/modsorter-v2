@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using ModSorter.Models;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -44,11 +45,4 @@ public partial class MainWindow : Window
         CrashResult.Text = $"選択: {item.Display}\n\n(解析処理は Day 5 で実装)";
         Log($"クラッシュ解析(仮): {Path.GetFileName(item.FullPath)}");
     }
-}
-
-public class CrashFileItem
-{
-    public string FullPath { get; set; } = "";
-    public string Display { get; set; } = "";
-    public override string ToString() => Display;
 }

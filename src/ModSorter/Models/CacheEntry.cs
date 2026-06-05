@@ -1,4 +1,4 @@
-﻿namespace ModSorter;
+﻿namespace ModSorter.Models;
 
 public class CacheEntry
 {

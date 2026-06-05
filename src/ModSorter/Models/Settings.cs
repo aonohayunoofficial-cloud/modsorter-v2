@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace ModSorter;
+namespace ModSorter.Models;
 
 public class Settings
 {
