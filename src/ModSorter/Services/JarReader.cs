@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace ModSorter;
+namespace ModSorter.Services;
 
 public static class JarReader
 {
