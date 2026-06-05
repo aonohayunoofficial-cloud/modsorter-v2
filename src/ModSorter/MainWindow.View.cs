@@ -108,6 +108,7 @@ public partial class MainWindow : Window
         CardList.ItemsSource = null;
         CardList.ItemsSource = sorted;
         SetViewMode(_viewMode);
+        RefreshCoverArts();
     }
 
     private void ViewAll_Click(object sender, RoutedEventArgs e)
@@ -287,5 +288,299 @@ public partial class MainWindow : Window
         }
         var result = baseList.ToList();
         CardList.ItemsSource = result;
+    }
+
+    // ===== カバーアート（軽量カルーセル / 最近5日間更新） =====
+    private readonly System.Collections.Generic.List<ModEntry> _coverMods = new();
+    private System.Windows.Threading.DispatcherTimer? _coverTimer;
+    private double _coverCardWidth = 0;       // 1枚幅(窓幅/3)
+    private bool _coverAnimating = false;
+
+    // 物理スロット(0..SLOTS-1)に置くカードと、各スロットが指す論理index
+    private const int SLOTS = 5;              // 予備1 + 見える3 + 予備1
+    private readonly System.Windows.Controls.Border[] _coverSlots =
+        new System.Windows.Controls.Border[SLOTS];
+    private int _coverHead = 0;               // スロット0が指す _coverMods のindex
+    private double _coverOffset = 0;          // スライドオフセット(px, 左へ負)
+
+    // ドラッグ
+    private bool _coverDragging = false;
+    private bool _coverDragMoved = false;
+    private double _coverDragStartX = 0;
+    private double _coverDragBaseOffset = 0;
+
+    private readonly System.Collections.Generic.Dictionary<string,
+        System.Windows.Media.Imaging.BitmapImage> _coverBmpCache = new();
+
+    // 5日以内に更新があったMODを集めてカバーを構築
+    private void RefreshCoverArts()
+    {
+        _coverMods.Clear();
+        var since = System.DateTime.Now.AddDays(-5);
+        foreach (var m in _mods
+                     .Where(m => m.FileModified >= since)
+                     .OrderByDescending(m => m.FileModified))
+        {
+            _coverMods.Add(m);
+        }
+
+        _coverHead = 0;
+        _coverOffset = 0;
+        BuildCoverSlots();
+
+        _coverTimer?.Stop();
+        if (_coverMods.Count > 3)
+        {
+            if (_coverTimer == null)
+            {
+                _coverTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = System.TimeSpan.FromSeconds(3)
+                };
+                _coverTimer.Tick += (s, e) => AnimateStep(forward: true);
+            }
+            _coverTimer.Start();
+        }
+    }
+
+    // スロット5枚を生成して Canvas に配置
+    private void BuildCoverSlots()
+    {
+        if (CoverCanvas == null) return;
+        CoverCanvas.Children.Clear();
+
+        if (_coverCardWidth <= 0 && CoverCanvas.ActualWidth > 0)
+            _coverCardWidth = CoverCanvas.ActualWidth / 3.0;
+
+        if (_coverMods.Count == 0) return;
+
+        for (int slot = 0; slot < SLOTS; slot++)
+        {
+            var border = new System.Windows.Controls.Border
+            {
+                Background = (System.Windows.Media.Brush)FindResource("StoneDark"),
+                ClipToBounds = true,
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+            border.MouseLeftButtonUp += CoverCard_Click;
+            border.Child = new System.Windows.Controls.Image
+            {
+                Stretch = System.Windows.Media.Stretch.UniformToFill
+            };
+            _coverSlots[slot] = border;
+            CoverCanvas.Children.Add(border);
+        }
+        LayoutCoverSlots();
+    }
+
+    // 各スロットの位置・サイズ・画像を現在の _coverHead と _coverOffset で更新
+    private void LayoutCoverSlots()
+    {
+        if (_coverMods.Count == 0 || _coverCardWidth <= 0) return;
+        double h = CoverCanvas.ActualHeight;
+
+        for (int slot = 0; slot < SLOTS; slot++)
+        {
+            var b = _coverSlots[slot];
+            if (b == null) continue;
+
+            // スロット0を左予備(-1枚)とする: 実表示は slot=1,2,3 が窓内
+            double left = (slot - 1) * _coverCardWidth + _coverOffset + 3;
+            System.Windows.Controls.Canvas.SetLeft(b, left);
+            System.Windows.Controls.Canvas.SetTop(b, 3);
+            b.Width = _coverCardWidth - 6;
+            b.Height = h - 6;
+
+            int idx = Mod(_coverHead + (slot - 1), _coverMods.Count);
+            var mod = _coverMods[idx];
+            b.Tag = mod;
+            if (b.Child is System.Windows.Controls.Image img)
+                img.Source = LoadCoverBitmap(mod.IconSource);
+        }
+    }
+
+    private static int Mod(int a, int n) => ((a % n) + n) % n;
+
+    // 1枚ぶんスライド(forward=true:次へ, false:前へ)
+    private void AnimateStep(bool forward)
+    {
+        if (_coverAnimating || _coverDragging) return;
+        if (_coverMods.Count <= 3 || _coverCardWidth <= 0) return;
+
+        _coverAnimating = true;
+        double from = _coverOffset;
+        double to = forward ? from - _coverCardWidth : from + _coverCardWidth;
+        AnimateOffsetTo(from, to, () =>
+        {
+            // 論理indexを進退してオフセットを0へリセット
+            _coverHead = Mod(_coverHead + (forward ? 1 : -1), _coverMods.Count);
+            _coverOffset = 0;
+            LayoutCoverSlots();
+            _coverAnimating = false;
+        });
+    }
+
+    // オフセットをアニメ。各フレームで LayoutCoverSlots を呼んでスロットを動かす
+    private void AnimateOffsetTo(double from, double to, System.Action onDone)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        double durMs = 300;
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = System.TimeSpan.FromMilliseconds(15)
+        };
+        timer.Tick += (s, e) =>
+        {
+            double t = sw.ElapsedMilliseconds / durMs;
+            if (t >= 1.0)
+            {
+                timer.Stop();
+                _coverOffset = to;
+                LayoutCoverSlots();
+                onDone();
+                return;
+            }
+            double eased = 1 - System.Math.Pow(1 - t, 3); // easeOutCubic
+            _coverOffset = from + (to - from) * eased;
+            LayoutCoverSlots();
+        };
+        timer.Start();
+    }
+
+    private void CoverCanvas_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+    {
+        if (CoverCanvas == null || CoverCanvas.ActualWidth <= 0) return;
+        double newWidth = CoverCanvas.ActualWidth / 3.0;
+        if (System.Math.Abs(newWidth - _coverCardWidth) < 0.5 && _coverSlots[0] != null)
+        {
+            LayoutCoverSlots();
+            return;
+        }
+        _coverCardWidth = newWidth;
+        if (_coverSlots[0] == null) BuildCoverSlots();
+        else LayoutCoverSlots();
+    }
+
+    // ===== ドラッグ =====
+    private void CoverCanvas_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_coverMods.Count <= 3 || _coverAnimating) return;
+        _coverDragging = true;
+        _coverDragMoved = false;
+        _coverDragStartX = e.GetPosition(CoverCanvas).X;
+        _coverDragBaseOffset = _coverOffset;
+        _coverTimer?.Stop();
+        CoverCanvas.CaptureMouse();
+    }
+
+    private void CoverCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_coverDragging) return;
+        double cur = e.GetPosition(CoverCanvas).X;
+        double delta = cur - _coverDragStartX;
+        if (System.Math.Abs(delta) > 4) _coverDragMoved = true;
+
+        _coverOffset = _coverDragBaseOffset + delta;
+        // 1枚幅を超えたらその場で論理indexを巻き取り、offsetを範囲内に収める
+        while (_coverOffset <= -_coverCardWidth)
+        {
+            _coverOffset += _coverCardWidth;
+            _coverHead = Mod(_coverHead + 1, _coverMods.Count);
+        }
+        while (_coverOffset >= _coverCardWidth)
+        {
+            _coverOffset -= _coverCardWidth;
+            _coverHead = Mod(_coverHead - 1, _coverMods.Count);
+        }
+        LayoutCoverSlots();
+    }
+
+    private void CoverCanvas_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (!_coverDragging) return;
+        _coverDragging = false;
+        CoverCanvas.ReleaseMouseCapture();
+        SettleDrag();
+    }
+
+    private void CoverCanvas_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_coverDragging) return;
+        _coverDragging = false;
+        CoverCanvas.ReleaseMouseCapture();
+        SettleDrag();
+    }
+
+    // 離した位置から最寄り境界(0 or ±cardW)へ収束
+    private void SettleDrag()
+    {
+        if (_coverCardWidth <= 0 || _coverMods.Count == 0)
+        {
+            if (_coverMods.Count > 3) _coverTimer?.Start();
+            return;
+        }
+        _coverAnimating = true;
+        double from = _coverOffset;
+        // offsetは -cardW..+cardW の範囲。半分超なら1枚送る方向へ、未満なら0へ
+        double to;
+        int headDelta;
+        if (from <= -_coverCardWidth / 2.0) { to = -_coverCardWidth; headDelta = 1; }
+        else if (from >= _coverCardWidth / 2.0) { to = _coverCardWidth; headDelta = -1; }
+        else { to = 0; headDelta = 0; }
+
+        AnimateOffsetTo(from, to, () =>
+        {
+            if (headDelta != 0)
+                _coverHead = Mod(_coverHead + headDelta, _coverMods.Count);
+            _coverOffset = 0;
+            LayoutCoverSlots();
+            _coverAnimating = false;
+            if (_coverMods.Count > 3) _coverTimer?.Start();
+        });
+    }
+
+    private void CoverCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_coverDragMoved) { _coverDragMoved = false; return; }
+        if (sender is not System.Windows.Controls.Border b) return;
+        if (b.Tag is not ModEntry mod) return;
+
+        ShowDetail(mod);
+        if (CardList.Items.Contains(mod))
+        {
+            CardList.ScrollIntoView(mod);
+            Dispatcher.BeginInvoke(new Action(() => HighlightCard(mod)),
+                DispatcherPriority.Loaded);
+        }
+    }
+
+    private System.Windows.Media.Imaging.BitmapImage? LoadCoverBitmap(string src)
+    {
+        if (string.IsNullOrEmpty(src)) return null;
+        if (_coverBmpCache.TryGetValue(src, out var cached)) return cached;
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            if (System.IO.File.Exists(src))
+            {
+                var bytes = System.IO.File.ReadAllBytes(src);
+                using var ms = new System.IO.MemoryStream(bytes);
+                bmp.BeginInit();
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.StreamSource = ms;
+                bmp.EndInit();
+            }
+            else
+            {
+                bmp.BeginInit();
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.UriSource = new System.Uri(src, System.UriKind.RelativeOrAbsolute);
+                bmp.EndInit();
+            }
+            bmp.Freeze();
+            _coverBmpCache[src] = bmp;
+            return bmp;
+        }
+        catch { return null; }
     }
 }

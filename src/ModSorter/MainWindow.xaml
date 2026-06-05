@@ -183,6 +183,20 @@
                                          TextChanged="SearchBox_TextChanged"/>
                             </DockPanel>
 
+                            <!-- ===== カバーアート帯（軽量カルーセル） ===== -->
+                            <Border DockPanel.Dock="Top" Height="150" Margin="8,0,8,8"
+                                    Background="{StaticResource BgCard}"
+                                    BorderBrush="{StaticResource StoneDark}" BorderThickness="2"
+                                    ClipToBounds="True">
+                                <Canvas x:Name="CoverCanvas" ClipToBounds="True"
+                                        Background="Transparent"
+                                        SizeChanged="CoverCanvas_SizeChanged"
+                                        MouseLeftButtonDown="CoverCanvas_MouseDown"
+                                        MouseMove="CoverCanvas_MouseMove"
+                                        MouseLeftButtonUp="CoverCanvas_MouseUp"
+                                        MouseLeave="CoverCanvas_MouseLeave"/>
+                            </Border>
+
                             <ListBox x:Name="CardList" Background="Transparent"
                                      BorderThickness="0" Padding="6"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
