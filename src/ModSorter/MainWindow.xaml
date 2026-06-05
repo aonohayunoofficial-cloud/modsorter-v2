@@ -57,7 +57,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*" MinWidth="300"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="320" MinWidth="220"/>
+                        <ColumnDefinition Width="420" MinWidth="320"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Background="{StaticResource BgPanel}">
@@ -143,7 +143,31 @@
                                 </StackPanel>
 
                             </DockPanel>
-
+                            <!-- 検索行 -->
+                            <DockPanel DockPanel.Dock="Top" Margin="8,0,8,6">
+                                <TextBlock Text="検索:" Style="{StaticResource PixelText}"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                            Margin="8,0,0,0">
+                                    <RadioButton x:Name="SearchAndRadio" Content="AND"
+                                                 GroupName="SearchMode" IsChecked="True"
+                                                 Foreground="{StaticResource TextMain}"
+                                                 VerticalAlignment="Center" Margin="0,0,8,0"
+                                                 Checked="SearchMode_Changed"/>
+                                    <RadioButton x:Name="SearchOrRadio" Content="OR"
+                                                 GroupName="SearchMode"
+                                                 Foreground="{StaticResource TextMain}"
+                                                 VerticalAlignment="Center"
+                                                 Checked="SearchMode_Changed"/>
+                                </StackPanel>
+                                <TextBox x:Name="SearchBox"
+                                         Background="{StaticResource BgCard}"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}"
+                                         BorderThickness="0" Padding="6,3"
+                                         VerticalContentAlignment="Center"
+                                         TextChanged="SearchBox_TextChanged"/>
+                            </DockPanel>
 
                             <ListBox x:Name="CardList" Background="Transparent"
                                      BorderThickness="0" Padding="6"

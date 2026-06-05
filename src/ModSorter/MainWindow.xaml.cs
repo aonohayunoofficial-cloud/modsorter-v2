@@ -515,10 +515,9 @@ public partial class MainWindow : Window
     private void ViewAll_Click(object sender, RoutedEventArgs e)
     {
         _categoryView = false;
-        CardList.ItemsSource = null;
-        CardList.ItemsSource = GetSortedMods();   // 中央は全件に戻す
-        SetViewMode(_viewMode);
-        RefreshModViews();
+        _activeCategory = null;   // カテゴリ絞り込み解除
+        RefreshModViews();        // ツリーをフラットへ
+        ApplyCardFilter();        // 中央は検索語を反映した全件(検索が空なら全件)
     }
 
     private void ViewByCategory_Click(object sender, RoutedEventArgs e)
@@ -609,32 +608,87 @@ public partial class MainWindow : Window
     // 中央カードを指定カテゴリのMODだけに絞り込む(空文字=未分類)
     private void FilterCardsByCategory(string category)
     {
+        _activeCategory = category;   // カテゴリ絞り込みを記憶(検索と併用)
+        ApplyCardFilter();
+    }
+
+
+    // 検索ボックスの入力変更
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ApplyCardFilter();
+    }
+
+    // AND/ORトグルの変更
+    private void SearchMode_Changed(object sender, RoutedEventArgs e)
+    {
+        // 初期化中(SearchBox未生成)はスキップ
+        if (SearchBox == null) return;
+        ApplyCardFilter();
+    }
+
+    // 現在のカテゴリ絞り込み＋検索語で中央カードを絞り込む
+    private void ApplyCardFilter()
+    {
         var sorted = GetSortedMods();
-        List<ModEntry> filtered;
 
-        if (string.IsNullOrEmpty(category))
+        // 1) カテゴリ絞り込み(カテゴリ表示でカテゴリ名選択中のみ)
+        IEnumerable<ModEntry> baseList = sorted;
+        if (_activeCategory != null)
         {
-            // 未分類
-            filtered = sorted.Where(m => m.Categories == null || m.Categories.Count == 0)
-                             .ToList();
-        }
-        else
-        {
-            filtered = sorted.Where(m => m.Categories != null &&
-                                         m.Categories.Any(c =>
-                                             string.Equals(c, category,
-                                                 StringComparison.OrdinalIgnoreCase)))
-                             .ToList();
+            if (_activeCategory.Length == 0)
+            {
+                baseList = sorted.Where(m => m.Categories == null || m.Categories.Count == 0);
+            }
+            else
+            {
+                baseList = sorted.Where(m => m.Categories != null &&
+                    m.Categories.Any(c => string.Equals(c, _activeCategory,
+                        StringComparison.OrdinalIgnoreCase)));
+            }
         }
 
+        // 2) 検索語で絞り込み(名前・カテゴリ・ModId、AND/OR)
+        string raw = SearchBox?.Text?.Trim() ?? "";
+        if (raw.Length > 0)
+        {
+            var terms = raw.Split(new[] { ' ', '　' },
+                StringSplitOptions.RemoveEmptyEntries);
+            bool andMode = SearchAndRadio?.IsChecked == true;
+
+            baseList = baseList.Where(m =>
+            {
+                bool MatchTerm(string term)
+                {
+                    if (m.DisplayName != null &&
+                        m.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    if (m.ModId != null &&
+                        m.ModId.Contains(term, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    if (m.Categories != null &&
+                        m.Categories.Any(c => c != null &&
+                            c.Contains(term, StringComparison.OrdinalIgnoreCase)))
+                        return true;
+                    return false;
+                }
+                return andMode ? terms.All(MatchTerm) : terms.Any(MatchTerm);
+            });
+        }
+
+        var result = baseList.ToList();
         CardList.ItemsSource = null;
-        CardList.ItemsSource = filtered;
+        CardList.ItemsSource = result;
         SetViewMode(_viewMode);
     }
+
 
     private bool _selectionMode = false;
     // ツリー表示モード: false=すべて表示(フラット), true=カテゴリ表示
     private bool _categoryView = false;
+    // 現在のカテゴリ絞り込み(カテゴリ表示でカテゴリ名クリック中のみ非null)
+    private string? _activeCategory = null;
+
 
     private void CardList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
