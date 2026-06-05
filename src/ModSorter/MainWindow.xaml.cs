@@ -425,22 +425,107 @@ public partial class MainWindow : Window
         var sorted = GetSortedMods();
 
         ModTree.Items.Clear();
-        var root = new TreeViewItem { Header = $"全 {_mods.Count} 件", IsExpanded = true };
-        foreach (var mod in sorted)
+
+        if (_categoryView)
         {
-            root.Items.Add(new TreeViewItem
+            // カテゴリ別ツリー: カテゴリ名 → 配下にそのカテゴリのMOD
+            // 1MODが複数カテゴリを持つ場合は該当する全カテゴリに重複表示
+            var byCategory = new SortedDictionary<string, List<ModEntry>>(
+                StringComparer.OrdinalIgnoreCase);
+            var uncategorized = new List<ModEntry>();
+
+            foreach (var mod in sorted)
             {
-                Header = $"{mod.DisplayName} ({mod.Loader})",
-                Tag = mod
-            });
+                if (mod.Categories == null || mod.Categories.Count == 0)
+                {
+                    uncategorized.Add(mod);
+                    continue;
+                }
+                foreach (var cat in mod.Categories)
+                {
+                    if (string.IsNullOrWhiteSpace(cat)) continue;
+                    if (!byCategory.TryGetValue(cat, out var list))
+                    {
+                        list = new List<ModEntry>();
+                        byCategory[cat] = list;
+                    }
+                    list.Add(mod);
+                }
+            }
+
+            foreach (var kv in byCategory)
+            {
+                var catNode = new TreeViewItem
+                {
+                    Header = $"{kv.Key} ({kv.Value.Count})",
+                    Tag = kv.Key,          // カテゴリ名(中央フィルタ用)
+                    IsExpanded = false
+                };
+                foreach (var mod in kv.Value)
+                {
+                    catNode.Items.Add(new TreeViewItem
+                    {
+                        Header = $"{mod.DisplayName} ({mod.Loader})",
+                        Tag = mod
+                    });
+                }
+                ModTree.Items.Add(catNode);
+            }
+
+            // 未分類は末尾
+            if (uncategorized.Count > 0)
+            {
+                var node = new TreeViewItem
+                {
+                    Header = $"(未分類) ({uncategorized.Count})",
+                    Tag = "",              // 空文字=未分類(中央フィルタ用)
+                    IsExpanded = false
+                };
+                foreach (var mod in uncategorized)
+                {
+                    node.Items.Add(new TreeViewItem
+                    {
+                        Header = $"{mod.DisplayName} ({mod.Loader})",
+                        Tag = mod
+                    });
+                }
+                ModTree.Items.Add(node);
+            }
         }
-        ModTree.Items.Add(root);
+        else
+        {
+            // フラット表示: 全MOD
+            var root = new TreeViewItem { Header = $"全 {_mods.Count} 件", IsExpanded = true };
+            foreach (var mod in sorted)
+            {
+                root.Items.Add(new TreeViewItem
+                {
+                    Header = $"{mod.DisplayName} ({mod.Loader})",
+                    Tag = mod
+                });
+            }
+            ModTree.Items.Add(root);
+        }
+
+        // 中央カード: カテゴリ表示でも初期は全件(カテゴリ名クリックで絞り込む)
         CardList.ItemsSource = null;
         CardList.ItemsSource = sorted;
         SetViewMode(_viewMode);
     }
+    private void ViewAll_Click(object sender, RoutedEventArgs e)
+    {
+        _categoryView = false;
+        CardList.ItemsSource = null;
+        CardList.ItemsSource = GetSortedMods();   // 中央は全件に戻す
+        SetViewMode(_viewMode);
+        RefreshModViews();
+    }
 
-
+    private void ViewByCategory_Click(object sender, RoutedEventArgs e)
+    {
+        _categoryView = true;
+        RefreshModViews();   // ツリーをカテゴリ別へ
+    }
 
     private void ViewLarge_Click(object sender, RoutedEventArgs e) => SetViewMode("large");
     private void ViewMedium_Click(object sender, RoutedEventArgs e) => SetViewMode("medium");
@@ -496,12 +581,60 @@ public partial class MainWindow : Window
 
 
     private void ModTree_SelectedItemChanged(object sender,
-        RoutedPropertyChangedEventArgs<object> e)
+    RoutedPropertyChangedEventArgs<object> e)
     {
-        if (e.NewValue is TreeViewItem item && item.Tag is ModEntry mod)
+        if (e.NewValue is not TreeViewItem item) return;
+
+        if (item.Tag is ModEntry mod)
+        {
+            // MOD名クリック: 中央へスクロール強調＋右パネルに詳細
             ShowDetail(mod);
+
+            // カテゴリ表示で絞り込み中だと対象が中央に居ない場合があるので
+            // 念のため、その時点のCardListに含まれていればスクロール強調する
+            if (CardList.Items.Contains(mod))
+            {
+                CardList.ScrollIntoView(mod);
+                Dispatcher.BeginInvoke(new Action(() => HighlightCard(mod)),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+        }
+        else if (item.Tag is string category)
+        {
+            // カテゴリ名クリック: 中央をそのカテゴリのMODだけに絞り込む
+            FilterCardsByCategory(category);
+        }
     }
+
+    // 中央カードを指定カテゴリのMODだけに絞り込む(空文字=未分類)
+    private void FilterCardsByCategory(string category)
+    {
+        var sorted = GetSortedMods();
+        List<ModEntry> filtered;
+
+        if (string.IsNullOrEmpty(category))
+        {
+            // 未分類
+            filtered = sorted.Where(m => m.Categories == null || m.Categories.Count == 0)
+                             .ToList();
+        }
+        else
+        {
+            filtered = sorted.Where(m => m.Categories != null &&
+                                         m.Categories.Any(c =>
+                                             string.Equals(c, category,
+                                                 StringComparison.OrdinalIgnoreCase)))
+                             .ToList();
+        }
+
+        CardList.ItemsSource = null;
+        CardList.ItemsSource = filtered;
+        SetViewMode(_viewMode);
+    }
+
     private bool _selectionMode = false;
+    // ツリー表示モード: false=すべて表示(フラット), true=カテゴリ表示
+    private bool _categoryView = false;
 
     private void CardList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
