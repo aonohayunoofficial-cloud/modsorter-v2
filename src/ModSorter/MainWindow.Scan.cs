@@ -60,6 +60,7 @@ public partial class MainWindow : Window
                     ? c.IconFile : "";
                 mod.Categories = c.Categories ?? new();
                 mod.CategorySource = c.CategorySource;
+                mod.LlmCategories = c.LlmCategories ?? new();
                 fromCache++;
             }
             else
@@ -201,8 +202,10 @@ public partial class MainWindow : Window
                 IconUrl = mod.IconUrl,
                 IconFile = mod.IconFile,
                 Categories = mod.Categories,
-                CategorySource = mod.CategorySource
+                CategorySource = mod.CategorySource,
+                LlmCategories = mod.LlmCategories
             });
+
         }
         ModCache.Save();
 
@@ -306,8 +309,10 @@ public partial class MainWindow : Window
             IconUrl = mod.IconUrl,
             IconFile = mod.IconFile,
             Categories = mod.Categories,
-            CategorySource = mod.CategorySource
+            CategorySource = mod.CategorySource,
+            LlmCategories = mod.LlmCategories
         });
+
         ModCache.Save();
 
         return hit;

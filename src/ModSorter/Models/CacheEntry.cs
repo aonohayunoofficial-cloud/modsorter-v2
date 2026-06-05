@@ -14,5 +14,6 @@ public class CacheEntry
     public string IconFile { get; set; } = ""; // ローカル保存したアイコンの絶対パス
     public List<string> Categories { get; set; } = new(); // API由来のカテゴリ
     public string CategorySource { get; set; } = "";       // "CurseForge" / "Modrinth"
+    public List<string> LlmCategories { get; set; } = new(); // LLM(Ollama)による再分類
     public DateTime CachedAt { get; set; }
 }

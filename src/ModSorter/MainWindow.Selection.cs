@@ -1,5 +1,6 @@
 ﻿using ModSorter.Clients;
 using ModSorter.Models;
+using ModSorter.Services;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -208,6 +209,14 @@ public partial class MainWindow : Window
             if (result != null && result.Count > 0)
             {
                 mod.LlmCategories = result;   // INotifyで表示は自動更新
+
+                // キャッシュにもLLM分類を書き戻して永続化
+                var entry = ModCache.Get(mod.Sha1);
+                if (entry != null)
+                {
+                    entry.LlmCategories = result;
+                    ModCache.Put(entry);
+                }
                 ok++;
                 Log($"Ollama分類: {mod.DisplayName} → {string.Join(", ", result)}");
             }
@@ -226,6 +235,7 @@ public partial class MainWindow : Window
         RefetchSelectedBtn.IsEnabled = true;
         SelectModeBtn.IsEnabled = true;
 
+        ModCache.Save();
         Log($"Ollama分類完了: {targets.Count} 件中 {ok} 件成功。");
         if (ok < targets.Count)
         {
