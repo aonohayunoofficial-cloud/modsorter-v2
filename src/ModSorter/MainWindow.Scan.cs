@@ -76,6 +76,7 @@ public partial class MainWindow : Window
             ScanStatus.Text = $"完了(全てキャッシュ): {_mods.Count} 件";
             ScanProgress.Visibility = Visibility.Collapsed;
             ModCache.Save();
+            AddActivity($"スキャン完了: {_mods.Count} 件 (全てキャッシュ)");
             return;
         }
 
@@ -212,8 +213,10 @@ public partial class MainWindow : Window
         ScanStatus.Text = $"完了: MR {mrMatched} / CF {cfMatched}(新規 {total} 件)";
         ScanProgress.Value = 100;
         Log($"照合完了: Modrinth {mrMatched} 件、CurseForge {cfMatched} 件。キャッシュ保存済み。");
+        AddActivity($"スキャン完了: {_mods.Count} 件 (新規照合 {total} 件)");
         RefreshModViews();
     }
+
 
     // 1件のMODをオンライン照合し、アイコン保存とキャッシュ書き戻しまで行う
     private async Task<bool> FetchOneAsync(ModEntry mod)

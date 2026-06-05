@@ -54,6 +54,21 @@ public partial class MainWindow : Window
         LogBox.ScrollToEnd();
     }
 
+    // Tab0「最近の動作」に1件追加(新しいものを上に、最大20件保持)
+    private readonly List<string> _activity = new();
+    private void AddActivity(string msg)
+    {
+        _activity.Insert(0, $"[{DateTime.Now:MM/dd HH:mm}] {msg}");
+        if (_activity.Count > 20) _activity.RemoveAt(_activity.Count - 1);
+
+        // ActivityList が初期化済みなら表示更新
+        if (ActivityList != null)
+        {
+            ActivityList.ItemsSource = null;
+            ActivityList.ItemsSource = _activity;
+        }
+    }
+
     // ===== ナビゲーション =====
     private void NavMods_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 1;
     private void NavCrash_Click(object sender, RoutedEventArgs e)

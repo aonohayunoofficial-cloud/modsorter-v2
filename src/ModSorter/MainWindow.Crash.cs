@@ -176,9 +176,69 @@ public partial class MainWindow : Window
             Process.Start(new ProcessStartInfo(_crashMrUrl) { UseShellExecute = true });
     }
 
-    // 第3段階で実装。今は何もしない
     private void CrashDelete_Click(object sender, RoutedEventArgs e)
     {
+        if (CrashDeleteBtn.Tag is not ModEntry mod)
+        {
+            MessageBox.Show("削除対象のMODが特定できません。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(mod.FilePath) || !File.Exists(mod.FilePath))
+        {
+            MessageBox.Show(
+                $"ファイルが見つかりません。\n{mod.FilePath}",
+                "ModSorter", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"次のMODのjarファイルをごみ箱に移動します。\n\n" +
+            $"MOD: {mod.DisplayName}\nID: {mod.ModId}\n" +
+            $"ファイル: {mod.FileName}\n\nよろしいですか?",
+            "ModSorter - MOD削除",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        try
+        {
+            // ごみ箱へ送る(復元可能)
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                mod.FilePath,
+                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"削除に失敗しました。\n{ex.Message}", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Log($"MOD削除失敗: {mod.FileName} ({ex.Message})");
+            return;
+        }
+
+        Log($"MOD削除(ごみ箱): {mod.DisplayName} [{mod.ModId}] {mod.FileName}");
+
+        // 履歴に記録(第4で実装する Activity に積む)
+        AddActivity($"MOD削除: {mod.DisplayName} (ID: {mod.ModId})");
+
+        // _mods から除き、Tab1 の表示も更新
+        _mods.Remove(mod);
+        RefreshModViews();
+
+        // 中央 issue リストから、この jar に対応する issue を消す
+        if (CrashIssueList.ItemsSource is IEnumerable<CrashAnalyzer.Issue> issues)
+        {
+            var remaining = issues
+                .Where(i => !string.Equals(i.ModFile, mod.FileName,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            CrashIssueList.ItemsSource = remaining;
+        }
+
+        // 右詳細をクリア
+        ClearCrashDetail();
     }
+
 
 }

@@ -41,11 +41,25 @@
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="1" Background="{StaticResource BgDark}">
-                        <TextBlock Text="左のメニューから操作を選んでください"
-                                   Style="{StaticResource PixelText}"
-                                   Foreground="{StaticResource TextDim}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <DockPanel Margin="24">
+                            <TextBlock DockPanel.Dock="Top" Text="最近の動作"
+                                       FontSize="18"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"
+                                       Margin="0,0,0,12"/>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="左のメニューから操作を選んでください"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}"
+                                       FontSize="12" Margin="0,0,0,12"/>
+                            <ListBox x:Name="ActivityList" Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource TextMain}"
+                                     ItemContainerStyle="{StaticResource TransparentListBoxItem}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                        </DockPanel>
                     </Border>
+
                 </Grid>
             </TabItem>
 
