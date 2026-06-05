@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using ModSorter.Clients;
+using System.IO;
 using System.Windows;
 
 namespace ModSorter;

@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace ModSorter;
+namespace ModSorter.Clients;
 
 public class CurseForgeResult
 {
@@ -61,8 +61,8 @@ public static class CurseForgeClient
         int i = 0;
         while (length - i >= 4)
         {
-            uint k = (uint)(data[i] | (data[i + 1] << 8) |
-                            (data[i + 2] << 16) | (data[i + 3] << 24));
+            uint k = (uint)(data[i] | data[i + 1] << 8 |
+                            data[i + 2] << 16 | data[i + 3] << 24);
             k *= m;
             k ^= k >> r;
             k *= m;

@@ -3,7 +3,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace ModSorter;
+namespace ModSorter.Clients;
 
 public class ModrinthResult
 {

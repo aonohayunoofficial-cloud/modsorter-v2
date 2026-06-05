@@ -2,7 +2,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace ModSorter;
+namespace ModSorter.Clients;
 
 // ローカルOllama(http://localhost:11434)でMODを分類するクライアント
 public static class OllamaClient
@@ -77,7 +77,7 @@ Categories:";
         var payload = new
         {
             model = Model,
-            prompt = prompt,
+            prompt,
             stream = false,
             options = new { temperature = 0.0 }
         };
