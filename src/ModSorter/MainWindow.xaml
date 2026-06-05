@@ -237,19 +237,20 @@
                                 </StackPanel>
                             </ScrollViewer>
 
-                            <!-- ===== 選択モードパネル ===== -->
+                            <!-- ===== 取得モードパネル ===== -->
                             <DockPanel x:Name="SelectionPanel" Visibility="Collapsed">
-                                <TextBlock DockPanel.Dock="Top" Text="選択モード"
+                                <TextBlock DockPanel.Dock="Top" Text="取得モード"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}" Margin="0,0,0,10"/>
 
-                                <!-- 2×2 ボタン -->
+                                <!-- ボタン: 上2行は2列、最下行に選択終了 -->
                                 <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
@@ -262,10 +263,15 @@
                                     <Button Grid.Row="1" Grid.Column="0" x:Name="RefetchSelectedBtn"
                                             Content="選択を再取得(0件)"
                                             Style="{StaticResource McButton}"
-                                            Margin="0,4,4,0" Click="RefetchSelected_Click"/>
-                                    <Button Grid.Row="1" Grid.Column="1" Content="選択終了"
+                                            Margin="0,4,4,4" Click="RefetchSelected_Click"/>
+                                    <Button Grid.Row="1" Grid.Column="1" x:Name="OllamaSelectedBtn"
+                                            Content="Ollama取得(0件)"
+                                            Style="{StaticResource McButton}"
+                                            Margin="4,4,0,4" Click="OllamaSelected_Click"/>
+                                    <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                            Content="選択終了"
                                             Style="{StaticResource McButtonRed}"
-                                            Margin="4,4,0,0" Click="SelectMode_Click"/>
+                                            Margin="0,4,0,0" Click="SelectMode_Click"/>
                                 </Grid>
 
                                 <TextBlock DockPanel.Dock="Top" Text="選択中のMOD"

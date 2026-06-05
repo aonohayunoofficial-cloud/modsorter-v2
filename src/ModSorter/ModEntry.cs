@@ -41,10 +41,36 @@ public class ModEntry : INotifyPropertyChanged
     public List<string> Categories { get; set; } = new();
     // カテゴリの出所表示用 ("CurseForge" または "Modrinth")
     public string CategorySource { get; set; } = "";
-    // 詳細パネル等で1行表示するための文字列
+    // 詳細パネル等で1行表示するための文字列(API由来)
     public string CategoryText => Categories.Count == 0
         ? "(未分類)"
         : string.Join(", ", Categories);
+
+    // LLM(Ollama)による再分類カテゴリ。空ならLLM未実行
+    private List<string> _llmCategories = new();
+    public List<string> LlmCategories
+    {
+        get => _llmCategories;
+        set
+        {
+            _llmCategories = value ?? new();
+            OnChanged();
+            OnChanged(nameof(DisplayCategories));
+            OnChanged(nameof(DisplayCategoryText));
+            OnChanged(nameof(HasLlmCategory));
+        }
+    }
+    public bool HasLlmCategory => _llmCategories.Count > 0;
+
+    // バッジ表示用: LLM分類があればそれを、なければAPI由来を使う
+    public List<string> DisplayCategories =>
+        _llmCategories.Count > 0 ? _llmCategories : Categories;
+
+    // バッジ等の1行表示用
+    public string DisplayCategoryText => DisplayCategories.Count == 0
+        ? "(未分類)"
+        : string.Join(", ", DisplayCategories);
+
 
     // ソート用のファイル情報
     public long FileSize { get; set; }

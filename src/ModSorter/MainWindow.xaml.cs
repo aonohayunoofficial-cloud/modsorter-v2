@@ -845,9 +845,10 @@ public partial class MainWindow : Window
     }
 
     private void UpdateRefetchSelectedLabel()
-        {
+    {
         int n = _mods.Count(m => m.IsSelected);
         RefetchSelectedBtn.Content = $"選択を再取得({n}件)";
+        OllamaSelectedBtn.Content = $"Ollama取得({n}件)";
     }
 
     private async void RefetchSelected_Click(object sender, RoutedEventArgs e)
@@ -888,9 +889,101 @@ public partial class MainWindow : Window
         Log($"選択再取得完了: {hit}/{targets.Count} 件ヒット。");
 
         RefreshModViews();
+        RefreshSelectedList();
     }
 
+    // 取得済みカテゴリを集計して候補リストを作る(案A)
+    // CurseForge/Modrinthどちらの体系かは取得時点で決まっているので
+    // _mods全体のCategoriesをユニーク化すれば、その出所の体系になる
+    private List<string> BuildCategoryCandidates()
+    {
+        return _mods
+            .Where(m => m.Categories != null)
+            .SelectMany(m => m.Categories)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
+    // 選択中MODをOllamaでまとめて再分類(直列)
+    private async void OllamaSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var targets = _mods.Where(m => m.IsSelected).ToList();
+        if (targets.Count == 0)
+        {
+            MessageBox.Show("分類するMODを選択してください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 候補カテゴリ(取得済みカテゴリの集計)
+        var candidates = BuildCategoryCandidates();
+        if (candidates.Count == 0)
+        {
+            MessageBox.Show(
+                "候補となるカテゴリがありません。\n先にスキャンしてAPIカテゴリを取得してください。",
+                "ModSorter", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // Ollamaの起動確認
+        Log("Ollamaの起動を確認中...");
+        if (!await OllamaClient.IsAvailableAsync())
+        {
+            MessageBox.Show(
+                "Ollamaに接続できません。\nOllamaが起動しているか確認してください(http://localhost:11434)。",
+                "ModSorter", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Log("Ollama分類中止: 接続不可。");
+            return;
+        }
+
+        OllamaSelectedBtn.IsEnabled = false;
+        RefetchSelectedBtn.IsEnabled = false;
+        SelectModeBtn.IsEnabled = false;
+        ScanProgress.Visibility = Visibility.Visible;
+        ScanProgress.Value = 0;
+        ScanProgress.Maximum = targets.Count;
+
+        int done = 0, ok = 0;
+        foreach (var mod in targets)
+        {
+            ScanStatus.Text = $"Ollama分類中: {mod.DisplayName} ({done + 1}/{targets.Count})";
+            var result = await OllamaClient.ClassifyAsync(
+                mod.DisplayName, mod.Body, candidates);
+
+            if (result != null && result.Count > 0)
+            {
+                mod.LlmCategories = result;   // INotifyで表示は自動更新
+                ok++;
+                Log($"Ollama分類: {mod.DisplayName} → {string.Join(", ", result)}");
+            }
+            else
+            {
+                Log($"Ollama分類失敗({mod.DisplayName}): {OllamaClient.LastError}");
+            }
+
+            done++;
+            ScanProgress.Value = done;
+        }
+
+        ScanStatus.Text = "";
+        ScanProgress.Visibility = Visibility.Collapsed;
+        OllamaSelectedBtn.IsEnabled = true;
+        RefetchSelectedBtn.IsEnabled = true;
+        SelectModeBtn.IsEnabled = true;
+
+        Log($"Ollama分類完了: {targets.Count} 件中 {ok} 件成功。");
+        if (ok < targets.Count)
+        {
+            MessageBox.Show(
+                $"{targets.Count} 件中 {ok} 件を分類しました。\n失敗した分はログを確認してください。",
+                "ModSorter", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        RefreshModViews();
+        RefreshSelectedList();
+    }
     private async void ShowDetail(ModEntry mod)
     {
         _currentMod = mod;
@@ -900,10 +993,13 @@ public partial class MainWindow : Window
         DetailId.Text = $"ID: {mod.ModId}";
         DetailVersion.Text = $"バージョン: {mod.Version}";
         DetailLoader.Text = $"ローダー: {mod.Loader}";
-        DetailCategory.Text = mod.Categories.Count == 0
+        string apiLine = mod.Categories.Count == 0
             ? "カテゴリ: ―"
             : $"カテゴリ ({mod.CategorySource}): {mod.CategoryText}";
-
+        string llmLine = mod.HasLlmCategory
+            ? $"\nLLM分類: {string.Join(", ", mod.LlmCategories)}"
+            : "";
+        DetailCategory.Text = apiLine + llmLine;
 
         _mrUrl = mod.ModrinthUrl;
         _cfUrl = mod.CurseForgeUrl;
