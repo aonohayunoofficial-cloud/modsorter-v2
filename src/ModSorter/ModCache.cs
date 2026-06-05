@@ -59,7 +59,20 @@ public static class ModCache
         }
         catch { }
     }
-
+    // キャッシュを全削除(メモリ・JSON・アイコン画像)
+    public static int ClearAll()
+    {
+        int count = _entries.Count;
+        _entries = new();
+        try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch { }
+        try
+        {
+            if (Directory.Exists(IconDir))
+                Directory.Delete(IconDir, true); // アイコンフォルダごと削除
+        }
+        catch { }
+        return count;
+    }
     // キャッシュエントリを返す。無ければnull(TTLは廃止: 一度取得したら無期限保持)
     public static CacheEntry? Get(string sha1)
     {

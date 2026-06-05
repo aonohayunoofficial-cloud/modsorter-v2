@@ -93,38 +93,48 @@
 
                     <Border Grid.Column="2" Background="{StaticResource BgDark}">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
-                                        Margin="8,8,8,4">
-                                <Button Content="大" Style="{StaticResource McButtonGray}"
-                                        Margin="0,0,6,0" Click="ViewLarge_Click"/>
-                                <Button Content="中" Style="{StaticResource McButtonGray}"
-                                        Margin="0,0,6,0" Click="ViewMedium_Click"/>
-                                <Button Content="一覧" Style="{StaticResource McButtonGray}"
-                                        Click="ViewList_Click"/>
+                            <DockPanel DockPanel.Dock="Top" Margin="8,8,8,4">
+                                <!-- 左: 表示切替と並び順 -->
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                    <Button Content="大" Style="{StaticResource McButtonGray}"
+                                            Margin="0,0,6,0" Click="ViewLarge_Click"/>
+                                    <Button Content="中" Style="{StaticResource McButtonGray}"
+                                            Margin="0,0,6,0" Click="ViewMedium_Click"/>
+                                    <Button Content="一覧" Style="{StaticResource McButtonGray}"
+                                            Click="ViewList_Click"/>
+                                    <TextBlock Text="並び順:" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="16,0,4,0"/>
+                                    <ComboBox x:Name="SortCombo" Width="160"
+                                              VerticalAlignment="Center"
+                                              Style="{StaticResource McComboBox}"
+                                              SelectionChanged="SortCombo_SelectionChanged">
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="名称順（昇順）" IsSelected="True"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="名称順（降順）"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="カテゴリ順"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="ファイル更新日順"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="ファイルサイズ順"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="追加日順"/>
+                                        <ComboBoxItem Style="{StaticResource McComboBoxItem}"
+                                                      Content="ローダー順"/>
+                                    </ComboBox>
+                                </StackPanel>
 
-                                <TextBlock Text="並び順:" Style="{StaticResource PixelText}"
-                                           VerticalAlignment="Center" Margin="16,0,4,0"/>
-                                <ComboBox x:Name="SortCombo" Width="160"
-                                          VerticalAlignment="Center"
-                                          Style="{StaticResource McComboBox}"
-                                          SelectionChanged="SortCombo_SelectionChanged">
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="名称順（昇順）" IsSelected="True"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="名称順（降順）"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="カテゴリ順"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="ファイル更新日順"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="ファイルサイズ順"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="追加日順"/>
-                                    <ComboBoxItem Style="{StaticResource McComboBoxItem}"
-                                                  Content="ローダー順"/>
-                                </ComboBox>
+                                <!-- 右: 選択モード開始ボタンのみ -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="SelectModeBtn" Content="選択"
+                                            Style="{StaticResource McButtonGray}"
+                                            Click="SelectMode_Click"/>
+                                </StackPanel>
 
-                            </StackPanel>
+                            </DockPanel>
+
+
                             <ListBox x:Name="CardList" Background="Transparent"
                                      BorderThickness="0" Padding="6"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -141,51 +151,104 @@
                                   Background="{StaticResource StoneDark}"/>
 
                     <Border Grid.Column="4" Background="{StaticResource BgPanel}" Padding="12">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <TextBlock Text="詳細" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource GrassGreen}" Margin="0,0,0,10"/>
-                                <TextBlock x:Name="DetailName" Style="{StaticResource PixelText}"
-                                           FontSize="16" TextWrapping="Wrap" Text="(MODを選択)"/>
-                                <TextBlock x:Name="DetailId" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource TextDim}" Margin="0,8,0,0"/>
-                                <TextBlock x:Name="DetailVersion" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource TextDim}" Margin="0,4,0,0"/>
-                                <TextBlock x:Name="DetailLoader" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource TextDim}" Margin="0,4,0,12"/>
-                                <TextBlock x:Name="DetailCategory" Style="{StaticResource PixelText}"
-                                           TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <Grid>
+                            <!-- ===== 詳細パネル（通常モード） ===== -->
+                            <ScrollViewer x:Name="DetailPanel" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="詳細" Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource GrassGreen}" Margin="0,0,0,10"/>
+                                    <TextBlock x:Name="DetailName" Style="{StaticResource PixelText}"
+                                               FontSize="16" TextWrapping="Wrap" Text="(MODを選択)"/>
+                                    <TextBlock x:Name="DetailId" Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}" Margin="0,8,0,0"/>
+                                    <TextBlock x:Name="DetailVersion" Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}" Margin="0,4,0,0"/>
+                                    <TextBlock x:Name="DetailLoader" Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}" Margin="0,4,0,12"/>
+                                    <TextBlock x:Name="DetailCategory" Style="{StaticResource PixelText}"
+                                               TextWrapping="Wrap" Margin="0,2,0,0"/>
 
-                                <Grid Margin="0,0,0,0">
+                                    <Grid Margin="0,0,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="説明"
+                                                   Style="{StaticResource PixelText}"
+                                                   Foreground="{StaticResource GrassGreen}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" x:Name="TranslateBtn" Content="翻訳"
+                                                Style="{StaticResource McButtonGray}"
+                                                Click="Translate_Click"/>
+                                    </Grid>
+                                    <wv2:WebView2 x:Name="DetailWeb" Height="320"
+                                                  Margin="0,4,0,12"/>
+
+                                    <TextBlock Text="MODページ" Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource GrassGreen}"/>
+                                    <TextBlock x:Name="UrlCurseForge" Style="{StaticResource PixelText}"
+                                               Foreground="#E69138" TextWrapping="Wrap"
+                                               Cursor="Hand" Margin="0,4,0,0"
+                                               MouseLeftButtonUp="UrlCf_Click"
+                                               Text="CurseForge: (なし)"/>
+                                    <TextBlock x:Name="UrlModrinth" Style="{StaticResource PixelText}"
+                                               Foreground="#1BD96A" TextWrapping="Wrap"
+                                               Cursor="Hand" Margin="0,4,0,0"
+                                               MouseLeftButtonUp="UrlMr_Click"
+                                               Text="Modrinth: (なし)"/>
+                                    <Button x:Name="RefetchBtn" Content="このMODを再取得"
+                                            Style="{StaticResource McButtonGray}"
+                                            HorizontalAlignment="Left" Margin="0,16,0,0"
+                                            Click="Refetch_Click"/>
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <!-- ===== 選択モードパネル ===== -->
+                            <DockPanel x:Name="SelectionPanel" Visibility="Collapsed">
+                                <TextBlock DockPanel.Dock="Top" Text="選択モード"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}" Margin="0,0,0,10"/>
+
+                                <!-- 2×2 ボタン -->
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="説明"
-                                               Style="{StaticResource PixelText}"
-                                               Foreground="{StaticResource GrassGreen}"
-                                               VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" x:Name="TranslateBtn" Content="翻訳"
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Button Grid.Row="0" Grid.Column="0" Content="全選択"
                                             Style="{StaticResource McButtonGray}"
-                                            Click="Translate_Click"/>
+                                            Margin="0,0,4,4" Click="SelectAll_Click"/>
+                                    <Button Grid.Row="0" Grid.Column="1" Content="全解除"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="4,0,0,4" Click="SelectNone_Click"/>
+                                    <Button Grid.Row="1" Grid.Column="0" x:Name="RefetchSelectedBtn"
+                                            Content="選択を再取得(0件)"
+                                            Style="{StaticResource McButton}"
+                                            Margin="0,4,4,0" Click="RefetchSelected_Click"/>
+                                    <Button Grid.Row="1" Grid.Column="1" Content="選択終了"
+                                            Style="{StaticResource McButtonRed}"
+                                            Margin="4,4,0,0" Click="SelectMode_Click"/>
                                 </Grid>
-                                <wv2:WebView2 x:Name="DetailWeb" Height="320"
-                                              Margin="0,4,0,12"/>
 
-                                <TextBlock Text="MODページ" Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource GrassGreen}"/>
-                                <TextBlock x:Name="UrlCurseForge" Style="{StaticResource PixelText}"
-                                           Foreground="#E69138" TextWrapping="Wrap"
-                                           Cursor="Hand" Margin="0,4,0,0"
-                                           MouseLeftButtonUp="UrlCf_Click"
-                                           Text="CurseForge: (なし)"/>
-                                <TextBlock x:Name="UrlModrinth" Style="{StaticResource PixelText}"
-                                           Foreground="#1BD96A" TextWrapping="Wrap"
-                                           Cursor="Hand" Margin="0,4,0,0"
-                                           MouseLeftButtonUp="UrlMr_Click"
-                                           Text="Modrinth: (なし)"/>
-                            </StackPanel>
-                        </ScrollViewer>
+                                <TextBlock DockPanel.Dock="Top" Text="選択中のMOD"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}" Margin="0,0,0,6"/>
+
+                                <!-- 選択中MOD一覧（一覧表示と同じ ListTemplate） -->
+                                <ListBox x:Name="SelectedList" Background="Transparent"
+                                         BorderThickness="0" Padding="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ItemContainerStyle="{StaticResource TransparentListBoxItem}"
+                                         HorizontalContentAlignment="Stretch"
+                                         ItemTemplate="{StaticResource ListTemplate}"
+                                         SelectionChanged="SelectedList_SelectionChanged"/>
+                            </DockPanel>
+                        </Grid>
                     </Border>
                 </Grid>
             </TabItem>
@@ -286,6 +349,18 @@
                                     HorizontalAlignment="Left" Click="SaveSettings_Click"/>
                             <TextBlock x:Name="SettingsStatus" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource TextDim}" Margin="0,10,0,0"/>
+
+                            <TextBlock Text="キャッシュ管理" Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}" Margin="0,28,0,0"/>
+                            <TextBlock Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,4,0,8"
+                                       Text="MOD情報とアイコンの保存データを全て削除します。次回スキャンで再取得されます。"/>
+                            <Button Content="キャッシュを全削除" Style="{StaticResource McButtonGray}"
+                                    HorizontalAlignment="Left" Click="ClearCache_Click"/>
+                            <TextBlock x:Name="CacheStatus" Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" Margin="0,8,0,0"/>
+
                         </StackPanel>
                     </Border>
                 </Grid>

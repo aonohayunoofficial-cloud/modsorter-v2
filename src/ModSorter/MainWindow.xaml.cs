@@ -87,10 +87,33 @@ public partial class MainWindow : Window
         Log("設定を保存しました。");
         CfKeyBox.Password = "";
         DeepLKeyBox.Password = "";
-
     }
+    private void ClearCache_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            "MOD情報とアイコンのキャッシュを全て削除します。\n次回スキャンで全件を再取得します。よろしいですか?",
+            "ModSorter - キャッシュ全削除",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes) return;
 
+        int count = ModCache.ClearAll();
+        CacheStatus.Text = $"キャッシュを削除しました({count} 件)。";
+        Log($"キャッシュを全削除しました({count} 件)。");
 
+        // 表示中のMODのキャッシュ由来データもクリアして見た目を揃える
+        foreach (var mod in _mods)
+        {
+            mod.ModrinthUrl = "";
+            mod.CurseForgeUrl = "";
+            mod.Body = "";
+            mod.IconUrl = "";
+            mod.IconFile = "";
+            mod.Categories = new();
+            mod.CategorySource = "";
+            mod.TranslatedHtml = "";
+        }
+        RefreshModViews();
+    }
     // ===== Mods スキャン =====
     private async void Scan_Click(object sender, RoutedEventArgs e)
     {
@@ -294,6 +317,106 @@ public partial class MainWindow : Window
         Log($"照合完了: Modrinth {mrMatched} 件、CurseForge {cfMatched} 件。キャッシュ保存済み。");
         RefreshModViews();
     }
+    // 1件のMODをオンライン照合し、アイコン保存とキャッシュ書き戻しまで行う
+    private async Task<bool> FetchOneAsync(ModEntry mod)
+    {
+        bool hit = false;
+
+        // 一旦クリア(古いキャッシュ由来データを消して取り直す)
+        mod.ModrinthUrl = "";
+        mod.CurseForgeUrl = "";
+        mod.Body = "";
+        mod.BodyIsHtml = false;
+        mod.IconUrl = "";
+        mod.IconFile = "";
+        mod.Categories = new();
+        mod.CategorySource = "";
+        mod.TranslatedHtml = "";
+
+        // SHA1とファイル情報が未取得なら取得
+        if (string.IsNullOrEmpty(mod.Sha1))
+            mod.Sha1 = ModrinthClient.Sha1(mod.FilePath);
+
+        // Modrinth照合
+        try
+        {
+            var r = await ModrinthClient.GetByHashAsync(mod.FilePath);
+            if (r != null)
+            {
+                mod.ModrinthUrl = r.Url;
+                mod.Body = r.Body;
+                mod.BodyIsHtml = false;
+                if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
+                if (mod.Categories.Count == 0 && r.Categories.Count > 0)
+                {
+                    mod.Categories = r.Categories;
+                    mod.CategorySource = "Modrinth";
+                }
+                hit = true;
+            }
+        }
+        catch { }
+
+        // CurseForge照合(APIキーがあれば)
+        var cfKey = Settings.Decrypt(_settings.CurseForgeKeyEnc);
+        if (!string.IsNullOrEmpty(cfKey))
+        {
+            if (!CurseForgeClient.IsReady) CurseForgeClient.Init(cfKey);
+            try
+            {
+                var r = await CurseForgeClient.GetByFingerprintAsync(mod.FilePath);
+                if (r != null && !string.IsNullOrEmpty(r.Url))
+                {
+                    mod.CurseForgeUrl = r.Url;
+                    if (string.IsNullOrEmpty(mod.IconUrl)) mod.IconUrl = r.IconUrl;
+                    if (string.IsNullOrEmpty(mod.Body))
+                    {
+                        if (!string.IsNullOrEmpty(r.DescriptionHtml))
+                        {
+                            mod.Body = r.DescriptionHtml;
+                            mod.BodyIsHtml = true;
+                        }
+                        else
+                        {
+                            mod.Body = r.Summary;
+                            mod.BodyIsHtml = false;
+                        }
+                    }
+                    if (r.Categories.Count > 0)
+                    {
+                        mod.Categories = r.Categories;
+                        mod.CategorySource = "CurseForge";
+                    }
+                    hit = true;
+                }
+            }
+            catch { }
+        }
+
+        // アイコンをローカル保存
+        if (!string.IsNullOrEmpty(mod.IconUrl))
+            mod.IconFile = await ModCache.EnsureIconAsync(mod.Sha1, mod.IconUrl);
+
+        // キャッシュに書き戻し
+        ModCache.Put(new CacheEntry
+        {
+            Sha1 = mod.Sha1,
+            ModId = mod.ModId,
+            Version = mod.Version,
+            Loader = mod.Loader,
+            ModrinthUrl = mod.ModrinthUrl,
+            CurseForgeUrl = mod.CurseForgeUrl,
+            Body = mod.Body,
+            BodyIsHtml = mod.BodyIsHtml,
+            IconUrl = mod.IconUrl,
+            IconFile = mod.IconFile,
+            Categories = mod.Categories,
+            CategorySource = mod.CategorySource
+        });
+        ModCache.Save();
+
+        return hit;
+    }
 
     private string _viewMode = "medium";
 
@@ -378,11 +501,194 @@ public partial class MainWindow : Window
         if (e.NewValue is TreeViewItem item && item.Tag is ModEntry mod)
             ShowDetail(mod);
     }
+    private bool _selectionMode = false;
+
     private void CardList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CardList.SelectedItem is ModEntry mod)
+        if (CardList.SelectedItem is not ModEntry mod) return;
+
+        if (_selectionMode)
+        {
+            // 選択モード中: クリックでチェック切替(詳細は出さない)
+            mod.IsSelected = !mod.IsSelected;
+            RefreshSelectedList();
+            UpdateRefetchSelectedLabel();
+            // ListBoxの選択ハイライト自体は使わないので選択を解除しておく
+            CardList.SelectedItem = null;
+        }
+        else
+        {
             ShowDetail(mod);
+        }
     }
+
+    private void SelectMode_Click(object sender, RoutedEventArgs e)
+    {
+        _selectionMode = !_selectionMode;
+
+        // 全MODのSelectionModeフラグを更新（カードのチェックボックス表示制御）
+        foreach (var m in _mods)
+            m.SelectionMode = _selectionMode;
+
+        if (_selectionMode)
+        {
+            // 選択モードに入る
+            SelectModeBtn.Visibility = Visibility.Collapsed;
+            DetailPanel.Visibility = Visibility.Collapsed;
+            SelectionPanel.Visibility = Visibility.Visible;
+
+            RefreshSelectedList();
+            UpdateRefetchSelectedLabel();
+        }
+        else
+        {
+            // 選択モードを抜ける：全チェック解除して通常表示へ
+            foreach (var m in _mods)
+                m.IsSelected = false;
+
+            SelectModeBtn.Visibility = Visibility.Visible;
+            SelectionPanel.Visibility = Visibility.Collapsed;
+            DetailPanel.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var mod in _mods) mod.IsSelected = true;
+        RefreshSelectedList();
+        UpdateRefetchSelectedLabel();
+    }
+    private void SelectNone_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var mod in _mods) mod.IsSelected = false;
+        RefreshSelectedList();
+        UpdateRefetchSelectedLabel();
+    }
+
+    // 選択中MOD一覧を再構築
+    private void RefreshSelectedList()
+    {
+        var selected = _mods.Where(m => m.IsSelected)
+                            .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+        SelectedList.ItemsSource = selected;
+    }
+
+    // 選択中リストの行クリック → 中央カードへスクロール＋黄枠ハイライト
+    private void SelectedList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SelectedList.SelectedItem is not ModEntry mod) return;
+
+        // クリックを単発扱いにするため選択状態はリセット
+        SelectedList.SelectedItem = null;
+
+        CardList.ScrollIntoView(mod);
+
+        // 仮想化でコンテナ生成が間に合わないことがあるため遅延実行
+        Dispatcher.BeginInvoke(new Action(() => HighlightCard(mod)),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    // 対象カードのcardBorderに黄枠フェードを2回かける
+    private void HighlightCard(ModEntry mod)
+    {
+        var container = CardList.ItemContainerGenerator
+                                .ContainerFromItem(mod) as FrameworkElement;
+        if (container == null) return;
+
+        var border = FindChild<System.Windows.Controls.Border>(container, "cardBorder");
+        if (border == null) return;
+
+        var originalBrush = border.BorderBrush;
+        var originalThickness = border.BorderThickness;
+
+        var highlight = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xFF, 0xD7, 0x00)); // 黄
+        border.BorderBrush = highlight;
+        border.BorderThickness = new Thickness(3);
+
+        var anim = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = 1.0,
+            To = 0.2,
+            Duration = TimeSpan.FromMilliseconds(300),
+            AutoReverse = true,
+            RepeatBehavior = new System.Windows.Media.Animation.RepeatBehavior(2)
+        };
+        anim.Completed += (_, __) =>
+        {
+            border.BorderBrush = originalBrush;
+            border.BorderThickness = originalThickness;
+            highlight.BeginAnimation(
+                System.Windows.Media.SolidColorBrush.OpacityProperty, null);
+        };
+
+        highlight.BeginAnimation(
+            System.Windows.Media.SolidColorBrush.OpacityProperty, anim);
+    }
+
+    // 指定名の子要素を再帰検索するヘルパー
+    private static T? FindChild<T>(DependencyObject parent, string name)
+        where T : FrameworkElement
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T fe && fe.Name == name)
+                return fe;
+            var result = FindChild<T>(child, name);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private void UpdateRefetchSelectedLabel()
+        {
+        int n = _mods.Count(m => m.IsSelected);
+        RefetchSelectedBtn.Content = $"選択を再取得({n}件)";
+    }
+
+    private async void RefetchSelected_Click(object sender, RoutedEventArgs e)
+        {
+        var targets = _mods.Where(m => m.IsSelected).ToList();
+        if (targets.Count == 0)
+            {
+            MessageBox.Show("再取得するMODを選択してください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"{targets.Count} 件のMODを再取得します。よろしいですか?",
+            "ModSorter - 選択再取得",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        RefetchSelectedBtn.IsEnabled = false;
+        SelectModeBtn.IsEnabled = false;
+        ScanProgress.Visibility = Visibility.Visible;
+        ScanProgress.Value = 0;
+
+        int done = 0, hit = 0;
+        foreach (var mod in targets)
+            {
+            bool ok = await FetchOneAsync(mod);
+            if (ok) hit++;
+            done++;
+            ScanProgress.Value = done * 100.0 / targets.Count;
+            ScanStatus.Text = $"再取得中... {done}/{targets.Count}";
+        }
+
+        ScanProgress.Value = 100;
+        ScanStatus.Text = $"再取得完了: {hit}/{targets.Count} 件ヒット";
+        RefetchSelectedBtn.IsEnabled = true;
+        SelectModeBtn.IsEnabled = true;
+        Log($"選択再取得完了: {hit}/{targets.Count} 件ヒット。");
+
+        RefreshModViews();
+    }
+
 
     private async void ShowDetail(ModEntry mod)
     {
@@ -409,6 +715,33 @@ public partial class MainWindow : Window
         Log($"選択: {mod.FileName}");
 
     }
+    private async void Refetch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentMod == null)
+        {
+            MessageBox.Show("先にMODを選択してください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var mod = _currentMod;
+
+        RefetchBtn.IsEnabled = false;
+        RefetchBtn.Content = "取得中...";
+        Log($"再取得: {mod.FileName}");
+
+        bool hit = await FetchOneAsync(mod);
+
+        RefetchBtn.IsEnabled = true;
+        RefetchBtn.Content = "このMODを再取得";
+
+        // 表示を更新
+        ShowDetail(mod);
+        RefreshModViews();
+
+        Log(hit ? $"再取得完了(ヒット): {mod.FileName}"
+                : $"再取得完了(該当なし): {mod.FileName}");
+    }
+
 
     private async Task ShowBodyAsync(ModEntry mod)
     {

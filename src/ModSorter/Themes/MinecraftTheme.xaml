@@ -1,6 +1,9 @@
 ﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:ModSorter">
+
+    <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
 
     <!-- 配色: Minecraftの石・土・草を意識した自作パレット -->
     <SolidColorBrush x:Key="BgDark"      Color="#1E1B17"/>
@@ -95,42 +98,69 @@
 
     <!-- 大カード -->
     <DataTemplate x:Key="CardLargeTemplate">
-        <Border Style="{StaticResource ModCard}" Width="220" Height="180">
-            <DockPanel>
-                <Border DockPanel.Dock="Top" Height="100" Background="{StaticResource StoneDark}">
-                    <Grid>
-                        <TextBlock Text="MOD" FontSize="26" FontFamily="{StaticResource PixelFont}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextDim}"/>
-                        <Image Stretch="Uniform" Source="{Binding IconSource}"
-                               RenderOptions.BitmapScalingMode="HighQuality"/>
-                    </Grid>
-                </Border>
-                <TextBlock Text="{Binding DisplayName}" FontFamily="{StaticResource PixelFont}"
-                           Foreground="{StaticResource TextMain}" TextWrapping="Wrap"
-                           Margin="0,6,0,0" FontSize="13"/>
-            </DockPanel>
-        </Border>
+        <Grid Width="220" Height="180">
+            <Border x:Name="cardBorder" Style="{StaticResource ModCard}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Height="100" Background="{StaticResource StoneDark}">
+                        <Grid>
+                            <TextBlock Text="MOD" FontSize="26" FontFamily="{StaticResource PixelFont}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextDim}"/>
+                            <Image Stretch="Uniform" Source="{Binding IconSource}"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                    </Border>
+                    <TextBlock Text="{Binding DisplayName}" FontFamily="{StaticResource PixelFont}"
+                               Foreground="{StaticResource TextMain}" TextWrapping="Wrap"
+                               Margin="0,6,0,0" FontSize="13"/>
+                </DockPanel>
+            </Border>
+            <!-- 選択モード中のみ表示するチェックボックス(左上) -->
+            <CheckBox HorizontalAlignment="Left" VerticalAlignment="Top"
+                      Margin="12,12,0,0"
+                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                      IsHitTestVisible="False"
+                      Visibility="{Binding SelectionMode, Converter={StaticResource BoolToVis}}"/>
+        </Grid>
+        <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter TargetName="cardBorder" Property="BorderBrush" Value="#4A90E2"/>
+                <Setter TargetName="cardBorder" Property="BorderThickness" Value="3"/>
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 
     <!-- 中カード -->
     <DataTemplate x:Key="CardMediumTemplate">
-        <Border Style="{StaticResource ModCard}" Width="150" Height="130">
-            <DockPanel>
-                <Border DockPanel.Dock="Top" Height="64" Background="{StaticResource StoneDark}">
-                    <Grid>
-                        <TextBlock Text="MOD" FontSize="18" FontFamily="{StaticResource PixelFont}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextDim}"/>
-                        <Image Stretch="Uniform" Source="{Binding IconSource}"
-                               RenderOptions.BitmapScalingMode="HighQuality"/>
-                    </Grid>
-                </Border>
-                <TextBlock Text="{Binding DisplayName}" FontFamily="{StaticResource PixelFont}"
-                           Foreground="{StaticResource TextMain}" TextWrapping="Wrap"
-                           Margin="0,4,0,0" FontSize="11"/>
-            </DockPanel>
-        </Border>
+        <Grid Width="150" Height="130">
+            <Border x:Name="cardBorder" Style="{StaticResource ModCard}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Height="64" Background="{StaticResource StoneDark}">
+                        <Grid>
+                            <TextBlock Text="MOD" FontSize="18" FontFamily="{StaticResource PixelFont}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextDim}"/>
+                            <Image Stretch="Uniform" Source="{Binding IconSource}"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                    </Border>
+                    <TextBlock Text="{Binding DisplayName}" FontFamily="{StaticResource PixelFont}"
+                               Foreground="{StaticResource TextMain}" TextWrapping="Wrap"
+                               Margin="0,4,0,0" FontSize="11"/>
+                </DockPanel>
+            </Border>
+            <CheckBox HorizontalAlignment="Left" VerticalAlignment="Top"
+                      Margin="8,8,0,0"
+                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                      IsHitTestVisible="False"
+                      Visibility="{Binding SelectionMode, Converter={StaticResource BoolToVis}}"/>
+        </Grid>
+        <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter TargetName="cardBorder" Property="BorderBrush" Value="#4A90E2"/>
+                <Setter TargetName="cardBorder" Property="BorderThickness" Value="3"/>
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 
     <!-- 一覧表示(画像なし・縦並び) -->
@@ -290,5 +320,32 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- ===== 赤ボタン（選択終了など） ===== -->
+    <Style x:Key="McButtonRed" TargetType="Button" BasedOn="{StaticResource McButton}">
+        <Setter Property="Background" Value="#B23B3B"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="#7A2222" Padding="0,0,2,2">
+                        <Border x:Name="inner" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="inner" Property="Background" Value="#C84A4A"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="inner" Property="Background" Value="#922F2F"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 
 </ResourceDictionary>

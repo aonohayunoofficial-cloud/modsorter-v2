@@ -1,6 +1,9 @@
-﻿namespace ModSorter;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
-public class ModEntry
+namespace ModSorter;
+
+public class ModEntry : INotifyPropertyChanged
 {
     public string FileName { get; set; } = "";
     public string FilePath { get; set; } = "";
@@ -23,7 +26,13 @@ public class ModEntry
     public bool BodyIsHtml { get; set; } = false; // true=HTML(CurseForge), false=Markdown(Modrinth)
 
     public string Sha1 { get; set; } = "";
-    public string IconFile { get; set; } = "";
+
+    private string _iconFile = "";
+    public string IconFile
+    {
+        get => _iconFile;
+        set { _iconFile = value; OnChanged(); OnChanged(nameof(IconSource)); }
+    }
     // 画像表示用: ローカルファイルがあればそれを、なければURLを使う
     public string IconSource => string.IsNullOrEmpty(IconFile) ? IconUrl : IconFile;
     public string TranslatedHtml { get; set; } = ""; // 翻訳済みHTMLのキャッシュ(セッション内)
@@ -41,4 +50,23 @@ public class ModEntry
     public long FileSize { get; set; }
     public DateTime FileCreated { get; set; }
     public DateTime FileModified { get; set; }
+
+    // ===== 選択モード用 =====
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { _isSelected = value; OnChanged(); }
+    }
+
+    private bool _selectionMode;
+    public bool SelectionMode
+    {
+        get => _selectionMode;
+        set { _selectionMode = value; OnChanged(); }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
