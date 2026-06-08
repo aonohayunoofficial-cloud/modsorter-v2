@@ -603,6 +603,14 @@
                                        Foreground="{StaticResource TextDim}" FontSize="11"
                                        TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
 
+                            <TextBlock DockPanel.Dock="Top" Text="3Dプレビュー"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <Border DockPanel.Dock="Top" Height="300" Margin="0,4,0,8"
+                                    BorderBrush="{StaticResource StoneDark}" BorderThickness="2">
+                                <wv2:WebView2 x:Name="ArchPreviewWeb"/>
+                            </Border>
+
                             <TextBlock DockPanel.Dock="Top" Text="生出力 / パース結果"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
@@ -613,6 +621,7 @@
                                      BorderThickness="0" Padding="6" Margin="0,4,0,0"
                                      TextWrapping="Wrap"
                                      VerticalScrollBarVisibility="Auto"/>
+
                         </DockPanel>
                     </Border>
                 </Grid>
