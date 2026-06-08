@@ -37,7 +37,10 @@
                             <Button Content="クラッシュレポート" Style="{StaticResource McButtonGray}"
                                     Margin="0,0,0,10" Click="NavCrash_Click"/>
                             <Button Content="設定" Style="{StaticResource McButtonGray}"
-                                    Click="NavSettings_Click"/>
+                                    Margin="0,0,0,10" Click="NavSettings_Click"/>
+                            <Button Content="建築モード" Style="{StaticResource McButtonGray}"
+                                    Click="NavArchitect_Click"/>
+
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="1" Background="{StaticResource BgDark}">
@@ -530,6 +533,87 @@
                                        Foreground="{StaticResource TextDim}" Margin="0,8,0,0"/>
 
                         </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
+            <!-- ===== Tab 4: 建築モード（Mine Architect / 最小実験） ===== -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource BgPanel}">
+                        <StackPanel Margin="10">
+                            <Button Content="← 戻る" Style="{StaticResource McButtonGray}"
+                                    HorizontalAlignment="Left" Click="Back_Click"/>
+                            <TextBlock Text="建築モード" FontSize="18" Margin="0,20,0,0"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBlock Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Text="最小実験: 指示+ブロックリスト → 座標+ID JSON が返るか確認"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="{StaticResource BgDark}" Padding="24">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="モデル名"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,4,0,12">
+                                <Button DockPanel.Dock="Right" x:Name="ArchModelRefreshBtn"
+                                        Content="再取得" Style="{StaticResource McButtonGray}"
+                                        Margin="6,0,0,0" Click="ArchModelRefresh_Click"/>
+                                <ComboBox x:Name="ArchModelCombo"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          VerticalAlignment="Center"/>
+                            </DockPanel>
+
+                            <TextBlock DockPanel.Dock="Top" Text="使用可能ブロック(カンマ区切り)"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBox DockPanel.Dock="Top" x:Name="ArchBlocksBox"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}"
+                                     BorderThickness="0" Padding="6" Margin="0,4,0,12"
+                                     TextWrapping="Wrap" AcceptsReturn="True" Height="48"
+                                     Text="minecraft:oak_planks, minecraft:oak_log, minecraft:glass, minecraft:cobblestone"/>
+
+                            <TextBlock DockPanel.Dock="Top" Text="作りたいものの指示"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBox DockPanel.Dock="Top" x:Name="ArchPromptBox"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}"
+                                     BorderThickness="0" Padding="6" Margin="0,4,0,12"
+                                     TextWrapping="Wrap" AcceptsReturn="True" Height="60"
+                                     Text="5x5x4 の小さな木の小屋。壁は oak_planks、窓は glass を少し。"/>
+
+                            <Button DockPanel.Dock="Top" x:Name="ArchGenBtn"
+                                    Content="生成テスト" Style="{StaticResource McButton}"
+                                    HorizontalAlignment="Left" Margin="0,0,0,8"
+                                    Click="ArchGenerate_Click"/>
+                            <TextBlock DockPanel.Dock="Top" x:Name="ArchStatus"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
+
+                            <TextBlock DockPanel.Dock="Top" Text="生出力 / パース結果"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBox x:Name="ArchResultBox" IsReadOnly="True"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}" FontSize="11"
+                                     BorderThickness="0" Padding="6" Margin="0,4,0,0"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </DockPanel>
                     </Border>
                 </Grid>
             </TabItem>
