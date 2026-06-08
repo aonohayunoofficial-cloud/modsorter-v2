@@ -62,9 +62,19 @@ FIELD MEANING:
 - roof_type: ""flat"" (a flat roof) or ""gable"" (a triangular pitched roof).
 - ridge_axis: only for gable. ""x"" = ridge runs along X (roof slopes toward Z edges);
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
-- floor_levels: heights (y) where an extra floor is added, to make a multi-story building.
-  Empty [] = single story. For a 2-story house make height tall enough (e.g. 7) and put
-  one middle floor around the middle (e.g. [3]). Each value must be between 1 and height-2.
+- floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
+  to split the interior into multiple stories. Empty [] = single story.
+
+HOW TO HANDLE STORIES (IMPORTANT):
+- If the instruction asks for N stories (e.g. ""2-story"", ""2階建て"", ""3 floors""),
+  you MUST make a multi-story building. Do NOT leave floor_levels empty in that case.
+- Give each story about 4 blocks of height. So:
+    1 story  -> height about 4, floor_levels = []
+    2 stories -> height about 7, floor_levels = [4]   (one floor slab at y=4)
+    3 stories -> height about 10, floor_levels = [4, 7]
+- Each floor_levels value must be between 1 and height-2.
+- If the instruction explicitly gives dimensions like ""WxDxH"", use that H as height,
+  and still add the appropriate floor_levels for the requested number of stories.
 - openings: each is on one wall face (""north"",""south"",""east"",""west"").
   - kind: ""door"" (an empty opening) or ""window"" (a glass cell).
   - offset: position along that face (0 = one corner, up to width-1 or depth-1).
