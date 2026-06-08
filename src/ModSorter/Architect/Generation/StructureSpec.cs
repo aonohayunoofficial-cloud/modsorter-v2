@@ -16,6 +16,13 @@ public sealed class StructureSpec
     [JsonPropertyName("roof_block")] public string? RoofBlock { get; set; }
     [JsonPropertyName("wall_block")] public string? WallBlock { get; set; }
 
+    // 屋根の形: "flat"（平屋根・既定） または "gable"（切妻・三角）
+    [JsonPropertyName("roof_type")] public string? RoofType { get; set; }
+
+    // gable のときの棟の向き: "x"（棟がx軸に平行・z方向に傾斜） または "z"
+    [JsonPropertyName("ridge_axis")] public string? RidgeAxis { get; set; }
+
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 }

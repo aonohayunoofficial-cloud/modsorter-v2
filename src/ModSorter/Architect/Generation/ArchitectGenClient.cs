@@ -42,10 +42,13 @@ OUTPUT SHAPE (this exact JSON shape):
   ""width"": 5,
   ""depth"": 5,
   ""height"": 4,
-  ""floor_block"": ""minecraft:oak_planks"",
+    ""floor_block"": ""minecraft:oak_planks"",
   ""wall_block"": ""minecraft:oak_planks"",
   ""roof_block"": ""minecraft:oak_planks"",
+  ""roof_type"": ""gable"",
+  ""ridge_axis"": ""x"",
   ""openings"": [
+
     {{ ""face"": ""south"", ""kind"": ""door"",   ""offset"": 2, ""level"": 1 }},
     {{ ""face"": ""east"",  ""kind"": ""window"", ""offset"": 2, ""level"": 1, ""block"": ""minecraft:glass"" }}
   ]
@@ -54,7 +57,11 @@ OUTPUT SHAPE (this exact JSON shape):
 FIELD MEANING:
 - width = size along X, depth = size along Z, height = number of layers (vertical).
 - *_block = which allowed block to use for that part.
+- roof_type: ""flat"" (a flat roof) or ""gable"" (a triangular pitched roof).
+- ridge_axis: only for gable. ""x"" = ridge runs along X (roof slopes toward Z edges);
+  ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
 - openings: each is on one wall face (""north"",""south"",""east"",""west"").
+
   - kind: ""door"" (an empty opening) or ""window"" (a glass cell).
   - offset: position along that face (0 = one corner, up to width-1 or depth-1).
   - level: which middle layer, counting from the floor (1 = just above the floor).

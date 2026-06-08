@@ -29,10 +29,13 @@ public static class StructureExpander
             for (int z = 0; z < d; z++)
                 cells[(x, 0, z)] = floor;
 
-        // 屋根（y=h-1 全面）
-        for (int x = 0; x < w; x++)
-            for (int z = 0; z < d; z++)
-                cells[(x, h - 1, z)] = roof;
+        // 屋根（roof_type で分岐）
+        string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
+        if (roofType == "gable")
+            BuildGableRoof(cells, spec, w, d, h, roof);
+        else
+            BuildFlatRoof(cells, w, d, h, roof);
+
 
         // 壁（中間層 y=1..h-2 の外周リングのみ）
         for (int y = 1; y <= h - 2; y++)
@@ -55,6 +58,51 @@ public static class StructureExpander
                 Id = kv.Value
             })
             .ToList();
+    }
+
+    // 平屋根: 最上層 y=h-1 を全面で塞ぐ
+    private static void BuildFlatRoof(
+        Dictionary<(int x, int y, int z), string> cells, int w, int d, int h, string roof)
+    {
+        for (int x = 0; x < w; x++)
+            for (int z = 0; z < d; z++)
+                cells[(x, h - 1, z)] = roof;
+    }
+
+    // 切妻屋根: 棟の向き(ridge_axis)に沿って段々に三角を作る。
+    // 屋根は本体の上(y=h から上)に積む。傾斜方向の端から中央へ向け段を上げる。
+    private static void BuildGableRoof(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string roof)
+    {
+        string axis = (spec.RidgeAxis ?? "x").Trim().ToLowerInvariant();
+        // 棟がx軸に平行 → z方向に傾斜（zの端から中央へ高くなる）
+        // 棟がz軸に平行 → x方向に傾斜（xの端から中央へ高くなる）
+        bool ridgeAlongX = (axis != "z");
+
+        int slopeLen = ridgeAlongX ? d : w; // 傾斜する方向の長さ
+        // 端から中央までの段数。中央で最も高い。
+        int half = (slopeLen + 1) / 2;
+
+        for (int i = 0; i < slopeLen; i++)
+        {
+            // 端(0 と slopeLen-1)が低く、中央が高い。step = 端からの距離。
+            int step = System.Math.Min(i, slopeLen - 1 - i);
+            int yLevel = h + step; // 本体の上(y=h)から段を積む
+
+            if (ridgeAlongX)
+            {
+                // z=i の列。棟方向(x)は全幅に渡って同じ高さ。
+                for (int x = 0; x < w; x++)
+                    cells[(x, yLevel, i)] = roof;
+            }
+            else
+            {
+                // x=i の列。棟方向(z)は全奥行きに渡って同じ高さ。
+                for (int z = 0; z < d; z++)
+                    cells[(i, yLevel, z)] = roof;
+            }
+        }
     }
 
     private static void ApplyOpening(
