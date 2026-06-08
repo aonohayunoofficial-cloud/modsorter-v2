@@ -22,7 +22,7 @@ public sealed class ArchitectGenClient
     }
     public async Task<GenerationResult> GenerateAsync(
     string model, string instruction, IReadOnlyList<string> allowedBlocks,
-    double temperature = 0.2)
+    double temperature = 0.2, string? variantHint = null)
     {
 
         var result = new GenerationResult();
@@ -89,6 +89,7 @@ RULES:
 
 BUILD INSTRUCTION:
 {instruction}
+{(string.IsNullOrEmpty(variantHint) ? "" : "\nVARIATION FOR THIS DESIGN: " + variantHint)}
 
 JSON:";
 
@@ -169,15 +170,21 @@ JSON:";
     // 同じ指示で複数案を生成する。案ごとに temperature を変えて差を出す。
     // 成功・失敗を問わず count 件の結果を返す（呼び出し側で成否を見る）。
     public async Task<List<GenerationResult>> GenerateMultipleAsync(
-        string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3)
+    string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3)
     {
         var results = new List<GenerationResult>();
-        // 案ごとの temperature。案1は手堅く、案2・3は変化を出す。
-        double[] temps = { 0.3, 0.6, 0.9 };
+        // 案ごとの temperature と方向性ヒント。temperatureだけでは差が出ないため
+        // 方向性を明示的に変えて、確実に違う案を作る。
+        var variants = new (double temp, string hint)[]
+        {
+            (0.3, "A standard, balanced version that fits the instruction faithfully."),
+            (0.6, "A more compact version: slightly smaller footprint, cozy. Vary window/door placement."),
+            (0.9, "A more spacious version: taller or larger, more windows. Consider a flat roof or a different ridge axis if it suits.")
+        };
         for (int i = 0; i < count; i++)
         {
-            double t = temps[i % temps.Length];
-            var r = await GenerateAsync(model, instruction, allowedBlocks, t);
+            var v = variants[i % variants.Length];
+            var r = await GenerateAsync(model, instruction, allowedBlocks, v.temp, v.hint);
             results.Add(r);
         }
         return results;
