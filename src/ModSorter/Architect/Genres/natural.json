@@ -1,0 +1,47 @@
+﻿{
+  "display_name": "自然・素朴",
+  "order": 40,
+  "style_prompt": "A natural, rustic building that blends into the landscape. Use earthy, organic materials like raw logs, leaves, stone and dirt. Favor simple, cozy shapes over rigid geometry. Keep walls plain without prominent columns or exposed framing; do not emphasize pilasters. Gentle, irregular charm rather than industrial precision.",
+  "blocks": [
+    {
+      "id": "minecraft:oak_log",
+      "name": "樫の原木"
+    },
+    {
+      "id": "minecraft:oak_planks",
+      "name": "樫の木材"
+    },
+    {
+      "id": "minecraft:spruce_log",
+      "name": "トウヒの原木"
+    },
+    {
+      "id": "minecraft:spruce_planks",
+      "name": "トウヒの木材"
+    },
+    {
+      "id": "minecraft:cobblestone",
+      "name": "丸石"
+    },
+    {
+      "id": "minecraft:mossy_cobblestone",
+      "name": "苔むした丸石"
+    },
+    {
+      "id": "minecraft:stone",
+      "name": "石"
+    },
+    {
+      "id": "minecraft:dirt",
+      "name": "土"
+    },
+    {
+      "id": "minecraft:oak_leaves",
+      "name": "樫の葉"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    }
+  ]
+}
