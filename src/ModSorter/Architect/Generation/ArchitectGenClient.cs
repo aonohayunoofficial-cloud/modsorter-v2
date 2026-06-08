@@ -47,6 +47,8 @@ OUTPUT SHAPE (this exact JSON shape):
   ""floor_block"": ""minecraft:oak_planks"",
   ""wall_block"": ""minecraft:oak_planks"",
   ""roof_block"": ""minecraft:oak_planks"",
+  ""accent_block"": ""minecraft:oak_log"",
+  ""pilaster_step"": 3,
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
   ""floor_levels"": [],
@@ -66,6 +68,12 @@ FIELD MEANING:
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
+- accent_block: an allowed block used for vertical support columns (pilasters) on the
+  walls. Choose a block that contrasts with wall_block (e.g. a log or a darker block).
+  Omit it (or set it equal to wall_block) if the style should look plain.
+- pilaster_step: spacing of those columns along the walls, as an integer.
+  2-4 gives a visible rhythm of columns; use it when the style suits exposed framing
+  (e.g. industrial, half-timbered, structured looks). Omit or 0 means no columns.
 
 HOW TO HANDLE STORIES (IMPORTANT):
 - If the instruction asks for N stories (e.g. ""2-story"", ""2階建て"", ""3 floors""),
@@ -86,6 +94,9 @@ RULES:
 - Interpret the instruction's size (e.g. ""5x5x4"" means width=5, depth=5, height=4).
 - Use only allowed block IDs for *_block and window block.
 - Keep openings on walls, not on corners. A small house has 1 door and a few windows.
+- Use accent_block + pilaster_step only when the style benefits from visible columns or
+  framing (industrial, fortified, or structured looks). For plain or natural styles,
+  omit them so the walls stay simple.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
 {(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:

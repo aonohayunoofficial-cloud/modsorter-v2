@@ -26,10 +26,17 @@ public sealed class StructureSpec
     // 1階の床(y=0)と屋根は別管理なので、ここには中間の階の床だけを入れる。
     [JsonPropertyName("floor_levels")] public List<int> FloorLevels { get; set; } = new();
 
+    // 柱型リズム（pilaster）用のアクセント材。未指定なら wall_block と同じ＝柱が目立たない。
+    // 例: 壁が oak_planks のとき accent_block を oak_log にすると柱だけ丸太になる。
+    [JsonPropertyName("accent_block")] public string? AccentBlock { get; set; }
 
+    // 柱を立てる間隔。2以上で有効、未指定/1以下なら柱なし（角だけは accent になる）。
+    // 例: 3 なら外周に沿って3マスごとに柱を立てる。
+    [JsonPropertyName("pilaster_step")] public int? PilasterStep { get; set; }
 
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
+
 }
 
 // 開口部1つ。座標ではなく「どの面の、どのあたりか」で表す。

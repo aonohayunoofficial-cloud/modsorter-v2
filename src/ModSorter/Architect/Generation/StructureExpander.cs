@@ -36,12 +36,25 @@ public static class StructureExpander
         else
             BuildFlatRoof(cells, w, d, h, roof);
 
+        // アクセント材（柱型リズム用）。未指定なら wall と同じ＝従来の見た目。
+        string accent = Pick(spec.AccentBlock, allowedBlocks, wall);
+        // 柱の間隔（spec 指定、未指定/不正なら 0＝柱なし）。
+        int pilasterStep = spec.PilasterStep.HasValue && spec.PilasterStep.Value >= 2
+            ? spec.PilasterStep.Value : 0;
+
         // 壁（中間層 y=1..h-2 の外周リングのみ）
         for (int y = 1; y <= h - 2; y++)
             for (int x = 0; x < w; x++)
                 for (int z = 0; z < d; z++)
                     if (x == 0 || x == w - 1 || z == 0 || z == d - 1)
-                        cells[(x, y, z)] = wall;
+                    {
+                        bool isCorner = (x == 0 || x == w - 1) && (z == 0 || z == d - 1);
+                        bool isPilaster = pilasterStep > 0 &&
+                            ((x == 0 || x == w - 1) ? (z % pilasterStep == 0)
+                                                    : (x % pilasterStep == 0));
+                        cells[(x, y, z)] = (isCorner || isPilaster) ? accent : wall;
+                    }
+
 
         // 中間床（複数階）。指定された各 y に内部も含む全面の床を敷く。
         foreach (int fy in (spec.FloorLevels ?? new List<int>()).Distinct())
