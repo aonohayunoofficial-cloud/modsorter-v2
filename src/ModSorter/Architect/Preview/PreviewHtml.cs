@@ -19,11 +19,25 @@ public static class PreviewHtml
 <script src='https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js'></script>
 </head>
 <body>
-<div id='info'>(生成するとここに表示されます)</div>
+<div id='info'>(初期化中...)</div>
 <script>
+window.onerror = function(msg) {
+  document.getElementById('info').textContent = 'JSエラー: ' + msg;
+};
 let scene, camera, renderer, controls, group;
 
 function init() {
+  if (typeof THREE === 'undefined') {
+    document.getElementById('info').textContent =
+      'THREE 未読込（CDNに到達できていない可能性）';
+    return;
+  }
+  if (typeof THREE.OrbitControls === 'undefined') {
+    document.getElementById('info').textContent =
+      'OrbitControls 未読込';
+    return;
+  }
+
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1c1c1c);
 
