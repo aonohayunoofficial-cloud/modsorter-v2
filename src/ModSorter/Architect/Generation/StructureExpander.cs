@@ -29,6 +29,17 @@ public static class StructureExpander
             for (int z = 0; z < d; z++)
                 cells[(x, 0, z)] = floor;
 
+        // 土台段（base course）: y=0 の外周一周を土台材に差し替える。
+        // 未指定なら floor と同じ＝従来の見た目（差し替えても影響なし）。座標系は変えない。
+        string baseBlock = Pick(spec.BaseBlock, allowedBlocks, floor);
+        if (spec.HasBase)
+        {
+            for (int x = 0; x < w; x++)
+                for (int z = 0; z < d; z++)
+                    if (x == 0 || x == w - 1 || z == 0 || z == d - 1)
+                        cells[(x, 0, z)] = baseBlock;
+        }
+
         // 屋根（roof_type で分岐）
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
         if (roofType == "gable")

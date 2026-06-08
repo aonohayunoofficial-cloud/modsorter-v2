@@ -49,6 +49,8 @@ OUTPUT SHAPE (this exact JSON shape):
   ""roof_block"": ""minecraft:oak_planks"",
   ""accent_block"": ""minecraft:oak_log"",
   ""pilaster_step"": 3,
+  ""has_base"": true,
+  ""base_block"": ""minecraft:cobblestone"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
   ""floor_levels"": [],
@@ -74,6 +76,11 @@ FIELD MEANING:
 - pilaster_step: spacing of those columns along the walls, as an integer.
   2-4 gives a visible rhythm of columns; use it when the style suits exposed framing
   (e.g. industrial, half-timbered, structured looks). Omit or 0 means no columns.
+- has_base: true to add a base course (a foundation ring) at the bottom of the walls.
+  Use it for buildings that look better sitting on a stone/brick foundation.
+- base_block: the allowed block for that base course. Choose something solid and
+  contrasting with the floor (e.g. cobblestone or stone bricks under wooden walls).
+  Only matters when has_base is true.
 
 HOW TO HANDLE STORIES (IMPORTANT):
 - If the instruction asks for N stories (e.g. ""2-story"", ""2階建て"", ""3 floors""),
@@ -97,6 +104,8 @@ RULES:
 - Use accent_block + pilaster_step only when the style benefits from visible columns or
   framing (industrial, fortified, or structured looks). For plain or natural styles,
   omit them so the walls stay simple.
+- Use has_base + base_block when a stone/brick foundation suits the building (most
+  houses look good on one). Skip it for very simple or floating structures.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
 {(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:

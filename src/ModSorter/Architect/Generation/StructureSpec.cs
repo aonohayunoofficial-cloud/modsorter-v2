@@ -34,9 +34,16 @@ public sealed class StructureSpec
     // 例: 3 なら外周に沿って3マスごとに柱を立てる。
     [JsonPropertyName("pilaster_step")] public int? PilasterStep { get; set; }
 
+    // 土台段（base course）を作るか。true で y=0 の外周一周を base_block に差し替える。
+    // 未指定(false)なら土台なし＝従来の見た目。座標系は変えない（張り出しはしない）。
+    [JsonPropertyName("has_base")] public bool HasBase { get; set; }
+
+    // 土台段の素材。未指定なら floor_block と同じ＝差し替えても見た目が変わらない。
+    // 例: 床が oak_planks のとき base_block を cobblestone にすると足元だけ石の基礎になる。
+    [JsonPropertyName("base_block")] public string? BaseBlock { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
-
 }
 
 // 開口部1つ。座標ではなく「どの面の、どのあたりか」で表す。
