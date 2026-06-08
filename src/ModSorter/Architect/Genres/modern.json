@@ -1,0 +1,27 @@
+﻿{
+  "display_name": "近代的",
+  "order": 30,
+  "style_prompt": "A modern building. Clean lines, flat roofs, lots of glass. Use concrete and quartz with large glass walls. Minimalist and bright.",
+  "blocks": [
+    {
+      "id": "minecraft:white_concrete",
+      "name": "白色のコンクリート"
+    },
+    {
+      "id": "minecraft:quartz_block",
+      "name": "クォーツブロック"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
+    },
+    {
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
+    }
+  ]
+}

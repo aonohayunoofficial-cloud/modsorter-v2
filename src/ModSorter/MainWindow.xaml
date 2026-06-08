@@ -561,9 +561,19 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
+                                <TextBlock Text="ジャンル"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <ComboBox x:Name="ArchGenreCombo" Margin="0,4,0,12"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectionChanged="ArchGenre_SelectionChanged"/>
+
                                 <TextBlock Text="モデル名"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
+
                                 <DockPanel Margin="0,4,0,12">
                                     <Button DockPanel.Dock="Right" x:Name="ArchModelRefreshBtn"
                                             Content="再取得" Style="{StaticResource McButtonGray}"

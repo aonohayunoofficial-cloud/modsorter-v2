@@ -1,0 +1,27 @@
+﻿{
+  "display_name": "工業的",
+  "order": 20,
+  "style_prompt": "An industrial / factory building. Use concrete, iron, and bricks. Flat roofs, large window openings, a utilitarian boxy look. Prefer stone, iron blocks, and bricks.",
+  "blocks": [
+    {
+      "id": "minecraft:stone",
+      "name": "石"
+    },
+    {
+      "id": "minecraft:bricks",
+      "name": "レンガ"
+    },
+    {
+      "id": "minecraft:iron_block",
+      "name": "鉄ブロック"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
+    }
+  ]
+}

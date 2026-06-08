@@ -1,0 +1,27 @@
+﻿{
+  "display_name": "中世・ファンタジー",
+  "order": 10,
+  "style_prompt": "A medieval / fantasy building. Use stone and timber. Sloped (gable) roofs, small windows, a sturdy rustic look. Prefer cobblestone, stone bricks, and oak wood.",
+  "blocks": [
+    {
+      "id": "minecraft:cobblestone",
+      "name": "丸石"
+    },
+    {
+      "id": "minecraft:stone_bricks",
+      "name": "石レンガ"
+    },
+    {
+      "id": "minecraft:oak_planks",
+      "name": "オークの板材"
+    },
+    {
+      "id": "minecraft:oak_log",
+      "name": "オークの原木"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    }
+  ]
+}

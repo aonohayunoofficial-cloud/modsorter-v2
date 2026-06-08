@@ -19,6 +19,9 @@ public partial class MainWindow
     private PreviewWindow? _previewWindow;
     // 直近に生成した3案を保持（案切り替え用）
     private List<GenerationResult>? _archCases;
+    // 読み込んだジャンル一覧と、現在選択中のジャンル
+    private List<Genre>? _genres;
+    private Genre? _currentGenre;
 
     private async void NavArchitect_Click(object sender, RoutedEventArgs e)
     {
@@ -28,9 +31,12 @@ public partial class MainWindow
         MainTabs.SelectedIndex = 4;
         Log("建築モードを起動しました（最小実験）。");
 
-        // 初回起動時にモデル一覧をロード（タブを開いた後なので遅延方針に反しない）
+        // 初回起動時にモデル一覧とジャンルをロード
         if (firstLaunch)
+        {
             await LoadArchModelsAsync();
+            LoadArchGenres();
+        }
     }
 
     // 3Dプレビューを別ウィンドウで開く（既に開いていれば前面に出す）
@@ -80,7 +86,34 @@ public partial class MainWindow
 
         ArchStatus.Text = $"モデル {models.Count} 件を取得しました。";
     }
+    private void LoadArchGenres()
+    {
+        _genres = GenreCatalog.Load();
+        ArchGenreCombo.ItemsSource = _genres;
 
+        if (_genres.Count == 0)
+        {
+            ArchStatus.Text = "ジャンルが読み込めませんでした。" +
+                (string.IsNullOrEmpty(GenreCatalog.LastError) ? "" : GenreCatalog.LastError);
+            return;
+        }
+        ArchGenreCombo.SelectedIndex = 0; // 先頭ジャンルを選択（→ブロック欄も自動入力）
+    }
+
+    private void ArchGenre_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        _currentGenre = ArchGenreCombo.SelectedItem as Genre;
+        if (_currentGenre == null) return;
+
+        // ブロック欄を、このジャンルのブロックで自動入力（日本語名つきの参考表示も）
+        // 実際にモデルへ渡すのは ID。欄にはIDをカンマ区切りで入れる。
+        ArchBlocksBox.Text = string.Join(", ", _currentGenre.Blocks.Select(b => b.Id));
+
+        // 分かりやすいように、ID→日本語名の対応をステータスに出す
+        var pairs = _currentGenre.Blocks
+            .Select(b => $"{b.Name}({b.Id})");
+        ArchStatus.Text = $"ジャンル「{_currentGenre.DisplayName}」: " + string.Join(" / ", pairs);
+    }
 
     private async void ArchGenerate_Click(object sender, RoutedEventArgs e)
     {
@@ -108,7 +141,8 @@ public partial class MainWindow
         ArchResultBox.Text = "";
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        _archCases = await _architectHost.Generation.GenerateMultipleAsync(model, prompt, blocks, 3);
+        string? style = _currentGenre?.StylePrompt;
+        _archCases = await _architectHost.Generation.GenerateMultipleAsync(model, prompt, blocks, 3, style);
         sw.Stop();
 
         ArchGenBtn.IsEnabled = true;
