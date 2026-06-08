@@ -32,10 +32,9 @@ public static class StructureExpander
         // 屋根（roof_type で分岐）
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
         if (roofType == "gable")
-            BuildGableRoof(cells, spec, w, d, h, roof);
+            BuildGableRoof(cells, spec, w, d, h, roof, wall);
         else
             BuildFlatRoof(cells, w, d, h, roof);
-
 
         // 壁（中間層 y=1..h-2 の外周リングのみ）
         for (int y = 1; y <= h - 2; y++)
@@ -83,8 +82,8 @@ public static class StructureExpander
     // 切妻屋根: 棟の向き(ridge_axis)に沿って段々に三角を作る。
     // 屋根は本体の上(y=h から上)に積む。傾斜方向の端から中央へ向け段を上げる。
     private static void BuildGableRoof(
-        Dictionary<(int x, int y, int z), string> cells,
-        StructureSpec spec, int w, int d, int h, string roof)
+    Dictionary<(int x, int y, int z), string> cells,
+    StructureSpec spec, int w, int d, int h, string roof, string wall)
     {
         string axis = (spec.RidgeAxis ?? "x").Trim().ToLowerInvariant();
         // 棟がx軸に平行 → z方向に傾斜（zの端から中央へ高くなる）
@@ -103,17 +102,33 @@ public static class StructureExpander
 
             if (ridgeAlongX)
             {
-                // z=i の列。棟方向(x)は全幅に渡って同じ高さ。
+                // 屋根: z=i の列。棟方向(x)は全幅に渡って同じ高さ。
                 for (int x = 0; x < w; x++)
                     cells[(x, yLevel, i)] = roof;
+
+                // 妻壁: 妻側の面(x=0 と x=w-1)で、壁の上端(y=h-1)から
+                //       この列の屋根の手前(yLevel-1)までを埋める。
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(0, y, i)] = wall;
+                    cells[(w - 1, y, i)] = wall;
+                }
             }
             else
             {
-                // x=i の列。棟方向(z)は全奥行きに渡って同じ高さ。
+                // 屋根: x=i の列。棟方向(z)は全奥行きに渡って同じ高さ。
                 for (int z = 0; z < d; z++)
                     cells[(i, yLevel, z)] = roof;
+
+                // 妻壁: 妻側の面(z=0 と z=d-1)で、壁の上端からこの列の屋根の手前までを埋める。
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(i, y, 0)] = wall;
+                    cells[(i, y, d - 1)] = wall;
+                }
             }
         }
+
     }
 
     private static void ApplyOpening(
