@@ -140,9 +140,24 @@ public partial class MainWindow
         ArchStatus.Text = "3案を生成中...（少し時間がかかります）";
         ArchResultBox.Text = "";
 
+        // 寸法欄を読み取る（数値でなければエラー）
+        if (!int.TryParse(ArchWidthBox.Text.Trim(), out int w) ||
+            !int.TryParse(ArchDepthBox.Text.Trim(), out int d) ||
+            !int.TryParse(ArchHeightBox.Text.Trim(), out int h))
+        {
+            ArchStatus.Text = "幅・奥行・高さは数値で入力してください。";
+            return;
+        }
+        if (w < 2 || d < 2 || h < 2 || w > 64 || d > 64 || h > 64)
+        {
+            ArchStatus.Text = "幅・奥行・高さは 2〜64 の範囲で入力してください。";
+            return;
+        }
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string? style = _currentGenre?.StylePrompt;
-        _archCases = await _architectHost.Generation.GenerateMultipleAsync(model, prompt, blocks, 3, style);
+        _archCases = await _architectHost.Generation.GenerateMultipleAsync(
+            model, prompt, blocks, 3, style, w, d, h);
         sw.Stop();
 
         ArchGenBtn.IsEnabled = true;

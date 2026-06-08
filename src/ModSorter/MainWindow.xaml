@@ -595,7 +595,40 @@
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="48"
                                          Text="minecraft:oak_planks, minecraft:oak_log, minecraft:glass, minecraft:cobblestone"/>
 
-                                <TextBlock Text="作りたいものの指示"
+                                <TextBlock Text="サイズ（幅 × 奥行 × 高さ）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+                                    <TextBlock Text="幅" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBox x:Name="ArchWidthBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center"
+                                             Text="5"/>
+                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                    <TextBox x:Name="ArchDepthBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center"
+                                             Text="5"/>
+                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                    <TextBox x:Name="ArchHeightBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center"
+                                             Text="4"/>
+                                </StackPanel>
+
+                                <TextBlock Text="作りたいものの指示（窓・ドア・雰囲気など）"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
                                 <TextBox x:Name="ArchPromptBox"
@@ -604,7 +637,7 @@
                                          FontFamily="{StaticResource PixelFont}"
                                          BorderThickness="0" Padding="6" Margin="0,4,0,12"
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="60"
-                                         Text="5x5x4 の小さな木の小屋。壁は oak_planks、窓は glass を少し。"/>
+                                         Text="木の小屋。南にドア、東西に窓を少し。三角屋根。"/>
 
                                 <Button x:Name="ArchGenBtn"
                                         Content="3案を生成" Style="{StaticResource McButton}"

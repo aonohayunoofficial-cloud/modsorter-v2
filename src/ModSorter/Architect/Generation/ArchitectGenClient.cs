@@ -22,7 +22,8 @@ public sealed class ArchitectGenClient
     }
     public async Task<GenerationResult> GenerateAsync(
     string model, string instruction, IReadOnlyList<string> allowedBlocks,
-    double temperature = 0.2, string? variantHint = null)
+    double temperature = 0.2, string? variantHint = null, string? stylePrompt = null,
+    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null)
     {
 
         var result = new GenerationResult();
@@ -87,7 +88,7 @@ RULES:
 - Keep openings on walls, not on corners. A small house has 1 door and a few windows.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
-BUILD INSTRUCTION:
+{(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
 {instruction}
 {(string.IsNullOrEmpty(variantHint) ? "" : "\nVARIATION FOR THIS DESIGN: " + variantHint)}
 
@@ -133,6 +134,12 @@ JSON:";
                 result.Error = "SPEC(JSON)としてパースできませんでした。";
                 return result;
             }
+
+            // UIで寸法が確定されていれば、モデルの値を上書きする（寸法のブレを根絶）
+            if (fixedWidth.HasValue) spec.Width = fixedWidth.Value;
+            if (fixedDepth.HasValue) spec.Depth = fixedDepth.Value;
+            if (fixedHeight.HasValue) spec.Height = fixedHeight.Value;
+
             if (spec.Width < 2 || spec.Depth < 2 || spec.Height < 2)
             {
                 result.Error = $"寸法が不正です（W={spec.Width}, D={spec.Depth}, H={spec.Height}）。";
@@ -141,6 +148,7 @@ JSON:";
 
             // 確定的に座標展開（壁の外周リングは必ずここで生成）
             var blocks = StructureExpander.Expand(spec, allowedBlocks);
+
             if (blocks.Count == 0)
             {
                 result.Error = "展開結果が空になりました。";
@@ -170,8 +178,11 @@ JSON:";
     // 同じ指示で複数案を生成する。案ごとに temperature を変えて差を出す。
     // 成功・失敗を問わず count 件の結果を返す（呼び出し側で成否を見る）。
     public async Task<List<GenerationResult>> GenerateMultipleAsync(
-    string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3)
+    string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3,
+    string? stylePrompt = null,
+    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null)
     {
+
         var results = new List<GenerationResult>();
         // 案ごとの temperature と方向性ヒント。temperatureだけでは差が出ないため
         // 方向性を明示的に変えて、確実に違う案を作る。
@@ -184,7 +195,8 @@ JSON:";
         for (int i = 0; i < count; i++)
         {
             var v = variants[i % variants.Length];
-            var r = await GenerateAsync(model, instruction, allowedBlocks, v.temp, v.hint);
+            var r = await GenerateAsync(model, instruction, allowedBlocks, v.temp, v.hint, stylePrompt,
+                                        fixedWidth, fixedDepth, fixedHeight);
             results.Add(r);
         }
         return results;
