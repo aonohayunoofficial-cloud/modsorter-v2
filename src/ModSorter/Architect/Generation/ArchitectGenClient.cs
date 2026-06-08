@@ -42,12 +42,14 @@ OUTPUT SHAPE (this exact JSON shape):
   ""width"": 5,
   ""depth"": 5,
   ""height"": 4,
-    ""floor_block"": ""minecraft:oak_planks"",
+  ""floor_block"": ""minecraft:oak_planks"",
   ""wall_block"": ""minecraft:oak_planks"",
   ""roof_block"": ""minecraft:oak_planks"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
+  ""floor_levels"": [],
   ""openings"": [
+
 
     {{ ""face"": ""south"", ""kind"": ""door"",   ""offset"": 2, ""level"": 1 }},
     {{ ""face"": ""east"",  ""kind"": ""window"", ""offset"": 2, ""level"": 1, ""block"": ""minecraft:glass"" }}
@@ -60,8 +62,10 @@ FIELD MEANING:
 - roof_type: ""flat"" (a flat roof) or ""gable"" (a triangular pitched roof).
 - ridge_axis: only for gable. ""x"" = ridge runs along X (roof slopes toward Z edges);
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
+- floor_levels: heights (y) where an extra floor is added, to make a multi-story building.
+  Empty [] = single story. For a 2-story house make height tall enough (e.g. 7) and put
+  one middle floor around the middle (e.g. [3]). Each value must be between 1 and height-2.
 - openings: each is on one wall face (""north"",""south"",""east"",""west"").
-
   - kind: ""door"" (an empty opening) or ""window"" (a glass cell).
   - offset: position along that face (0 = one corner, up to width-1 or depth-1).
   - level: which middle layer, counting from the floor (1 = just above the floor).

@@ -44,9 +44,20 @@ public static class StructureExpander
                     if (x == 0 || x == w - 1 || z == 0 || z == d - 1)
                         cells[(x, y, z)] = wall;
 
-        // 開口部の適用
+        // 中間床（複数階）。指定された各 y に内部も含む全面の床を敷く。
+        foreach (int fy in (spec.FloorLevels ?? new List<int>()).Distinct())
+        {
+            // 1階の床(0)・屋根の領域(h-1以上)とぶつかる指定は無視
+            if (fy <= 0 || fy >= h - 1) continue;
+            for (int x = 0; x < w; x++)
+                for (int z = 0; z < d; z++)
+                    cells[(x, fy, z)] = floor;
+        }
+
+        // 開口部の適用（中間床より後。床に窓・ドアが指定されても壁セルのみ作用するので安全）
         foreach (var op in spec.Openings ?? new List<Opening>())
             ApplyOpening(cells, op, w, d, h, allowedBlocks);
+
 
         return cells
             .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)

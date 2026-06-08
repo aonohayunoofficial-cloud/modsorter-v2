@@ -22,6 +22,11 @@ public sealed class StructureSpec
     // gable のときの棟の向き: "x"（棟がx軸に平行・z方向に傾斜） または "z"
     [JsonPropertyName("ridge_axis")] public string? RidgeAxis { get; set; }
 
+    // 中間床を入れる高さ(y)のリスト。例: [3] なら y=3 に2階の床。複数指定で3階建て以上。
+    // 1階の床(y=0)と屋根は別管理なので、ここには中間の階の床だけを入れる。
+    [JsonPropertyName("floor_levels")] public List<int> FloorLevels { get; set; } = new();
+
+
 
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
