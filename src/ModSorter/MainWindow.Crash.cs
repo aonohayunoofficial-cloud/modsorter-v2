@@ -117,12 +117,28 @@ public partial class MainWindow : Window
                 ? "カテゴリ: ―"
                 : $"カテゴリ ({mod.CategorySource}): {mod.CategoryText}";
 
-            _crashCfUrl = mod.CurseForgeUrl;
-            _crashMrUrl = mod.ModrinthUrl;
-            CrashUrlCurseForge.Text = string.IsNullOrEmpty(mod.CurseForgeUrl)
-                ? "CurseForge: ―" : $"CurseForge: {mod.CurseForgeUrl}";
-            CrashUrlModrinth.Text = string.IsNullOrEmpty(mod.ModrinthUrl)
-                ? "Modrinth: ―" : $"Modrinth: {mod.ModrinthUrl}";
+            // 直リンクがあればそれを、無ければ名前で検索ページにフォールバック
+            string cfQuery = string.IsNullOrEmpty(mod.DisplayName) ? mod.ModId : mod.DisplayName;
+            if (!string.IsNullOrEmpty(mod.CurseForgeUrl))
+            {
+                _crashCfUrl = mod.CurseForgeUrl;
+                CrashUrlCurseForge.Text = $"CurseForge: {mod.CurseForgeUrl}";
+            }
+            else
+            {
+                _crashCfUrl = BuildCfSearchUrl(cfQuery);
+                CrashUrlCurseForge.Text = $"CurseForge で検索: {cfQuery}";
+            }
+            if (!string.IsNullOrEmpty(mod.ModrinthUrl))
+            {
+                _crashMrUrl = mod.ModrinthUrl;
+                CrashUrlModrinth.Text = $"Modrinth: {mod.ModrinthUrl}";
+            }
+            else
+            {
+                _crashMrUrl = BuildMrSearchUrl(cfQuery);
+                CrashUrlModrinth.Text = $"Modrinth で検索: {cfQuery}";
+            }
 
             // 削除ボタンは「mods内に実ファイルがある」場合のみ有効化(第3段階で実処理)
             CrashDeleteBtn.IsEnabled = true;
@@ -130,21 +146,33 @@ public partial class MainWindow : Window
         }
         else
         {
-            // mods に無い or 未スキャン
+            // mods に無い or 未スキャン: ModId を検索キーにしてフォールバック
             CrashDetailName.Text = issue.ModId;
-            CrashDetailId.Text = "(スキャン済みのMODではないため、MOD詳細は表示できません)";
+            CrashDetailId.Text = "(未スキャン: 名前で検索ページを開けます)";
             CrashDetailVersion.Text = "";
             CrashDetailLoader.Text = "";
             CrashDetailCategory.Text = "";
 
-            _crashCfUrl = "";
-            _crashMrUrl = "";
-            CrashUrlCurseForge.Text = "CurseForge: ―";
-            CrashUrlModrinth.Text = "Modrinth: ―";
+            string q = issue.ModId;
+            if (string.IsNullOrEmpty(q) || q == "(特定不可)")
+            {
+                _crashCfUrl = "";
+                _crashMrUrl = "";
+                CrashUrlCurseForge.Text = "CurseForge: ―";
+                CrashUrlModrinth.Text = "Modrinth: ―";
+            }
+            else
+            {
+                _crashCfUrl = BuildCfSearchUrl(q);
+                _crashMrUrl = BuildMrSearchUrl(q);
+                CrashUrlCurseForge.Text = $"CurseForge で検索: {q}";
+                CrashUrlModrinth.Text = $"Modrinth で検索: {q}";
+            }
 
             CrashDeleteBtn.IsEnabled = false;
             CrashDeleteBtn.Tag = null;
         }
+
     }
 
     private void ClearCrashDetail()
@@ -163,6 +191,14 @@ public partial class MainWindow : Window
         CrashDeleteBtn.IsEnabled = false;
         CrashDeleteBtn.Tag = null;
     }
+
+    // MOD名/IDから検索ページURLを作る(直リンクが無いときのフォールバック)
+    private static string BuildCfSearchUrl(string query)
+        => "https://www.curseforge.com/minecraft/search?search=" +
+           Uri.EscapeDataString(query);
+
+    private static string BuildMrSearchUrl(string query)
+        => "https://modrinth.com/mods?q=" + Uri.EscapeDataString(query);
 
     private void CrashUrlCf_Click(object sender, MouseButtonEventArgs e)
     {
