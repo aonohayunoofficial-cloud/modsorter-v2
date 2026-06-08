@@ -13,6 +13,7 @@ public static class CrashAnalyzer
         MissingDependency,   // 前提MODが入っていない
         VersionMismatch,     // 入ってはいるがバージョンが合わない
         Incompatible,        // 競合(共存不可)
+        RuntimeError,        // 実行時例外(初期化中クラッシュ等)
         Unknown
     }
 
@@ -31,12 +32,19 @@ public static class CrashAnalyzer
         public string CurrentState = "";   // 現状(例: 6.0.10 / not installed)
         public string JapaneseSummary = ""; // 日本語の要約文
 
+        // ランタイム例外解析用
+        public string TopException = "";     // 最上段の例外型
+        public string RootException = "";    // 根本原因の例外型
+        public string RootMessage = "";      // 根本原因のメッセージ
+        public List<string> InvolvedMods = new();  // トレースに登場したMOD
+
         // 中央リスト表示用のラベル
         public string KindLabel => Kind switch
         {
             IssueKind.MissingDependency => "[前提MOD不足]",
             IssueKind.VersionMismatch => "[バージョン不一致]",
             IssueKind.Incompatible => "[競合]",
+            IssueKind.RuntimeError => "[実行時エラー]",
             _ => "[その他]"
         };
     }
@@ -114,7 +122,120 @@ public static class CrashAnalyzer
         missingSet.Sort(StringComparer.OrdinalIgnoreCase);
         result.MissingDependencies = missingSet;
 
+        // ロード失敗ブロックが無ければランタイム例外として解析を試みる
+        if (!result.ParsedAsModLoading)
+            AnalyzeRuntime(text, result);
+
         return result;
+    }
+
+    private static readonly HashSet<string> _coreMods = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "minecraft", "neoforge", "forge", "fabricloader", "fabric",
+        "java", "mixinextras", "connectormod", "sinytra_connector", "connector",
+        // 経路に出やすいライブラリ/API系(原因ではないことが多い)
+        "ponder", "catnip", "flywheel", "owo", "veil",
+        "architectury", "cloth_config", "yet_another_config_lib_v3",
+        "fabric_api", "kubejs", "rhino",
+    };
+
+
+    // ランタイム例外(初期化中クラッシュ等)を解析して容疑者MODを特定する
+    private static void AnalyzeRuntime(string text, Result result)
+    {
+        // スタックトレース本体を取り出す("A detailed walkthrough" や末尾まで)
+        // Description 直後の例外行から System Details の手前までを対象にする
+        var stackM = Regex.Match(text,
+            @"Description:.*?(?=-- System Details --|A detailed walkthrough|\z)",
+            RegexOptions.Singleline);
+        string stack = stackM.Success ? stackM.Value : text;
+
+        // 最上段の例外型: 1行目の "xxx.Exception: ..." または "xxx.Error: ..."
+        var topM = Regex.Match(stack, @"^([\w\.\$]+(?:Exception|Error))(?::\s*(.*))?$",
+            RegexOptions.Multiline);
+
+        // 最後の "Caused by:" を根本原因とする
+        string rootType = "", rootMsg = "";
+        foreach (Match cm in Regex.Matches(stack,
+            @"Caused by:\s*([\w\.\$]+(?:Exception|Error))(?::\s*(.*))?"))
+        {
+            rootType = cm.Groups[1].Value.Trim();
+            rootMsg = cm.Groups[2].Value.Trim();
+        }
+        // Caused by が無ければ最上段をそのまま根本原因に
+        if (string.IsNullOrEmpty(rootType) && topM.Success)
+        {
+            rootType = topM.Groups[1].Value.Trim();
+            rootMsg = topM.Groups[2].Value.Trim();
+        }
+
+        // スタック全体から MOD 帰属タグを収集
+        //   TRANSFORMER/<modid>@<ver>/...
+        //   {... from mod <modid>}
+        var involved = new List<string>();
+        string? suspect = null;
+
+        // TRANSFORMER タグ(出現順 = スタックの深さ順)
+        foreach (Match fm in Regex.Matches(stack,
+            @"TRANSFORMER/(?<id>[\w\-]+)@(?<ver>[\w\.\-\+]+)/"))
+        {
+            string id = fm.Groups["id"].Value;
+            if (!involved.Contains(id, StringComparer.OrdinalIgnoreCase))
+                involved.Add(id);
+            // コア以外で最初に見つかったものを容疑者にする
+            if (suspect == null && !_coreMods.Contains(id))
+                suspect = $"{id} {fm.Groups["ver"].Value}";
+        }
+
+        // "from mod <modid>" 形式(mixin 由来)
+        foreach (Match fm in Regex.Matches(stack,
+            @"from mod\s+(?<id>[\w\-]+)", RegexOptions.IgnoreCase))
+        {
+            string id = fm.Groups["id"].Value;
+            if (!involved.Contains(id, StringComparer.OrdinalIgnoreCase))
+                involved.Add(id);
+            if (suspect == null && !_coreMods.Contains(id))
+                suspect = id;
+        }
+
+        var issue = new Issue
+        {
+            Kind = IssueKind.RuntimeError,
+            ModId = suspect ?? "(特定不可)",
+            TopException = topM.Success ? topM.Groups[1].Value.Trim() : "",
+            RootException = rootType,
+            RootMessage = rootMsg,
+            InvolvedMods = involved,
+        };
+
+        // 日本語要約(現象 → 対処の形)
+        var sj = new StringBuilder();
+        if (suspect != null)
+        {
+            var (explain, advice) = ExplainRuntime(rootType, rootMsg, suspect);
+            sj.AppendLine($"【何が起きたか】");
+            sj.AppendLine($"     {explain}");
+            sj.AppendLine();
+            sj.AppendLine($"【試すとよい対処】");
+            sj.AppendLine($"     {advice}");
+        }
+        else
+        {
+            sj.AppendLine("実行時エラーの発生源MODを特定できませんでした。");
+            if (!string.IsNullOrEmpty(rootType))
+                sj.AppendLine($"     エラー種別: {rootType}");
+        }
+
+        // 技術詳細は参考として最小限だけ残す
+        sj.AppendLine();
+        sj.Append("     (参考: ");
+        sj.Append(string.IsNullOrEmpty(rootType) ? "原因不明" : rootType);
+        if (!string.IsNullOrEmpty(rootMsg)) sj.Append($" / {rootMsg}");
+        sj.Append(")");
+
+        issue.JapaneseSummary = sj.ToString().TrimEnd();
+
+        result.Issues.Add(issue);
     }
 
     // Failure message と Currently を分類して日本語要約を作る
@@ -202,6 +323,24 @@ public static class CrashAnalyzer
 
         if (!r.ParsedAsModLoading)
         {
+            // ランタイム例外として解析できていれば、その結果を出す
+            var rtIssues = r.Issues.Where(x => x.Kind == IssueKind.RuntimeError).ToList();
+            if (rtIssues.Count > 0)
+            {
+                sb.AppendLine("■ 実行時エラー(初期化中クラッシュ等)として解析しました");
+                sb.AppendLine(new string('=', 40));
+                sb.AppendLine();
+                int n = 1;
+                foreach (var issue in rtIssues)
+                {
+                    sb.AppendLine($"[{n}] {issue.KindLabel} {issue.ModId}");
+                    sb.AppendLine($"     {issue.JapaneseSummary}");
+                    sb.AppendLine();
+                    n++;
+                }
+                return sb.ToString();
+            }
+
             sb.AppendLine("(MODロード失敗形式として解析できませんでした。)");
             sb.AppendLine("別の種類のクラッシュの可能性があります。");
             return sb.ToString();
@@ -240,4 +379,54 @@ public static class CrashAnalyzer
 
         return sb.ToString();
     }
+    // 根本原因メッセージから「平易な説明」と「対処案」を作る
+    private static (string explain, string advice) ExplainRuntime(
+        string rootType, string rootMsg, string suspect)
+    {
+        string id = suspect.Split(' ')[0];  // バージョンを除いたMOD名
+
+        // よくあるパターンを判定
+        if (Regex.IsMatch(rootMsg, "config", RegexOptions.IgnoreCase) &&
+            Regex.IsMatch(rootMsg, "before|not loaded|loaded", RegexOptions.IgnoreCase))
+        {
+            return (
+                $"「{id}」が、設定(config)が読み込まれる前に設定値を読もうとして落ちています。" +
+                "MOD側の不具合か、対応していないバージョンの組み合わせで起きやすい現象です。",
+                $"・「{id}」を最新版に更新してみてください。\n" +
+                $"     ・それでも直らなければ「{id}」を一旦外して起動できるか確認してください。\n" +
+                $"     ・「{id}」の config ファイルを削除して初期化すると直る場合があります。"
+            );
+        }
+        if (rootType.Contains("NoClassDefFound") || rootType.Contains("ClassNotFound"))
+        {
+            return (
+                $"「{id}」が必要とするクラスが見つからず落ちています。前提MODが不足しているか、" +
+                "バージョンが噛み合っていない可能性が高いです。",
+                $"・「{id}」の必要前提MOD(ライブラリ)が入っているか確認してください。\n" +
+                $"     ・「{id}」と前提MODのバージョンを揃えてください。"
+            );
+        }
+        if (rootType.Contains("NoSuchMethod") || rootType.Contains("NoSuchField"))
+        {
+            return (
+                $"「{id}」が古い/新しいAPIを呼んでおり、他MODとバージョンが噛み合っていません。",
+                $"・「{id}」と、関連する前提MODのバージョンを合わせて更新してください。"
+            );
+        }
+        if (rootType.Contains("OutOfMemory"))
+        {
+            return (
+                "メモリ不足で落ちています。特定MODの問題ではない可能性があります。",
+                "・割り当てメモリを増やしてください(JVM引数 -Xmx)。"
+            );
+        }
+
+        // 該当なし: 一般的な案内
+        return (
+            $"「{id}」の処理中に実行時エラーが発生しました。",
+            $"・「{id}」を最新版に更新してみてください。\n" +
+            $"     ・直らなければ「{id}」を一旦外して起動できるか確認してください。"
+        );
+    }
+
 }

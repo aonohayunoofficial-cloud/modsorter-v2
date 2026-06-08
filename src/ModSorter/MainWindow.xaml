@@ -408,9 +408,17 @@
                                 <!-- クラッシュ理由 -->
                                 <TextBlock Text="クラッシュ原因" Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}" FontSize="12"/>
-                                <TextBlock x:Name="CrashDetailReason" Style="{StaticResource PixelText}"
-                                           TextWrapping="Wrap" Margin="0,4,0,12"
-                                           Text="(中央のリストから問題を選択)"/>
+                                <TextBox x:Name="CrashDetailReason"
+                                         IsReadOnly="True"
+                                         TextWrapping="Wrap"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}"
+                                         IsTabStop="False"
+                                         Margin="0,4,0,12"
+                                         Text="(中央のリストから問題を選択)"/>
+
 
                                 <!-- MOD情報(スキャン済みなら表示) -->
                                 <TextBlock Text="MOD情報" Style="{StaticResource PixelText}"
