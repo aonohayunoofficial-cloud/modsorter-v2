@@ -1,6 +1,7 @@
 ﻿namespace ModSorter.Architect.Preview;
 
 // 3Dプレビュー用のHTML（Three.js）を提供する。
+// OrbitControlsには依存せず、カメラ操作は自前実装（バージョン事故回避）。
 // ブロックデータは描画後に window.renderBlocks(json) で渡す。
 public static class PreviewHtml
 {
@@ -13,10 +14,10 @@ public static class PreviewHtml
 <style>
   html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#1c1c1c; }
   #info { position:absolute; top:6px; left:8px; color:#9fd39f;
-          font-family:monospace; font-size:12px; }
+          font-family:monospace; font-size:12px; pointer-events:none; }
+  canvas { display:block; }
 </style>
 <script src='https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js'></script>
 </head>
 <body>
 <div id='info'>(初期化中...)</div>
@@ -24,17 +25,16 @@ public static class PreviewHtml
 window.onerror = function(msg) {
   document.getElementById('info').textContent = 'JSエラー: ' + msg;
 };
-let scene, camera, renderer, controls, group;
+
+let scene, camera, renderer, group;
+// 自前カメラ制御の状態（球面座標：方位角yaw・仰角pitch・距離dist）
+let yaw = 0.8, pitch = 0.6, dist = 20;
+let dragging = false, lastX = 0, lastY = 0;
 
 function init() {
   if (typeof THREE === 'undefined') {
     document.getElementById('info').textContent =
       'THREE 未読込（CDNに到達できていない可能性）';
-    return;
-  }
-  if (typeof THREE.OrbitControls === 'undefined') {
-    document.getElementById('info').textContent =
-      'OrbitControls 未読込';
     return;
   }
 
@@ -43,21 +43,37 @@ function init() {
 
   camera = new THREE.PerspectiveCamera(
     50, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(12, 12, 12);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
-
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const dir = new THREE.DirectionalLight(0xffffff, 0.8);
   dir.position.set(10, 20, 10);
   scene.add(dir);
 
+  // ===== 自前のマウス操作 =====
+  const el = renderer.domElement;
+  el.addEventListener('mousedown', (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    yaw   -= (e.clientX - lastX) * 0.01;
+    pitch -= (e.clientY - lastY) * 0.01;
+    pitch = Math.max(-1.5, Math.min(1.5, pitch)); // 真上・真下を超えない
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    dist *= (e.deltaY > 0) ? 1.1 : 0.9;
+    dist = Math.max(3, Math.min(200, dist));
+  }, { passive: false });
+
   window.addEventListener('resize', onResize);
+  document.getElementById('info').textContent = '(生成するとここに表示されます)';
   animate();
 }
 
@@ -67,13 +83,20 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+function updateCamera() {
+  // 球面座標から直交座標へ。target は原点（構造は原点中心に寄せる）。
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cy = Math.cos(yaw),   sy = Math.sin(yaw);
+  camera.position.set(dist * cp * sy, dist * sp, dist * cp * cy);
+  camera.lookAt(0, 0, 0);
+}
+
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
+  updateCamera();
   renderer.render(scene, camera);
 }
 
-// ブロックIDごとに色を割り当てる（簡易ハッシュ）
 function colorFor(id) {
   const known = {
     'minecraft:oak_planks': 0xc8a564,
@@ -89,6 +112,7 @@ function colorFor(id) {
 
 // C#から呼ばれる。blocks = [{x,y,z,id}, ...]
 function renderBlocks(json) {
+  if (!scene) return;
   const blocks = JSON.parse(json);
   if (group) { scene.remove(group); }
   group = new THREE.Group();
@@ -117,17 +141,13 @@ function renderBlocks(json) {
     if (b.x>maxX)maxX=b.x; if (b.y>maxY)maxY=b.y; if (b.z>maxZ)maxZ=b.z;
   }
 
-  // 構造の中心が原点に来るよう平行移動
   const cx = (minX+maxX)/2, cy = (minY+maxY)/2, cz = (minZ+maxZ)/2;
   group.position.set(-cx, -cy, -cz);
   scene.add(group);
 
-  // 大きさに応じてカメラ距離を調整
+  // 大きさに応じて初期距離を調整
   const span = Math.max(maxX-minX, maxY-minY, maxZ-minZ, 4);
-  const d = span * 1.8 + 4;
-  camera.position.set(d, d, d);
-  controls.target.set(0, 0, 0);
-  controls.update();
+  dist = span * 1.8 + 4;
 
   document.getElementById('info').textContent = blocks.length + ' blocks';
 }
