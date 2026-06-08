@@ -88,7 +88,7 @@ public static class StructureExpander
         {
             // 端(0 と slopeLen-1)が低く、中央が高い。step = 端からの距離。
             int step = System.Math.Min(i, slopeLen - 1 - i);
-            int yLevel = h + step; // 本体の上(y=h)から段を積む
+            int yLevel = (h - 1) + step; // 壁の最上層と同じ高さ(y=h-1)から積む
 
             if (ridgeAlongX)
             {
