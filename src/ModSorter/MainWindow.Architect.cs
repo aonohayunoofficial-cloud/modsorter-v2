@@ -15,7 +15,7 @@ public partial class MainWindow
     // 建築モードのリソースは初回起動までロードしない（仕様書 第1部 ★徹底）
     private ArchitectModeHost? _architectHost;
 
-    private bool _archPreviewReady = false;
+    private PreviewWindow? _previewWindow;
 
     private async void NavArchitect_Click(object sender, RoutedEventArgs e)
     {
@@ -27,25 +27,24 @@ public partial class MainWindow
 
         // 初回起動時にモデル一覧をロード（タブを開いた後なので遅延方針に反しない）
         if (firstLaunch)
-        {
             await LoadArchModelsAsync();
-            await InitArchPreviewAsync();
-        }
     }
 
-    // WebView2 を初期化し、Three.js入りHTMLを読み込む
-    private async Task InitArchPreviewAsync()
+    // 3Dプレビューを別ウィンドウで開く（既に開いていれば前面に出す）
+    private async void ArchOpenPreview_Click(object sender, RoutedEventArgs e)
     {
-        try
+        if (_previewWindow == null)
         {
-            await ArchPreviewWeb.EnsureCoreWebView2Async();
-            ArchPreviewWeb.NavigateToString(PreviewHtml.Build());
-            _archPreviewReady = true;
+            _previewWindow = new PreviewWindow { Owner = this };
+            // 閉じられたら参照をクリアして再生成できるようにする
+            _previewWindow.Closed += (_, __) => _previewWindow = null;
+            _previewWindow.Show();
+            await _previewWindow.InitAsync();
+            Log("3Dプレビューウィンドウを開きました。");
         }
-        catch (System.Exception ex)
+        else
         {
-            Log($"3Dプレビュー初期化に失敗: {ex.Message}");
-            _archPreviewReady = false;
+            _previewWindow.Activate(); // 既に開いていれば前面へ
         }
     }
     private async void ArchModelRefresh_Click(object sender, RoutedEventArgs e)
@@ -152,26 +151,30 @@ public partial class MainWindow
         Log($"建築生成テスト: {ArchStatus.Text}");
     }
 
-    // 生成結果を WebView2 内の renderBlocks(json) に渡す
+    // 生成結果を別ウィンドウの 3Dプレビューへ描画する。
+    // ウィンドウが未オープンなら自動で開いて描画する。
     private async Task RenderArchPreviewAsync(System.Collections.Generic.List<GeneratedBlock> blocks)
     {
-        if (!_archPreviewReady) return;
-        try
+        // プレビューウィンドウが無ければ開く
+        if (_previewWindow == null)
         {
-            string json = JsonSerializer.Serialize(blocks.Select(b => new
-            {
-                x = b.X,
-                y = b.Y,
-                z = b.Z,
-                id = b.Id
-            }));
-            // JS文字列リテラルとして安全に渡すため、JSONをさらに文字列化
-            string jsArg = JsonSerializer.Serialize(json);
-            await ArchPreviewWeb.ExecuteScriptAsync($"renderBlocks({jsArg})");
+            _previewWindow = new PreviewWindow { Owner = this };
+            _previewWindow.Closed += (_, __) => _previewWindow = null;
+            _previewWindow.Show();
+            await _previewWindow.InitAsync();
         }
-        catch (System.Exception ex)
+
+        if (!_previewWindow.IsReady) return;
+
+        string json = JsonSerializer.Serialize(blocks.Select(b => new
         {
-            Log($"3Dプレビュー描画に失敗: {ex.Message}");
-        }
+            x = b.X,
+            y = b.Y,
+            z = b.Z,
+            id = b.Id
+        }));
+        await _previewWindow.RenderAsync(json);
+        _previewWindow.Activate(); // 結果が見えるよう前面へ
     }
+
 }

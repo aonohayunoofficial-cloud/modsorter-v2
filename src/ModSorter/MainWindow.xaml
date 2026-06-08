@@ -605,13 +605,11 @@
                                            Foreground="{StaticResource TextDim}" FontSize="11"
                                            TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
 
-                                <TextBlock Text="3Dプレビュー"
-                                           Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource GrassGreen}"/>
-                                <Border Height="320" Margin="0,4,0,8"
-                                        BorderBrush="{StaticResource StoneDark}" BorderThickness="2">
-                                    <wv2:WebView2 x:Name="ArchPreviewWeb"/>
-                                </Border>
+                                <Button x:Name="ArchOpenPreviewBtn"
+                                        Content="3Dプレビューを開く"
+                                        Style="{StaticResource McButtonGray}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,8"
+                                        Click="ArchOpenPreview_Click"/>
 
                                 <TextBlock Text="生出力 / パース結果"
                                            Style="{StaticResource PixelText}"
