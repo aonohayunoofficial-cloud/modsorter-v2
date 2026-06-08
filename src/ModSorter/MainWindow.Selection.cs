@@ -53,6 +53,7 @@ public partial class MainWindow : Window
             // 選択モードを抜ける：全チェック解除して通常表示へ
             foreach (var m in _mods)
                 m.IsSelected = false;
+            RefreshSelectedList();
 
             SelectModeBtn.Visibility = Visibility.Visible;
             SelectionPanel.Visibility = Visibility.Collapsed;
@@ -122,8 +123,10 @@ public partial class MainWindow : Window
         if (confirm != MessageBoxResult.Yes) return;
 
         RefetchSelectedBtn.IsEnabled = false;
+        OllamaSelectedBtn.IsEnabled = false;
         SelectModeBtn.IsEnabled = false;
         ScanProgress.Visibility = Visibility.Visible;
+        ScanProgress.Maximum = targets.Count;
         ScanProgress.Value = 0;
 
         int done = 0, hit = 0;
@@ -132,13 +135,14 @@ public partial class MainWindow : Window
             bool ok = await FetchOneAsync(mod);
             if (ok) hit++;
             done++;
-            ScanProgress.Value = done * 100.0 / targets.Count;
+            ScanProgress.Value = done;
             ScanStatus.Text = $"再取得中... {done}/{targets.Count}";
         }
 
-        ScanProgress.Value = 100;
         ScanStatus.Text = $"再取得完了: {hit}/{targets.Count} 件ヒット";
+        ScanProgress.Visibility = Visibility.Collapsed;
         RefetchSelectedBtn.IsEnabled = true;
+        OllamaSelectedBtn.IsEnabled = true;
         SelectModeBtn.IsEnabled = true;
         Log($"選択再取得完了: {hit}/{targets.Count} 件ヒット。");
 
