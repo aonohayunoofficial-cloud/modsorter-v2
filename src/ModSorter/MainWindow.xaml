@@ -597,13 +597,28 @@
                                          Text="5x5x4 の小さな木の小屋。壁は oak_planks、窓は glass を少し。"/>
 
                                 <Button x:Name="ArchGenBtn"
-                                        Content="生成テスト" Style="{StaticResource McButton}"
+                                        Content="3案を生成" Style="{StaticResource McButton}"
                                         HorizontalAlignment="Left" Margin="0,0,0,8"
                                         Click="ArchGenerate_Click"/>
                                 <TextBlock x:Name="ArchStatus"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" FontSize="11"
                                            TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button x:Name="ArchCase1Btn" Content="案1"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="0,0,6,0" IsEnabled="False"
+                                            Click="ArchCase_Click" Tag="0"/>
+                                    <Button x:Name="ArchCase2Btn" Content="案2"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="0,0,6,0" IsEnabled="False"
+                                            Click="ArchCase_Click" Tag="1"/>
+                                    <Button x:Name="ArchCase3Btn" Content="案3"
+                                            Style="{StaticResource McButtonGray}"
+                                            IsEnabled="False"
+                                            Click="ArchCase_Click" Tag="2"/>
+                                </StackPanel>
+
 
                                 <Button x:Name="ArchOpenPreviewBtn"
                                         Content="3Dプレビューを開く"

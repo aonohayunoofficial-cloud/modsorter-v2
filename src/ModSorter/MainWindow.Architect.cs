@@ -6,6 +6,7 @@ using System.Windows;
 using ModSorter.Architect;
 using ModSorter.Architect.Generation;
 using ModSorter.Architect.Preview;
+using System.Collections.Generic;
 
 
 namespace ModSorter;
@@ -16,6 +17,8 @@ public partial class MainWindow
     private ArchitectModeHost? _architectHost;
 
     private PreviewWindow? _previewWindow;
+    // 直近に生成した3案を保持（案切り替え用）
+    private List<GenerationResult>? _archCases;
 
     private async void NavArchitect_Click(object sender, RoutedEventArgs e)
     {
@@ -89,7 +92,6 @@ public partial class MainWindow
 
         string model = (ArchModelCombo.SelectedItem as string ?? "").Trim();
         string prompt = ArchPromptBox.Text.Trim();
-
         var blocks = ArchBlocksBox.Text
             .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
             .Select(s => s.Trim())
@@ -101,54 +103,88 @@ public partial class MainWindow
         if (blocks.Count == 0) { ArchStatus.Text = "使用可能ブロックが空です。"; return; }
 
         ArchGenBtn.IsEnabled = false;
-        ArchStatus.Text = "生成中...（モデルが重い場合は時間がかかります）";
+        SetCaseButtonsEnabled(false);
+        ArchStatus.Text = "3案を生成中...（少し時間がかかります）";
         ArchResultBox.Text = "";
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var result = await _architectHost.Generation.GenerateAsync(model, prompt, blocks);
+        _archCases = await _architectHost.Generation.GenerateMultipleAsync(model, prompt, blocks, 3);
         sw.Stop();
 
         ArchGenBtn.IsEnabled = true;
 
-        var sb = new StringBuilder();
-        sb.AppendLine($"[所要 {sw.Elapsed.TotalSeconds:F1} 秒]");
-        sb.AppendLine();
+        // 各案ボタンを成否に応じて有効化＋ブロック数をラベルに反映
+        var caseButtons = new[] { ArchCase1Btn, ArchCase2Btn, ArchCase3Btn };
+        int okCount = 0;
+        for (int i = 0; i < caseButtons.Length; i++)
+        {
+            if (i < _archCases.Count && _archCases[i].Blocks != null)
+            {
+                caseButtons[i].IsEnabled = true;
+                caseButtons[i].Content = $"案{i + 1} ({_archCases[i].Blocks!.Count})";
+                okCount++;
+            }
+            else
+            {
+                caseButtons[i].IsEnabled = false;
+                caseButtons[i].Content = $"案{i + 1} (失敗)";
+            }
+        }
 
+        ArchStatus.Text = $"[所要 {sw.Elapsed.TotalSeconds:F1} 秒] 成功 {okCount}/3 案。" +
+                          (okCount > 0 ? "案ボタンで切り替えて表示します。" : "全案が失敗しました。");
+
+        // 最初の成功案を自動表示
+        int firstOk = _archCases.FindIndex(r => r.Blocks != null);
+        if (firstOk >= 0)
+            await ShowCase(firstOk);
+        else
+            ArchResultBox.Text = "全案が失敗しました。\n" +
+                string.Join("\n", _archCases.Select((r, i) => $"案{i + 1}: {r.Error}"));
+
+        Log($"建築3案生成: {ArchStatus.Text}");
+    }
+
+    private void SetCaseButtonsEnabled(bool enabled)
+    {
+        ArchCase1Btn.IsEnabled = enabled;
+        ArchCase2Btn.IsEnabled = enabled;
+        ArchCase3Btn.IsEnabled = enabled;
+    }
+
+    // 案ボタンが押されたとき
+    private async void ArchCase_Click(object sender, RoutedEventArgs e)
+    {
+        if (_archCases == null) return;
+        if (sender is FrameworkElement fe && fe.Tag is string tagStr
+            && int.TryParse(tagStr, out int index))
+        {
+            await ShowCase(index);
+        }
+    }
+
+    // 指定インデックスの案を結果テキストとプレビューに表示する
+    private async Task ShowCase(int index)
+    {
+        if (_archCases == null || index < 0 || index >= _archCases.Count) return;
+        var result = _archCases[index];
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"=== 案{index + 1} ===");
         if (result.Blocks == null)
         {
-            ArchStatus.Text = $"失敗: {result.Error}";
-            sb.AppendLine("=== 生出力 ===");
-            sb.AppendLine(result.RawResponse ?? "(なし)");
-        }
-        else
-        {
-            // 候補外IDの混入チェック（捏造防止の確認用）
-            var allowed = new System.Collections.Generic.HashSet<string>(
-                blocks, System.StringComparer.OrdinalIgnoreCase);
-            var invalid = result.Blocks
-                .Where(b => !allowed.Contains(b.Id))
-                .Select(b => b.Id).Distinct().ToList();
-
-            ArchStatus.Text =
-                $"成功: {result.Blocks.Count} ブロック" +
-                (invalid.Count > 0 ? $" / 候補外ID {invalid.Count}種 混入" : " / 候補外なし");
-
-            sb.AppendLine($"=== パース結果: {result.Blocks.Count} ブロック ===");
-            if (invalid.Count > 0)
-                sb.AppendLine($"[警告] 候補外ID: {string.Join(", ", invalid)}");
-            sb.AppendLine();
-            foreach (var b in result.Blocks)
-                sb.AppendLine($"({b.X},{b.Y},{b.Z}) {b.Id}");
-            sb.AppendLine();
-            sb.AppendLine("=== 生出力 ===");
-            sb.AppendLine(result.RawResponse ?? "(なし)");
-
-            // 3Dプレビューへ描画
-            await RenderArchPreviewAsync(result.Blocks);
+            sb.AppendLine($"この案は失敗: {result.Error}");
+            ArchResultBox.Text = sb.ToString();
+            return;
         }
 
+        sb.AppendLine($"パース結果: {result.Blocks.Count} ブロック");
+        sb.AppendLine();
+        sb.AppendLine("=== 生出力(スペック) ===");
+        sb.AppendLine(result.RawResponse ?? "(なし)");
         ArchResultBox.Text = sb.ToString();
-        Log($"建築生成テスト: {ArchStatus.Text}");
+
+        await RenderArchPreviewAsync(result.Blocks);
     }
 
     // 生成結果を別ウィンドウの 3Dプレビューへ描画する。

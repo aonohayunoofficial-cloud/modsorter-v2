@@ -20,10 +20,11 @@ public sealed class ArchitectGenClient
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
     }
-
     public async Task<GenerationResult> GenerateAsync(
-        string model, string instruction, IReadOnlyList<string> allowedBlocks)
+    string model, string instruction, IReadOnlyList<string> allowedBlocks,
+    double temperature = 0.2)
     {
+
         var result = new GenerationResult();
 
         string blockList = string.Join(", ", allowedBlocks);
@@ -97,7 +98,7 @@ JSON:";
             prompt,
             stream = false,
             format = "json", // OllamaのJSONモードで素のJSONを促す
-            options = new { temperature = 0.2 }
+            options = new { temperature }
         };
 
         try
@@ -163,6 +164,23 @@ JSON:";
             result.Error = ex.Message;
             return result;
         }
+    }
+
+    // 同じ指示で複数案を生成する。案ごとに temperature を変えて差を出す。
+    // 成功・失敗を問わず count 件の結果を返す（呼び出し側で成否を見る）。
+    public async Task<List<GenerationResult>> GenerateMultipleAsync(
+        string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3)
+    {
+        var results = new List<GenerationResult>();
+        // 案ごとの temperature。案1は手堅く、案2・3は変化を出す。
+        double[] temps = { 0.3, 0.6, 0.9 };
+        for (int i = 0; i < count; i++)
+        {
+            double t = temps[i % temps.Length];
+            var r = await GenerateAsync(model, instruction, allowedBlocks, t);
+            results.Add(r);
+        }
+        return results;
     }
 
     // Ollamaにインストール済みのモデルタグ一覧を取得。失敗時は空リスト。
