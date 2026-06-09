@@ -155,9 +155,23 @@ public partial class MainWindow
         }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        string? style = _currentGenre?.StylePrompt;
-        _archCases = await _architectHost.Generation.GenerateMultipleAsync(
-            model, prompt, blocks, 3, style, w, d, h);
+        // 種類で経路を分岐。0=建築(家)、1=プリミティブ(曲面)。
+        bool isPrimitive = ArchKindCombo.SelectedIndex == 1;
+        if (isPrimitive)
+        {
+            // サイズ欄(直径)を半径に変換。半径 = 直径/2（最低1）。
+            int rx = System.Math.Max(1, w / 2);
+            int ry = System.Math.Max(1, h / 2); // 高さ→y半径
+            int rz = System.Math.Max(1, d / 2); // 奥行→z半径
+            _archCases = await _architectHost.Generation.GeneratePrimitiveMultipleAsync(
+                model, prompt, blocks, 3, rx, ry, rz);
+        }
+        else
+        {
+            string? style = _currentGenre?.StylePrompt;
+            _archCases = await _architectHost.Generation.GenerateMultipleAsync(
+                model, prompt, blocks, 3, style, w, d, h);
+        }
         sw.Stop();
 
         ArchGenBtn.IsEnabled = true;

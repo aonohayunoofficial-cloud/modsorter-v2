@@ -561,6 +561,17 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
+                                <TextBlock Text="種類"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <ComboBox x:Name="ArchKindCombo" Margin="0,4,0,12"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="建築（家・建物）"/>
+                                    <ComboBoxItem Content="プリミティブ（球・ドームなど曲面）"/>
+                                </ComboBox>
+
                                 <TextBlock Text="ジャンル"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>

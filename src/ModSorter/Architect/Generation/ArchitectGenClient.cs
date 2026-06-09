@@ -222,6 +222,140 @@ JSON:";
         return results;
     }
 
+    // プリミティブ（曲面・造形物）を1案生成する。LLMは PrimitiveSpec を吐き、
+    // PrimitiveExpander が確定的にボクセル化する。
+    public async Task<GenerationResult> GeneratePrimitiveAsync(
+        string model, string instruction, IReadOnlyList<string> allowedBlocks,
+        double temperature = 0.3,
+        int? fixedRadiusX = null, int? fixedRadiusY = null, int? fixedRadiusZ = null)
+    {
+        var result = new GenerationResult();
+        string blockList = string.Join(", ", allowedBlocks);
+        string prompt =
+$@"You design a single Minecraft curved primitive (a rounded shape, NOT a building).
+Output ONLY strict JSON, no prose. You do NOT output coordinates; you output a SPEC.
+A separate program voxelizes your spec into blocks.
+
+ALLOWED BLOCK IDS (use one exactly for the block field, never invent others):
+{blockList}
+
+OUTPUT SHAPE (this exact JSON shape):
+{{
+  ""shape"": ""ellipsoid"",
+  ""radius_x"": 5,
+  ""radius_y"": 4,
+  ""radius_z"": 5,
+  ""hollow"": false,
+  ""block"": ""minecraft:stone""
+}}
+
+FIELD MEANING:
+- shape: ""sphere"" (all radii equal) or ""ellipsoid"" (radii can differ, e.g. a dome
+  is a flattened ellipsoid; an egg/blimp is elongated on one axis).
+- radius_x / radius_y / radius_z: half-size in blocks along each axis (1-32).
+  Make the shape match the instruction (e.g. tall -> larger radius_y).
+- hollow: true to keep only the outer shell (a hollow dome/ball), false for solid.
+- block: which allowed block to fill the shape with.
+
+RULES:
+- Choose radii that fit the requested object's proportions.
+- Use only an allowed block ID for block.
+- Output ONLY the JSON spec. No explanation, no coordinates.
+
+BUILD INSTRUCTION:
+{instruction}
+
+JSON:";
+
+        var payload = new
+        {
+            model,
+            prompt,
+            stream = false,
+            format = "json",
+            options = new { temperature }
+        };
+
+        try
+        {
+            string json = JsonSerializer.Serialize(payload);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var resp = await _http.PostAsync(Endpoint, content);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                string err = await resp.Content.ReadAsStringAsync();
+                result.Error = $"HTTP {(int)resp.StatusCode}: {err}";
+                return result;
+            }
+
+            string respText = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(respText);
+            if (!doc.RootElement.TryGetProperty("response", out var respProp))
+            {
+                result.Error = "応答に response フィールドがありません。";
+                result.RawResponse = respText;
+                return result;
+            }
+
+            string raw = respProp.GetString() ?? "";
+            result.RawResponse = raw;
+
+            var spec = TryParsePrimitive(raw);
+            if (spec == null)
+            {
+                result.Error = "PRIMITIVE(JSON)としてパースできませんでした。";
+                return result;
+            }
+
+            // UIで寸法（直径）が確定されていれば、半径として上書きする（ブレ根絶）
+            if (fixedRadiusX.HasValue) spec.RadiusX = fixedRadiusX.Value;
+            if (fixedRadiusY.HasValue) spec.RadiusY = fixedRadiusY.Value;
+            if (fixedRadiusZ.HasValue) spec.RadiusZ = fixedRadiusZ.Value;
+
+            var blocks = PrimitiveExpander.Expand(spec, allowedBlocks);
+            if (blocks.Count == 0)
+            {
+                result.Error = "展開結果が空になりました。";
+                return result;
+            }
+
+            result.Blocks = blocks;
+            return result;
+        }
+        catch (TaskCanceledException)
+        {
+            result.Error = $"タイムアウト({TimeoutSeconds}秒)。モデルが重い可能性があります。";
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            result.Error = $"接続失敗: {ex.Message}（Ollamaが起動していない可能性）";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.Error = ex.Message;
+            return result;
+        }
+    }
+
+    // 同じ指示で複数のプリミティブ案を生成（半径などをLLMの揺らぎで変える）。
+    public async Task<List<GenerationResult>> GeneratePrimitiveMultipleAsync(
+        string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3,
+        int? fixedRadiusX = null, int? fixedRadiusY = null, int? fixedRadiusZ = null)
+    {
+        var results = new List<GenerationResult>();
+        double[] temps = { 0.3, 0.6, 0.9 };
+        for (int i = 0; i < count; i++)
+        {
+            var r = await GeneratePrimitiveAsync(model, instruction, allowedBlocks,
+                                                 temps[i % temps.Length],
+                                                 fixedRadiusX, fixedRadiusY, fixedRadiusZ);
+            results.Add(r);
+        }
+        return results;
+    }
     // Ollamaにインストール済みのモデルタグ一覧を取得。失敗時は空リスト。
     public async Task<List<string>> ListModelsAsync()
     {
@@ -293,6 +427,26 @@ JSON:";
         {
             var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             return JsonSerializer.Deserialize<StructureSpec>(candidate, opts);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    // 生出力から PrimitiveSpec を取り出してパース。
+    private static PrimitiveSpec? TryParsePrimitive(string raw)
+    {
+        string candidate = raw.Trim();
+        int start = candidate.IndexOf('{');
+        int end = candidate.LastIndexOf('}');
+        if (start >= 0 && end > start)
+            candidate = candidate.Substring(start, end - start + 1);
+
+        try
+        {
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<PrimitiveSpec>(candidate, opts);
         }
         catch (JsonException)
         {
