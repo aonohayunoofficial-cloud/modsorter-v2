@@ -45,6 +45,9 @@ public sealed class StructureSpec
     // ドーム屋根(roof_type="dome")の高さ。未指定なら水平半径から自動。
     [JsonPropertyName("dome_height")] public int? DomeHeight { get; set; }
 
+    // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
+    [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 }
