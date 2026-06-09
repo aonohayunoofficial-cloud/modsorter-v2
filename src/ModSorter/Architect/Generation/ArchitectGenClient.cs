@@ -51,6 +51,7 @@ OUTPUT SHAPE (this exact JSON shape):
   ""pilaster_step"": 3,
   ""has_base"": true,
   ""base_block"": ""minecraft:cobblestone"",
+  ""building_style"": ""walled"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
   ""dome_height"": 5,
@@ -72,6 +73,10 @@ FIELD MEANING:
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
 - dome_height: only for dome. How tall the dome rises above the walls, in blocks.
   Omit to let it auto-size to a hemisphere. Use a larger value for a tall, grand dome.
+- building_style: ""walled"" (an ordinary building with solid walls, the default) or
+  ""colonnade"" (an open structure with NO walls, just rows of round columns around the
+  perimeter, like a Greek temple or a pavilion). Column thickness and spacing are
+  decided automatically from the building's size; you only choose the style.
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the
@@ -112,6 +117,9 @@ RULES:
   houses look good on one). Skip it for very simple or floating structures.
 - Use roof_type ""dome"" for grand, rounded buildings (temples, observatories, domed
   halls). For ordinary houses prefer ""gable"" or ""flat"".
+- Use building_style ""colonnade"" for open, columned structures (temples, shrines,
+  pavilions) where the instruction implies pillars or an open, roofed-but-wall-less
+  look. For normal houses keep ""walled"". When colonnade, openings are ignored.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
 {(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
