@@ -571,6 +571,19 @@
                                     <ComboBoxItem Content="建築（家・建物）"/>
                                     <ComboBoxItem Content="プリミティブ（球・ドームなど曲面）"/>
                                 </ComboBox>
+                                <TextBlock Text="正面の向き（ファサード神殿のとき）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <ComboBox x:Name="ArchFacadeCombo" Margin="0,4,0,12"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="南 (south)" Tag="south"/>
+                                    <ComboBoxItem Content="北 (north)" Tag="north"/>
+                                    <ComboBoxItem Content="東 (east)" Tag="east"/>
+                                    <ComboBoxItem Content="西 (west)" Tag="west"/>
+                                </ComboBox>
+
 
                                 <TextBlock Text="ジャンル"
                                            Style="{StaticResource PixelText}"

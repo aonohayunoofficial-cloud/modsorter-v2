@@ -169,10 +169,14 @@ public partial class MainWindow
         else
         {
             string? style = _currentGenre?.StylePrompt;
+            // 正面の向き（ファサード神殿用）。選択中の ComboBoxItem の Tag を取り出す。
+            string facade = "south";
+            if (ArchFacadeCombo.SelectedItem is System.Windows.Controls.ComboBoxItem fi
+                && fi.Tag is string ftag && !string.IsNullOrWhiteSpace(ftag))
+                facade = ftag;
             _archCases = await _architectHost.Generation.GenerateMultipleAsync(
-                model, prompt, blocks, 3, style, w, d, h);
+                model, prompt, blocks, 3, style, w, d, h, facade);
         }
-        sw.Stop();
 
         ArchGenBtn.IsEnabled = true;
 

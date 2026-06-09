@@ -48,6 +48,10 @@ public sealed class StructureSpec
     // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
     [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 
+    // ファサード型(temple)の正面の向き。柱廊をどの面に置くか。
+    // "north" | "south" | "east" | "west"。未指定なら "south"。
+    [JsonPropertyName("facade_face")] public string? FacadeFace { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 }

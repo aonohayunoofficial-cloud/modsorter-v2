@@ -23,7 +23,8 @@ public sealed class ArchitectGenClient
     public async Task<GenerationResult> GenerateAsync(
     string model, string instruction, IReadOnlyList<string> allowedBlocks,
     double temperature = 0.2, string? variantHint = null, string? stylePrompt = null,
-    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null)
+    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null,
+    string? facadeFace = null)
     {
 
         var result = new GenerationResult();
@@ -52,6 +53,7 @@ OUTPUT SHAPE (this exact JSON shape):
   ""has_base"": true,
   ""base_block"": ""minecraft:cobblestone"",
   ""building_style"": ""walled"",
+  ""facade_face"": ""south"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
   ""dome_height"": 5,
@@ -77,10 +79,15 @@ FIELD MEANING:
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
 - dome_height: only for dome. How tall the dome rises above the walls, in blocks.
   Omit to let it auto-size to a hemisphere. Use a larger value for a tall, grand dome.
-- building_style: ""walled"" (an ordinary building with solid walls, the default) or
-  ""colonnade"" (an open structure with NO walls, just rows of round columns around the
-  perimeter, like a Greek temple or a pavilion). Column thickness and spacing are
-  decided automatically from the building's size; you only choose the style.
+- building_style: ""walled"" (an ordinary building with solid walls, the default),
+  ""colonnade"" (an open structure with NO walls, just a sparse row of slim round
+  columns around the perimeter, like a pavilion), or ""temple"" (a walled room at the
+  back with a row of columns forming a porch across the FRONT, like a Greek temple
+  facade). Column thickness and spacing are decided automatically; you only choose the
+  style. ""temple"" looks best with a larger depth (6 or more).
+- facade_face: only for building_style ""temple"". Which side the columned porch faces:
+  ""north"", ""south"", ""east"", or ""west"". Choose the side that should be the front
+  entrance. Omit to default to ""south"".
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the
@@ -124,9 +131,10 @@ RULES:
 - Prefer ""gable_stairs"" over ""gable"" when a stair block is available and a nicer
   sloped roof suits the house; set roof_block to that stair block.
 
-- Use building_style ""colonnade"" for open, columned structures (temples, shrines,
-  pavilions) where the instruction implies pillars or an open, roofed-but-wall-less
-  look. For normal houses keep ""walled"". When colonnade, openings are ignored.
+- Use building_style ""colonnade"" for fully open, columned structures (pavilions,
+  shrines) with columns all around. Use ""temple"" when the instruction wants a
+  classical facade: a solid room behind a front row of columns (a porticoed temple).
+  For normal houses keep ""walled"". When colonnade or temple, openings are ignored.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
 {(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
@@ -180,6 +188,8 @@ JSON:";
             if (fixedWidth.HasValue) spec.Width = fixedWidth.Value;
             if (fixedDepth.HasValue) spec.Depth = fixedDepth.Value;
             if (fixedHeight.HasValue) spec.Height = fixedHeight.Value;
+            // UIで正面の向きが指定されていれば上書き（temple のときのみ意味を持つ）。
+            if (!string.IsNullOrWhiteSpace(facadeFace)) spec.FacadeFace = facadeFace;
 
             if (spec.Width < 2 || spec.Depth < 2 || spec.Height < 2)
             {
@@ -221,7 +231,8 @@ JSON:";
     public async Task<List<GenerationResult>> GenerateMultipleAsync(
     string model, string instruction, IReadOnlyList<string> allowedBlocks, int count = 3,
     string? stylePrompt = null,
-    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null)
+    int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null,
+    string? facadeFace = null)
     {
 
         var results = new List<GenerationResult>();
@@ -237,7 +248,7 @@ JSON:";
         {
             var v = variants[i % variants.Length];
             var r = await GenerateAsync(model, instruction, allowedBlocks, v.temp, v.hint, stylePrompt,
-                                        fixedWidth, fixedDepth, fixedHeight);
+                                        fixedWidth, fixedDepth, fixedHeight, facadeFace);
             results.Add(r);
         }
         return results;
