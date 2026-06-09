@@ -608,16 +608,26 @@
                                               VerticalAlignment="Center"/>
                                 </DockPanel>
 
-                                <TextBlock Text="使用可能ブロック(カンマ区切り)"
+                                <TextBlock Text="使用可能ブロック"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
-                                <TextBox x:Name="ArchBlocksBox"
+                                <TextBlock x:Name="ArchBlocksSummary"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource TextDim}" FontSize="11"
+                                           TextWrapping="Wrap" Margin="0,4,0,4"
+                                           Text="(未選択)"/>
+                                <TextBox x:Name="ArchBlocksBox" Visibility="Collapsed"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          FontFamily="{StaticResource PixelFont}"
-                                         BorderThickness="0" Padding="6" Margin="0,4,0,12"
+                                         BorderThickness="0" Padding="6" Margin="0,0,0,0"
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="48"
                                          Text="minecraft:oak_planks, minecraft:oak_log, minecraft:glass, minecraft:cobblestone"/>
+
+                                <Button x:Name="ArchPickBlocksBtn"
+                                        Content="ブロックを選択..." Style="{StaticResource McButtonGray}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,12"
+                                        Click="ArchPickBlocks_Click"/>
 
                                 <TextBlock Text="サイズ（幅 × 奥行 × 高さ）"
                                            Style="{StaticResource PixelText}"

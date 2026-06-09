@@ -1,0 +1,44 @@
+﻿<Window x:Class="ModSorter.BlockPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ブロックを選択" Height="760" Width="360"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgDark}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="使用するブロックを選んでください"
+                   Style="{StaticResource PixelText}"
+                   Foreground="{StaticResource GrassGreen}" Margin="0,0,0,8"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="CategoryPanel"/>
+        </ScrollViewer>
+
+        <!-- ID直接入力（指定追加） -->
+        <StackPanel Grid.Row="2" Margin="0,8,0,0">
+            <TextBlock Text="ID直接指定（カンマ区切りで追加）"
+                       Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" FontSize="11"/>
+            <TextBox x:Name="ExtraIdBox"
+                     Background="{StaticResource BgPanel}"
+                     Foreground="{StaticResource TextMain}"
+                     FontFamily="{StaticResource PixelFont}"
+                     BorderThickness="0" Padding="6" Margin="0,4,0,0"
+                     TextWrapping="Wrap" AcceptsReturn="True" Height="48"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="キャンセル" Style="{StaticResource McButtonGray}"
+                    Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="決定" Style="{StaticResource McButton}"
+                    Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

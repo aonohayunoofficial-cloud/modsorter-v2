@@ -100,6 +100,32 @@ public partial class MainWindow
         ArchGenreCombo.SelectedIndex = 0; // 先頭ジャンルを選択（→ブロック欄も自動入力）
     }
 
+    // ブロック選択ウィンドウを開き、決定したら ArchBlocksBox に書き戻す。
+    private void ArchPickBlocks_Click(object sender, RoutedEventArgs e)
+    {
+        var current = ArchBlocksBox.Text
+            .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries);
+        var win = new BlockPickerWindow(current) { Owner = this };
+        bool? ok = win.ShowDialog();
+        if (ok == true && win.ResultCsv != null)
+        {
+            ArchBlocksBox.Text = win.ResultCsv;
+            UpdateBlocksSummary();
+            ArchStatus.Text = "ブロック選択を反映しました。";
+        }
+    }
+    // 使用可能ブロックの件数サマリを更新する（隠した欄の中身を要約表示）。
+    private void UpdateBlocksSummary()
+    {
+        var ids = ArchBlocksBox.Text
+            .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
+            .ToList();
+        ArchBlocksSummary.Text = ids.Count == 0
+            ? "(未選択)"
+            : $"{ids.Count} 種類を選択中";
+    }
     private void ArchGenre_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         _currentGenre = ArchGenreCombo.SelectedItem as Genre;
@@ -108,6 +134,7 @@ public partial class MainWindow
         // ブロック欄を、このジャンルのブロックで自動入力（日本語名つきの参考表示も）
         // 実際にモデルへ渡すのは ID。欄にはIDをカンマ区切りで入れる。
         ArchBlocksBox.Text = string.Join(", ", _currentGenre.Blocks.Select(b => b.Id));
+        UpdateBlocksSummary();
 
         // 分かりやすいように、ID→日本語名の対応をステータスに出す
         var pairs = _currentGenre.Blocks

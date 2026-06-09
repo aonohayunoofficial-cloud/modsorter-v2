@@ -1,0 +1,423 @@
+﻿{
+  "categories": [
+    {
+      "key": "wood",
+      "display_name": "木材",
+      "blocks": [
+        {
+          "id": "minecraft:oak_planks",
+          "name": "オークの板材"
+        },
+        {
+          "id": "minecraft:spruce_planks",
+          "name": "トウヒの板材"
+        },
+        {
+          "id": "minecraft:birch_planks",
+          "name": "シラカバの板材"
+        },
+        {
+          "id": "minecraft:jungle_planks",
+          "name": "ジャングルの板材"
+        },
+        {
+          "id": "minecraft:acacia_planks",
+          "name": "アカシアの板材"
+        },
+        {
+          "id": "minecraft:dark_oak_planks",
+          "name": "ダークオークの板材"
+        },
+        {
+          "id": "minecraft:oak_log",
+          "name": "オークの原木"
+        },
+        {
+          "id": "minecraft:spruce_log",
+          "name": "トウヒの原木"
+        },
+        {
+          "id": "minecraft:birch_log",
+          "name": "シラカバの原木"
+        },
+        {
+          "id": "minecraft:dark_oak_log",
+          "name": "ダークオークの原木"
+        }
+      ]
+    },
+    {
+      "key": "stone",
+      "display_name": "石・岩",
+      "blocks": [
+        {
+          "id": "minecraft:stone",
+          "name": "石"
+        },
+        {
+          "id": "minecraft:cobblestone",
+          "name": "丸石"
+        },
+        {
+          "id": "minecraft:mossy_cobblestone",
+          "name": "苔むした丸石"
+        },
+        {
+          "id": "minecraft:andesite",
+          "name": "安山岩"
+        },
+        {
+          "id": "minecraft:diorite",
+          "name": "閃緑岩"
+        },
+        {
+          "id": "minecraft:granite",
+          "name": "花崗岩"
+        },
+        {
+          "id": "minecraft:deepslate",
+          "name": "深層岩"
+        },
+        {
+          "id": "minecraft:cobbled_deepslate",
+          "name": "丸石の深層岩"
+        },
+        {
+          "id": "minecraft:smooth_stone",
+          "name": "滑らかな石"
+        },
+        {
+          "id": "minecraft:basalt",
+          "name": "玄武岩"
+        }
+      ]
+    },
+    {
+      "key": "brick",
+      "display_name": "加工石・レンガ",
+      "blocks": [
+        {
+          "id": "minecraft:stone_bricks",
+          "name": "石レンガ"
+        },
+        {
+          "id": "minecraft:mossy_stone_bricks",
+          "name": "苔むした石レンガ"
+        },
+        {
+          "id": "minecraft:cracked_stone_bricks",
+          "name": "ひび割れた石レンガ"
+        },
+        {
+          "id": "minecraft:chiseled_stone_bricks",
+          "name": "模様入り石レンガ"
+        },
+        {
+          "id": "minecraft:bricks",
+          "name": "レンガ"
+        },
+        {
+          "id": "minecraft:deepslate_bricks",
+          "name": "深層岩レンガ"
+        },
+        {
+          "id": "minecraft:deepslate_tiles",
+          "name": "深層岩タイル"
+        },
+        {
+          "id": "minecraft:polished_deepslate",
+          "name": "磨かれた深層岩"
+        },
+        {
+          "id": "minecraft:polished_andesite",
+          "name": "磨かれた安山岩"
+        },
+        {
+          "id": "minecraft:polished_granite",
+          "name": "磨かれた花崗岩"
+        },
+        {
+          "id": "minecraft:nether_bricks",
+          "name": "ネザーレンガ"
+        },
+        {
+          "id": "minecraft:mud_bricks",
+          "name": "泥レンガ"
+        }
+      ]
+    },
+    {
+      "key": "ground",
+      "display_name": "土・地面",
+      "blocks": [
+        {
+          "id": "minecraft:dirt",
+          "name": "土"
+        },
+        {
+          "id": "minecraft:grass_block",
+          "name": "草ブロック"
+        },
+        {
+          "id": "minecraft:coarse_dirt",
+          "name": "粗い土"
+        },
+        {
+          "id": "minecraft:sand",
+          "name": "砂"
+        },
+        {
+          "id": "minecraft:red_sand",
+          "name": "赤い砂"
+        },
+        {
+          "id": "minecraft:gravel",
+          "name": "砂利"
+        },
+        {
+          "id": "minecraft:clay",
+          "name": "粘土"
+        },
+        {
+          "id": "minecraft:sandstone",
+          "name": "砂岩"
+        },
+        {
+          "id": "minecraft:smooth_sandstone",
+          "name": "滑らかな砂岩"
+        },
+        {
+          "id": "minecraft:red_sandstone",
+          "name": "赤い砂岩"
+        }
+      ]
+    },
+    {
+      "key": "metal",
+      "display_name": "鉱物・金属",
+      "blocks": [
+        {
+          "id": "minecraft:iron_block",
+          "name": "鉄ブロック"
+        },
+        {
+          "id": "minecraft:gold_block",
+          "name": "金ブロック"
+        },
+        {
+          "id": "minecraft:copper_block",
+          "name": "銅ブロック"
+        },
+        {
+          "id": "minecraft:weathered_copper",
+          "name": "錆びた銅"
+        },
+        {
+          "id": "minecraft:cut_copper",
+          "name": "切り込み入りの銅"
+        },
+        {
+          "id": "minecraft:lapis_block",
+          "name": "ラピスラズリブロック"
+        },
+        {
+          "id": "minecraft:emerald_block",
+          "name": "エメラルドブロック"
+        },
+        {
+          "id": "minecraft:diamond_block",
+          "name": "ダイヤモンドブロック"
+        },
+        {
+          "id": "minecraft:redstone_block",
+          "name": "レッドストーンブロック"
+        },
+        {
+          "id": "minecraft:netherite_block",
+          "name": "ネザライトブロック"
+        }
+      ]
+    },
+    {
+      "key": "concrete",
+      "display_name": "コンクリート・テラコッタ",
+      "blocks": [
+        {
+          "id": "minecraft:white_concrete",
+          "name": "白いコンクリート"
+        },
+        {
+          "id": "minecraft:gray_concrete",
+          "name": "灰色のコンクリート"
+        },
+        {
+          "id": "minecraft:black_concrete",
+          "name": "黒いコンクリート"
+        },
+        {
+          "id": "minecraft:blue_concrete",
+          "name": "青いコンクリート"
+        },
+        {
+          "id": "minecraft:red_concrete",
+          "name": "赤いコンクリート"
+        },
+        {
+          "id": "minecraft:green_concrete",
+          "name": "緑のコンクリート"
+        },
+        {
+          "id": "minecraft:yellow_concrete",
+          "name": "黄のコンクリート"
+        },
+        {
+          "id": "minecraft:terracotta",
+          "name": "テラコッタ"
+        },
+        {
+          "id": "minecraft:white_terracotta",
+          "name": "白いテラコッタ"
+        },
+        {
+          "id": "minecraft:orange_terracotta",
+          "name": "橙のテラコッタ"
+        }
+      ]
+    },
+    {
+      "key": "glass",
+      "display_name": "ガラス",
+      "blocks": [
+        {
+          "id": "minecraft:glass",
+          "name": "ガラス"
+        },
+        {
+          "id": "minecraft:white_stained_glass",
+          "name": "白の色付きガラス"
+        },
+        {
+          "id": "minecraft:light_gray_stained_glass",
+          "name": "薄灰色の色付きガラス"
+        },
+        {
+          "id": "minecraft:blue_stained_glass",
+          "name": "青の色付きガラス"
+        },
+        {
+          "id": "minecraft:light_blue_stained_glass",
+          "name": "水色の色付きガラス"
+        },
+        {
+          "id": "minecraft:green_stained_glass",
+          "name": "緑の色付きガラス"
+        },
+        {
+          "id": "minecraft:red_stained_glass",
+          "name": "赤の色付きガラス"
+        },
+        {
+          "id": "minecraft:black_stained_glass",
+          "name": "黒の色付きガラス"
+        },
+        {
+          "id": "minecraft:brown_stained_glass",
+          "name": "茶色の色付きガラス"
+        }
+      ]
+    },
+    {
+      "key": "nature",
+      "display_name": "植物・自然",
+      "blocks": [
+        {
+          "id": "minecraft:oak_leaves",
+          "name": "オークの葉"
+        },
+        {
+          "id": "minecraft:spruce_leaves",
+          "name": "トウヒの葉"
+        },
+        {
+          "id": "minecraft:birch_leaves",
+          "name": "シラカバの葉"
+        },
+        {
+          "id": "minecraft:moss_block",
+          "name": "苔ブロック"
+        },
+        {
+          "id": "minecraft:mycelium",
+          "name": "菌糸"
+        },
+        {
+          "id": "minecraft:podzol",
+          "name": "ポドゾル"
+        },
+        {
+          "id": "minecraft:hay_block",
+          "name": "干し草の俵"
+        },
+        {
+          "id": "minecraft:mushroom_stem",
+          "name": "キノコの柄"
+        },
+        {
+          "id": "minecraft:red_mushroom_block",
+          "name": "赤いキノコ"
+        },
+        {
+          "id": "minecraft:melon",
+          "name": "メロン"
+        }
+      ]
+    },
+    {
+      "key": "shape",
+      "display_name": "装飾・特殊（階段・ハーフ等）",
+      "note": "階段・ハーフブロック・柵・壁などの形状ブロックです。屋根(gable_stairs)用の階段材はここから選べます。壁や床に使うと見た目が崩れる場合があります。",
+      "blocks": [
+        {
+          "id": "minecraft:oak_stairs",
+          "name": "オークの階段"
+        },
+        {
+          "id": "minecraft:stone_brick_stairs",
+          "name": "石レンガの階段"
+        },
+        {
+          "id": "minecraft:cobblestone_stairs",
+          "name": "丸石の階段"
+        },
+        {
+          "id": "minecraft:deepslate_brick_stairs",
+          "name": "深層岩レンガの階段"
+        },
+        {
+          "id": "minecraft:oak_slab",
+          "name": "オークのハーフブロック"
+        },
+        {
+          "id": "minecraft:stone_brick_slab",
+          "name": "石レンガのハーフブロック"
+        },
+        {
+          "id": "minecraft:oak_fence",
+          "name": "オークの柵"
+        },
+        {
+          "id": "minecraft:stone_brick_wall",
+          "name": "石レンガの壁"
+        },
+        {
+          "id": "minecraft:cobblestone_wall",
+          "name": "丸石の壁"
+        },
+        {
+          "id": "minecraft:iron_bars",
+          "name": "鉄格子"
+        }
+      ]
+    }
+  ]
+}
