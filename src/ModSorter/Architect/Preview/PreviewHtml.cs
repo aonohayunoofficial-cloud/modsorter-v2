@@ -99,10 +99,13 @@ function animate() {
 
 function colorFor(id) {
   const known = {
-    'minecraft:oak_planks': 0xc8a564,
-    'minecraft:oak_log':    0x8a6a3b,
-    'minecraft:glass':      0x88ccee,
-    'minecraft:cobblestone':0x888888
+    'minecraft:oak_planks':  0xc8a564,
+    'minecraft:oak_log':     0x8a6a3b,
+    'minecraft:glass':       0x88ccee,
+    'minecraft:cobblestone': 0x888888,
+    'minecraft:oak_stairs':  0xb89456,
+    'minecraft:stone_bricks':0x9a9a9a,
+    'minecraft:stone':       0x9a9a9a
   };
   if (known[id] !== undefined) return known[id];
   let h = 0;
@@ -124,9 +127,12 @@ function renderBlocks(json) {
   let minX=1e9,minY=1e9,minZ=1e9,maxX=-1e9,maxY=-1e9,maxZ=-1e9;
 
   for (const b of blocks) {
-    const isGlass = (b.id === 'minecraft:glass');
+    // id に状態が付く場合がある（例: minecraft:oak_stairs[facing=north]）。
+    // 色・ガラス判定は状態を剥がしたベースIDで行う。
+    const baseId = b.id.split('[')[0];
+    const isGlass = (baseId === 'minecraft:glass');
     const mat = new THREE.MeshLambertMaterial({
-      color: colorFor(b.id),
+      color: colorFor(baseId),
       transparent: isGlass, opacity: isGlass ? 0.4 : 1.0
     });
     const mesh = new THREE.Mesh(geo, mat);

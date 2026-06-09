@@ -67,8 +67,12 @@ OUTPUT SHAPE (this exact JSON shape):
 FIELD MEANING:
 - width = size along X, depth = size along Z, height = number of layers (vertical).
 - *_block = which allowed block to use for that part.
-- roof_type: ""flat"" (a flat roof), ""gable"" (a triangular pitched roof),
-  or ""dome"" (a rounded domed roof, good for temples, observatories, grand halls).
+- roof_type: ""flat"" (a flat roof), ""gable"" (a triangular pitched roof made of full
+  blocks), ""gable_stairs"" (a triangular pitched roof made of STAIR blocks for a
+  smoother sloped look), or ""dome"" (a rounded domed roof for temples/observatories).
+- When you use ""gable_stairs"", roof_block MUST be a stair block (an id ending in
+  ""_stairs"", e.g. minecraft:oak_stairs or minecraft:stone_brick_stairs) if one is in
+  the allowed list. Otherwise fall back to ""gable"".
 - ridge_axis: only for gable. ""x"" = ridge runs along X (roof slopes toward Z edges);
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
 - dome_height: only for dome. How tall the dome rises above the walls, in blocks.
@@ -117,6 +121,9 @@ RULES:
   houses look good on one). Skip it for very simple or floating structures.
 - Use roof_type ""dome"" for grand, rounded buildings (temples, observatories, domed
   halls). For ordinary houses prefer ""gable"" or ""flat"".
+- Prefer ""gable_stairs"" over ""gable"" when a stair block is available and a nicer
+  sloped roof suits the house; set roof_block to that stair block.
+
 - Use building_style ""colonnade"" for open, columned structures (temples, shrines,
   pavilions) where the instruction implies pillars or an open, roofed-but-wall-less
   look. For normal houses keep ""walled"". When colonnade, openings are ignored.

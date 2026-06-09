@@ -44,6 +44,8 @@ public static class StructureExpander
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
         if (roofType == "gable")
             BuildGableRoof(cells, spec, w, d, h, roof, wall);
+        else if (roofType == "gable_stairs")
+            BuildGableStairsRoof(cells, spec, w, d, h, roof, wall);
         else if (roofType == "dome")
             BuildDomeRoof(cells, spec, w, d, h, roof);
         else
@@ -167,6 +169,73 @@ public static class StructureExpander
         }
 
     }
+
+    // 切妻屋根（階段ブロック版）: 各段の屋根面を階段ブロックにし、
+    // 傾斜の下り方向へ facing を向ける。棟（最上段）はフルブロックで尖らせる。
+    // roof には階段ブロックID（例: minecraft:oak_stairs）が渡る想定。
+    // 状態は id に "[facing=...,half=bottom]" を埋め込む（プレビューは baseId で判定）。
+    private static void BuildGableStairsRoof(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string roof, string wall)
+    {
+        string axis = (spec.RidgeAxis ?? "x").Trim().ToLowerInvariant();
+        bool ridgeAlongX = (axis != "z");
+
+        int slopeLen = ridgeAlongX ? d : w;
+        int half = (slopeLen + 1) / 2;
+
+        // 棟の位置（傾斜方向の中央）。ここはフルブロックで尖らせる。
+        int ridgeLo = (slopeLen - 1) / 2;
+        int ridgeHi = slopeLen / 2;
+
+        for (int i = 0; i < slopeLen; i++)
+        {
+            int step = System.Math.Min(i, slopeLen - 1 - i);
+            int yLevel = (h - 1) + step;
+
+            bool isRidge = (i == ridgeLo || i == ridgeHi);
+            // 軒側へ下る向き。前半(i<中央)は一方向、後半は逆向き。
+            bool lowerSide = (i < slopeLen / 2); // 端0側か
+
+            if (ridgeAlongX)
+            {
+                // 階段の facing: z方向に傾斜。下り側を向く。
+                // 端0側は south(z+方向へ下る)を向く＝facing=south、反対側は north。
+                string facing = lowerSide ? "south" : "north";
+                string block = isRidge ? roof : StairId(roof, facing);
+
+                for (int x = 0; x < w; x++)
+                    cells[(x, yLevel, i)] = block;
+
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(0, y, i)] = wall;
+                    cells[(w - 1, y, i)] = wall;
+                }
+            }
+            else
+            {
+                // x方向に傾斜。端0側は east(x+方向へ下る)、反対側は west。
+                string facing = lowerSide ? "east" : "west";
+                string block = isRidge ? roof : StairId(roof, facing);
+
+                for (int z = 0; z < d; z++)
+                    cells[(i, yLevel, z)] = block;
+
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(i, y, 0)] = wall;
+                    cells[(i, y, d - 1)] = wall;
+                }
+            }
+        }
+    }
+
+    // 階段ブロックの id に向き状態を埋め込む。素材が階段でない場合もIDだけ付ける
+    // （Minecraft側で無効なら無視されるだけ。基本は roof に *_stairs を選ばせる）。
+    private static string StairId(string block, string facing)
+        => $"{block}[facing={facing},half=bottom]";
+
 
     // ドーム屋根: 建物の上面(w×d)を底面とする半楕円体の殻を、y=h-1 から上に積む。
     // 半径 rx=w/2, rz=d/2。ドーム高さ ry は spec.DomeHeight（未指定なら控えめな既定）。
