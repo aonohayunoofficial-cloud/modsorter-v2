@@ -42,6 +42,9 @@ public sealed class StructureSpec
     // 例: 床が oak_planks のとき base_block を cobblestone にすると足元だけ石の基礎になる。
     [JsonPropertyName("base_block")] public string? BaseBlock { get; set; }
 
+    // ドーム屋根(roof_type="dome")の高さ。未指定なら水平半径から自動。
+    [JsonPropertyName("dome_height")] public int? DomeHeight { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 }

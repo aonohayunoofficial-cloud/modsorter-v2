@@ -44,6 +44,8 @@ public static class StructureExpander
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
         if (roofType == "gable")
             BuildGableRoof(cells, spec, w, d, h, roof, wall);
+        else if (roofType == "dome")
+            BuildDomeRoof(cells, spec, w, d, h, roof);
         else
             BuildFlatRoof(cells, w, d, h, roof);
 
@@ -153,6 +155,66 @@ public static class StructureExpander
             }
         }
 
+    }
+
+    // ドーム屋根: 建物の上面(w×d)を底面とする半楕円体の殻を、y=h-1 から上に積む。
+    // 半径 rx=w/2, rz=d/2。ドーム高さ ry は spec.DomeHeight（未指定なら控えめな既定）。
+    // 殻だけ残す（中空）ことで屋根らしくする。底面 y=h-1 は全面塞いで天井とする。
+    private static void BuildDomeRoof(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string roof)
+    {
+        double rx = w / 2.0;
+        double rz = d / 2.0;
+        // 中心（底面）。整数格子の中央。
+        double cx = (w - 1) / 2.0;
+        double cz = (d - 1) / 2.0;
+
+        // ドームの高さ。未指定なら水平半径の小さい方に合わせる（半球に近い）。
+        int ry = spec.DomeHeight.HasValue && spec.DomeHeight.Value >= 1
+            ? spec.DomeHeight.Value
+            : Math.Max(2, (int)Math.Round(Math.Min(rx, rz)));
+
+        int baseY = h - 1; // ドームの底面（壁の最上層の上）
+
+        // まず底面を天井として全面塞ぐ（ドームの足元の穴を防ぐ）
+        for (int x = 0; x < w; x++)
+            for (int z = 0; z < d; z++)
+                cells[(x, baseY, z)] = roof;
+
+        // 半楕円体の殻。yLayer=0..ry の各層で、その高さの輪郭リングを置く。
+        for (int yi = 0; yi <= ry; yi++)
+        {
+            for (int x = 0; x < w; x++)
+                for (int z = 0; z < d; z++)
+                {
+                    double nx = (x - cx) / (rx <= 0 ? 1 : rx);
+                    double nz = (z - cz) / (rz <= 0 ? 1 : rz);
+                    double ny = (double)yi / (ry <= 0 ? 1 : ry);
+                    double v = nx * nx + nz * nz + ny * ny;
+                    if (v > 1.0) continue; // 楕円体の外
+
+                    // 殻判定: 隣接が外側になるセルだけ残す（表面）
+                    bool surface =
+                        Outside(x + 1, cx, rx, z, cz, rz, yi, ry) ||
+                        Outside(x - 1, cx, rx, z, cz, rz, yi, ry) ||
+                        Outside(x, cx, rx, z + 1, cz, rz, yi, ry) ||
+                        Outside(x, cx, rx, z - 1, cz, rz, yi, ry) ||
+                        Outside(x, cx, rx, z, cz, rz, yi + 1, ry);
+                    if (!surface) continue;
+
+                    cells[(x, baseY + yi, z)] = roof;
+                }
+        }
+    }
+
+    // 指定セルが半楕円体の外側か（殻判定用）
+    private static bool Outside(int x, double cx, double rx, int z, double cz, double rz, int yi, int ry)
+    {
+        double nx = (x - cx) / (rx <= 0 ? 1 : rx);
+        double nz = (z - cz) / (rz <= 0 ? 1 : rz);
+        double ny = (double)yi / (ry <= 0 ? 1 : ry);
+        return (nx * nx + nz * nz + ny * ny) > 1.0;
     }
 
     private static void ApplyOpening(

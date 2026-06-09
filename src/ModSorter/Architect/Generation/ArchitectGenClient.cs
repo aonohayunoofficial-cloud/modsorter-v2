@@ -53,6 +53,7 @@ OUTPUT SHAPE (this exact JSON shape):
   ""base_block"": ""minecraft:cobblestone"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
+  ""dome_height"": 5,
   ""floor_levels"": [],
   ""openings"": [
 
@@ -65,9 +66,12 @@ OUTPUT SHAPE (this exact JSON shape):
 FIELD MEANING:
 - width = size along X, depth = size along Z, height = number of layers (vertical).
 - *_block = which allowed block to use for that part.
-- roof_type: ""flat"" (a flat roof) or ""gable"" (a triangular pitched roof).
+- roof_type: ""flat"" (a flat roof), ""gable"" (a triangular pitched roof),
+  or ""dome"" (a rounded domed roof, good for temples, observatories, grand halls).
 - ridge_axis: only for gable. ""x"" = ridge runs along X (roof slopes toward Z edges);
   ""z"" = ridge runs along Z (roof slopes toward X edges). Pick whichever fits a house.
+- dome_height: only for dome. How tall the dome rises above the walls, in blocks.
+  Omit to let it auto-size to a hemisphere. Use a larger value for a tall, grand dome.
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the
@@ -106,6 +110,8 @@ RULES:
   omit them so the walls stay simple.
 - Use has_base + base_block when a stone/brick foundation suits the building (most
   houses look good on one). Skip it for very simple or floating structures.
+- Use roof_type ""dome"" for grand, rounded buildings (temples, observatories, domed
+  halls). For ordinary houses prefer ""gable"" or ""flat"".
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
 {(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
