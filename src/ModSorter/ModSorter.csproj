@@ -13,6 +13,7 @@
 	<ItemGroup>
 		<PackageReference Include="Markdig" Version="1.2.0" />
 		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+		<PackageReference Include="SharpGLTF.Toolkit" Version="1.0.6" />
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 	</ItemGroup>
 	<ItemGroup>

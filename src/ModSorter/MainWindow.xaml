@@ -570,6 +570,7 @@
                                           SelectedIndex="0">
                                     <ComboBoxItem Content="建築（家・建物）"/>
                                     <ComboBoxItem Content="プリミティブ（球・ドームなど曲面）"/>
+                                    <ComboBoxItem Content="彫刻（GLBから）"/>
                                 </ComboBox>
                                 <TextBlock Text="正面の向き（ファサード神殿のとき）"
                                            Style="{StaticResource PixelText}"
@@ -672,11 +673,25 @@
                                          BorderThickness="0" Padding="6" Margin="0,4,0,12"
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="60"
                                          Text="木の小屋。南にドア、東西に窓を少し。三角屋根。"/>
+                                
+                                <TextBlock Text="画像生成に常に付ける定型ワード（英語・3D化向け）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <TextBox x:Name="ArchFixedWordsBox"
+                                         Background="{StaticResource BgPanel}"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}"
+                                         BorderThickness="0" Padding="6" Margin="0,4,0,12"
+                                         TextWrapping="Wrap" AcceptsReturn="True" Height="44"
+                                         Text="centered, single object, plain background, isometric view, full view, highly detailed"/>
 
                                 <Button x:Name="ArchGenBtn"
                                         Content="3案を生成" Style="{StaticResource McButton}"
                                         HorizontalAlignment="Left" Margin="0,0,0,8"
                                         Click="ArchGenerate_Click"/>
+                                <Button x:Name="ArchGalleryBtn" Content="画像ギャラリー"
+                                        Width="120" Height="32" Margin="4,0"
+                                        Click="ArchGallery_Click"/>
                                 <TextBlock x:Name="ArchStatus"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" FontSize="11"

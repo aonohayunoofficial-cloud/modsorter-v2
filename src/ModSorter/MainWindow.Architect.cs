@@ -150,6 +150,23 @@ public partial class MainWindow
             return;
         }
 
+        // 種類が 彫刻(テキスト→画像→GLB) (index=2) なら、専用フローへ。
+        // LLM(Ollama)は使わないため、以降の model/prompt/blocks チェックは通さない。
+        if (ArchKindCombo.SelectedIndex == 2)
+        {
+            ArchGenBtn.IsEnabled = false;
+            SetCaseButtonsEnabled(false);
+            try
+            {
+                await GenerateSculptureAsync();
+            }
+            finally
+            {
+                ArchGenBtn.IsEnabled = true;
+            }
+            return;
+        }
+
         string model = (ArchModelCombo.SelectedItem as string ?? "").Trim();
         string prompt = ArchPromptBox.Text.Trim();
         var blocks = ArchBlocksBox.Text
@@ -257,6 +274,20 @@ public partial class MainWindow
         }
     }
 
+    // 文字列にひらがな・カタカナ・漢字が含まれるか判定する。
+    private static bool ContainsJapanese(string s)
+    {
+        foreach (char c in s)
+        {
+            // ひらがな(3040-309F) / カタカナ(30A0-30FF) / 漢字(4E00-9FFF)
+            if ((c >= '\u3040' && c <= '\u309F') ||
+                (c >= '\u30A0' && c <= '\u30FF') ||
+                (c >= '\u4E00' && c <= '\u9FFF'))
+                return true;
+        }
+        return false;
+    }
+
     // 指定インデックスの案を結果テキストとプレビューに表示する
     private async Task ShowCase(int index)
     {
@@ -281,6 +312,29 @@ public partial class MainWindow
         await RenderArchPreviewAsync(result.Blocks);
     }
 
+    // 画像ギャラリーを開き、選ばれた画像をそのまま 3D化する。
+    private async void ArchGallery_Click(object sender, RoutedEventArgs e)
+    {
+        var gallery = new ModSorter.Architect.Preview.GalleryWindow { Owner = this };
+        bool? ok = gallery.ShowDialog();
+        if (ok != true || gallery.SelectedForSculpt.Count == 0)
+            return;
+
+        // 解像度・ブロックIDは現在のUI欄から取得（彫刻フローと同じルール）。
+        var blockIds = ArchBlocksBox.Text
+            .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
+            .ToList();
+        string blockId = blockIds.Count > 0 ? blockIds[0] : "minecraft:stone";
+
+        if (!int.TryParse(ArchWidthBox.Text.Trim(), out int resolution))
+            resolution = 48;
+        resolution = System.Math.Clamp(resolution, 8, 128);
+
+        await RunSculptureFromImagesAsync(gallery.SelectedForSculpt, resolution, blockId);
+    }
+
     // 生成結果を別ウィンドウの 3Dプレビューへ描画する。
     // ウィンドウが未オープンなら自動で開いて描画する。
     private async Task RenderArchPreviewAsync(System.Collections.Generic.List<GeneratedBlock> blocks)
@@ -294,7 +348,20 @@ public partial class MainWindow
             await _previewWindow.InitAsync();
         }
 
-        if (!_previewWindow.IsReady) return;
+        // プレビューの準備ができていなければ、できるまで少し待つ（最大5秒）。
+        // TRELLIS.2 実行を挟むとタイミング次第で未初期化のことがあるため。
+        int waited = 0;
+        while (!_previewWindow.IsReady && waited < 5000)
+        {
+            await Task.Delay(100);
+            waited += 100;
+        }
+        if (!_previewWindow.IsReady)
+        {
+            Log("プレビュー描画中止: ウィンドウが準備完了になりませんでした。");
+            ArchResultBox.AppendText("\n[警告] プレビュー未初期化のため描画をスキップ。\n");
+            return;
+        }
 
         string json = JsonSerializer.Serialize(blocks.Select(b => new
         {
@@ -303,8 +370,185 @@ public partial class MainWindow
             z = b.Z,
             id = b.Id
         }));
+        Log($"プレビュー描画: {blocks.Count} ブロックを送信します。");
         await _previewWindow.RenderAsync(json);
         _previewWindow.Activate(); // 結果が見えるよう前面へ
     }
 
+    // 彫刻モード(一気通貫): プロンプト → ComfyUIで画像を複数生成 → ユーザーが1枚選択
+    // → 選んだ画像だけ TRELLIS.2 で GLB化 → MeshVoxelizerでボクセル化 → プレビュー。
+    private async Task GenerateSculptureAsync()
+    {
+        // 0. 入力チェック。プロンプトとブロックは必要(modelは不要)。
+        string prompt = ArchPromptBox.Text.Trim();
+        if (string.IsNullOrEmpty(prompt))
+        {
+            ArchStatus.Text = "指示(プロンプト)が空です。";
+            return;
+        }
+
+        // 0-A. 日本語が含まれていれば DeepL で英訳する（FLUXは英語が得意）。
+        if (ContainsJapanese(prompt))
+        {
+            string deeplKey = ModSorter.Models.Settings.Decrypt(_settings.DeepLKeyEnc);
+            if (string.IsNullOrEmpty(deeplKey))
+            {
+                ArchStatus.Text =
+                    "日本語プロンプトですが DeepL キーが未設定です。設定で保存してください。";
+                return;
+            }
+            if (!ModSorter.Clients.DeepLClient.IsReady)
+                ModSorter.Clients.DeepLClient.Init(deeplKey);
+
+            ArchStatus.Text = "プロンプトを英訳中...";
+            string? en = await ModSorter.Clients.DeepLClient.TranslateToEnglishAsync(prompt);
+            if (string.IsNullOrEmpty(en))
+            {
+                ArchStatus.Text =
+                    $"プロンプトの英訳に失敗: {ModSorter.Clients.DeepLClient.LastError}";
+                return;
+            }
+            Log($"プロンプト英訳: 「{prompt}」→「{en}」");
+            prompt = en; // 以降は英訳済みプロンプトを使う
+        }
+
+        // 0-B. 定型ワード（UI欄）を末尾に連結する。空なら何もしない。
+        //      英訳後に付けることで、定型部分は英語のまま安定して渡る。
+        string fixedWords = ArchFixedWordsBox.Text.Trim();
+        if (!string.IsNullOrEmpty(fixedWords))
+        {
+            // プロンプト末尾がカンマやピリオドでなければカンマで区切る。
+            string sep = (prompt.EndsWith(",") || prompt.EndsWith(".") ||
+                          prompt.Length == 0) ? " " : ", ";
+            prompt = prompt + sep + fixedWords;
+            Log($"定型ワード連結後: 「{prompt}」");
+        }
+
+        var blockIds = ArchBlocksBox.Text
+            .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
+            .ToList();
+        string blockId = blockIds.Count > 0 ? blockIds[0] : "minecraft:stone";
+
+        if (!int.TryParse(ArchWidthBox.Text.Trim(), out int resolution))
+            resolution = 48;
+        resolution = System.Math.Clamp(resolution, 8, 128);
+
+        // 1. 画像選択ウィンドウを開いて画像生成→選択。
+        ArchStatus.Text = "画像生成ウィンドウを開きました。画像を選んでください。";
+        var picker = new ModSorter.Architect.Preview.ImagePickerWindow(prompt)
+        {
+            Owner = this
+        };
+        // 表示後に最初の生成を走らせるため、Loaded で StartAsync を呼ぶ。
+        picker.Loaded += async (_, __) => await picker.StartAsync();
+
+        bool? picked = picker.ShowDialog();
+        if (picked != true || picker.SelectedImageWslPaths.Count == 0)
+        {
+            ArchStatus.Text = "画像選択をキャンセルしました。";
+            return;
+        }
+        // 2. 選ばれた画像を共通メソッドへ渡して 3D化→ボクセル化→案表示。
+        //    解像度・ブロックID もそのまま渡す。ギャラリーからも同じ経路を使う。
+        await RunSculptureFromImagesAsync(picker.SelectedImageWslPaths, resolution, blockId);
+    }
+
+    // 選択済み画像(WSL相対パスのリスト)を順に TRELLIS.2 で GLB化 → ボクセル化し、
+    // 案として並べて表示する。GenerateSculptureAsync とギャラリーの両方から呼ぶ。
+    // wslImagePaths: 例 ["assets/arch_xxx.png", ...]（1枚以上）
+    private async Task RunSculptureFromImagesAsync(
+        List<string> wslImagePaths, int resolution, string blockId)
+    {
+        if (wslImagePaths == null || wslImagePaths.Count == 0)
+        {
+            ArchStatus.Text = "3D化する画像が選ばれていません。";
+            return;
+        }
+
+        ArchResultBox.Text = "";
+        void AppendLog(string line) => Dispatcher.Invoke(() =>
+        {
+            ArchResultBox.AppendText(line + "\n");
+            ArchResultBox.ScrollToEnd();
+        });
+
+        const string wslGlbUncDir =
+            @"\\wsl$\Ubuntu-22.04\home\yuno\projects\TRELLIS.2";
+
+        var cases = new List<GenerationResult>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        for (int i = 0; i < wslImagePaths.Count; i++)
+        {
+            string imageWsl = wslImagePaths[i];
+            ArchStatus.Text = $"案{i + 1}/{wslImagePaths.Count} を 3D化中...（数分かかります）";
+            AppendLog($"=== 案{i + 1}: TRELLIS.2 で 3D化: {imageWsl} ===");
+
+            // 案ごとに別 GLB 名。
+            string glbName = $"arch_case{i}.glb";
+            var tr = await Trellis2Runner.RunAsync(imageWsl, glbName, AppendLog);
+            if (!tr.Success)
+            {
+                AppendLog($"案{i + 1} 3D化失敗 (終了コード {tr.ExitCode})");
+                cases.Add(new GenerationResult { Error = $"3D化失敗(終了 {tr.ExitCode})" });
+                continue;
+            }
+
+            string glbUnc = System.IO.Path.Combine(wslGlbUncDir, glbName);
+            if (!System.IO.File.Exists(glbUnc))
+            {
+                AppendLog($"案{i + 1} GLB が見つかりません: {glbUnc}");
+                cases.Add(new GenerationResult { Error = "GLBが見つかりません" });
+                continue;
+            }
+
+            AppendLog($"=== 案{i + 1}: ボクセル化 (解像度 {resolution}, ブロック {blockId}) ===");
+            var vox = await Task.Run(() =>
+                MeshVoxelizer.Voxelize(
+                    glbUnc, resolution, MeshVoxelizer.FillMode.Hollow, blockId));
+            if (vox.Blocks == null)
+            {
+                AppendLog($"案{i + 1} ボクセル化失敗: {vox.Error}");
+                cases.Add(new GenerationResult { Error = $"ボクセル化失敗: {vox.Error}" });
+                continue;
+            }
+            AppendLog($"案{i + 1} 完了: {vox.Blocks.Count} ブロック");
+            cases.Add(vox);
+        }
+
+        sw.Stop();
+        _archCases = cases;
+
+        // 案ボタンを成否で有効化。
+        var caseButtons = new[] { ArchCase1Btn, ArchCase2Btn, ArchCase3Btn };
+        int okCount = 0;
+        for (int i = 0; i < caseButtons.Length; i++)
+        {
+            if (i < cases.Count && cases[i].Blocks != null)
+            {
+                caseButtons[i].IsEnabled = true;
+                caseButtons[i].Content = $"案{i + 1} ({cases[i].Blocks!.Count})";
+                okCount++;
+            }
+            else
+            {
+                caseButtons[i].IsEnabled = false;
+                caseButtons[i].Content = $"案{i + 1}";
+            }
+        }
+
+        ArchStatus.Text = $"[所要 {sw.Elapsed.TotalSeconds:F0} 秒] " +
+                          $"成功 {okCount}/{wslImagePaths.Count} 案。";
+
+        // 最初の成功案を表示。
+        int firstOk = cases.FindIndex(r => r.Blocks != null);
+        if (firstOk >= 0)
+            await ShowCase(firstOk);
+        else
+            ArchResultBox.AppendText("\n全案が失敗しました。\n");
+
+        Log($"彫刻(一気通貫): {ArchStatus.Text}");
+    }
 }

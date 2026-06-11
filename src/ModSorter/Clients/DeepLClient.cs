@@ -58,4 +58,40 @@ public static class DeepLClient
             return null;
         }
     }
+
+    // プレーンテキストを英語に翻訳する（画像生成プロンプト用）。
+    // tag_handling は付けない（HTMLではなく素のテキストとして扱う）。
+    public static async Task<string?> TranslateToEnglishAsync(string text)
+    {
+        if (_http == null) { LastError = "未初期化"; return null; }
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        try
+        {
+            var form = new List<KeyValuePair<string, string>>
+            {
+                new("text", text),
+                new("target_lang", "EN-US")
+            };
+            using var content = new FormUrlEncodedContent(form);
+            using var resp = await _http.PostAsync("v2/translate", content);
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"HTTP {(int)resp.StatusCode}: " +
+                    body.Substring(0, Math.Min(120, body.Length));
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            var translations = doc.RootElement.GetProperty("translations");
+            if (translations.GetArrayLength() == 0) return null;
+            return translations[0].GetProperty("text").GetString();
+        }
+        catch (Exception ex)
+        {
+            LastError = "ex: " + ex.Message;
+            return null;
+        }
+    }
 }

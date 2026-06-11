@@ -13,14 +13,40 @@ public partial class PreviewWindow : Window
         InitializeComponent();
     }
 
-    // WebView2 を初期化し、Three.js入りHTMLを読み込む
+    // WebView2 を初期化し、Three.js入りHTMLを読み込む。
+    // NavigateToString は読み込み開始のみで完了を待たないため、
+    // NavigationCompleted イベントを待ってから _ready を立てる。
     public async Task InitAsync()
     {
         try
         {
             await PreviewWeb.EnsureCoreWebView2Async();
+
+            // ナビゲーション完了を待つための仕掛け。
+            var navDone = new TaskCompletionSource<bool>();
+            void Handler(object? s,
+                Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs e)
+            {
+                // 一度だけ拾えばよいのでハンドラを外す。
+                PreviewWeb.NavigationCompleted -= Handler;
+                navDone.TrySetResult(e.IsSuccess);
+            }
+            PreviewWeb.NavigationCompleted += Handler;
+
             PreviewWeb.NavigateToString(PreviewHtml.Build());
-            _ready = true;
+
+            // ページ読み込み完了を待つ（最大10秒のタイムアウト保険つき）。
+            var completed = await Task.WhenAny(navDone.Task, Task.Delay(10000));
+            if (completed == navDone.Task && navDone.Task.Result)
+            {
+                _ready = true;
+            }
+            else
+            {
+                // タイムアウト or 失敗。念のため外しておく。
+                PreviewWeb.NavigationCompleted -= Handler;
+                _ready = false;
+            }
         }
         catch (Exception)
         {

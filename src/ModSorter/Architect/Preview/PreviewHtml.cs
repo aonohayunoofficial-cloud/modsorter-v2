@@ -32,9 +32,12 @@ let yaw = 0.8, pitch = 0.6, dist = 20;
 let dragging = false, lastX = 0, lastY = 0;
 
 function init() {
+  // CDN からの Three.js 取得が間に合わないことがあるため、
+  // THREE が現れるまで待ってからリトライする。
   if (typeof THREE === 'undefined') {
     document.getElementById('info').textContent =
-      'THREE 未読込（CDNに到達できていない可能性）';
+      'THREE 読込待ち...';
+    setTimeout(init, 100);
     return;
   }
 
@@ -115,7 +118,13 @@ function colorFor(id) {
 
 // C#から呼ばれる。blocks = [{x,y,z,id}, ...]
 function renderBlocks(json) {
-  if (!scene) return;
+  // scene がまだ無ければ、準備できるまで繰り返し待ってから描く。
+  // (ウィンドウを開き直すたびに init が走るため、1回だけの待ちでは不足)
+  if (!scene) {
+    document.getElementById('info').textContent = 'シーン準備待ち...（データ受領済）';
+    setTimeout(function() { renderBlocks(json); }, 100);
+    return;
+  }
   const blocks = JSON.parse(json);
   if (group) { scene.remove(group); }
   group = new THREE.Group();
