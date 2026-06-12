@@ -561,16 +561,17 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <TextBlock Text="種類"
+                                <TextBlock Text="モード"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
                                 <ComboBox x:Name="ArchKindCombo" Margin="0,4,0,12"
                                           Style="{StaticResource McComboBox}"
                                           ItemContainerStyle="{StaticResource McComboBoxItem}"
-                                          SelectedIndex="0">
-                                    <ComboBoxItem Content="建築（家・建物）"/>
+                                          SelectedIndex="0"
+                                          SelectionChanged="ArchKind_SelectionChanged">
+                                    <ComboBoxItem Content="簡易建築（家・建物）"/>
                                     <ComboBoxItem Content="プリミティブ（球・ドームなど曲面）"/>
-                                    <ComboBoxItem Content="彫刻（GLBから）"/>
+                                    <ComboBoxItem Content="生成AI（GLBから）"/>
                                 </ComboBox>
                                 <TextBlock Text="正面の向き（ファサード神殿のとき）"
                                            Style="{StaticResource PixelText}"
@@ -630,37 +631,57 @@
                                         HorizontalAlignment="Left" Margin="0,0,0,12"
                                         Click="ArchPickBlocks_Click"/>
 
-                                <TextBlock Text="サイズ（幅 × 奥行 × 高さ）"
-                                           Style="{StaticResource PixelText}"
-                                           Foreground="{StaticResource GrassGreen}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
-                                    <TextBlock Text="幅" Style="{StaticResource PixelText}"
-                                               VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                    <TextBox x:Name="ArchWidthBox" Width="48"
-                                             Background="{StaticResource BgPanel}"
-                                             Foreground="{StaticResource TextMain}"
-                                             FontFamily="{StaticResource PixelFont}"
-                                             BorderThickness="0" Padding="4"
-                                             VerticalContentAlignment="Center"
-                                             Text="5"/>
-                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
-                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
-                                    <TextBox x:Name="ArchDepthBox" Width="48"
-                                             Background="{StaticResource BgPanel}"
-                                             Foreground="{StaticResource TextMain}"
-                                             FontFamily="{StaticResource PixelFont}"
-                                             BorderThickness="0" Padding="4"
-                                             VerticalContentAlignment="Center"
-                                             Text="5"/>
-                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
-                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
-                                    <TextBox x:Name="ArchHeightBox" Width="48"
-                                             Background="{StaticResource BgPanel}"
-                                             Foreground="{StaticResource TextMain}"
-                                             FontFamily="{StaticResource PixelFont}"
-                                             BorderThickness="0" Padding="4"
-                                             VerticalContentAlignment="Center"
-                                             Text="4"/>
+                                <!-- 建築/プリミティブ用のサイズ3欄。生成AIモードでは隠す。 -->
+                                <StackPanel x:Name="ArchSizePanel">
+                                    <TextBlock Text="サイズ（幅 × 奥行 × 高さ）"
+                                   Style="{StaticResource PixelText}"
+                                   Foreground="{StaticResource GrassGreen}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+                                        <TextBlock Text="幅" Style="{StaticResource PixelText}"
+                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                        <TextBox x:Name="ArchWidthBox" Width="48"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}"
+                                     BorderThickness="0" Padding="4"
+                                     VerticalContentAlignment="Center"
+                                     Text="5"/>
+                                        <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                       VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                        <TextBox x:Name="ArchDepthBox" Width="48"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}"
+                                     BorderThickness="0" Padding="4"
+                                     VerticalContentAlignment="Center"
+                                     Text="5"/>
+                                        <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                       VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                        <TextBox x:Name="ArchHeightBox" Width="48"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     FontFamily="{StaticResource PixelFont}"
+                                     BorderThickness="0" Padding="4"
+                                     VerticalContentAlignment="Center"
+                                     Text="4"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 生成AI用の解像度選択。建築/プリミティブでは隠す。 -->
+                                <StackPanel x:Name="ArchResolutionPanel" Visibility="Collapsed">
+                                    <TextBlock Text="解像度（ボクセルの細かさ）"
+                                   Style="{StaticResource PixelText}"
+                                   Foreground="{StaticResource GrassGreen}"/>
+                                    <ComboBox x:Name="ArchResolutionCombo" Margin="0,4,0,12"
+                                  Style="{StaticResource McComboBox}"
+                                  ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                  SelectedIndex="1">
+                                        <ComboBoxItem Content="32（粗い・軽い）" Tag="32"/>
+                                        <ComboBoxItem Content="48（標準）" Tag="48"/>
+                                        <ComboBoxItem Content="64（精細・重い）" Tag="64"/>
+                                        <ComboBoxItem Content="96（高精細）" Tag="96"/>
+                                        <ComboBoxItem Content="128（最高・かなり重い）" Tag="128"/>
+                                    </ComboBox>
                                 </StackPanel>
 
                                 <TextBlock Text="作りたいものの指示（窓・ドア・雰囲気など）"
@@ -685,13 +706,16 @@
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="44"
                                          Text="centered, single object, plain background, isometric view, full view, highly detailed"/>
 
-                                <Button x:Name="ArchGenBtn"
-                                        Content="3案を生成" Style="{StaticResource McButton}"
-                                        HorizontalAlignment="Left" Margin="0,0,0,8"
-                                        Click="ArchGenerate_Click"/>
-                                <Button x:Name="ArchGalleryBtn" Content="画像ギャラリー"
-                                        Width="120" Height="32" Margin="4,0"
-                                        Click="ArchGallery_Click"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button x:Name="ArchGenBtn"
+                                            Content="3案を生成" Style="{StaticResource McButton}"
+                                            Click="ArchGenerate_Click"/>
+                                    <Button x:Name="ArchGalleryBtn" Content="画像ギャラリー"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="8,0,0,0"
+                                            Click="ArchGallery_Click"/>
+                                </StackPanel>
+                                
                                 <TextBlock x:Name="ArchStatus"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" FontSize="11"

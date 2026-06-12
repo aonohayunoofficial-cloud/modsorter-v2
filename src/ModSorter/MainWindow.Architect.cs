@@ -1,12 +1,13 @@
-﻿using System.Linq;
+﻿using ModSorter.Architect;
+using ModSorter.Architect.Generation;
+using ModSorter.Architect.Preview;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
-using ModSorter.Architect;
-using ModSorter.Architect.Generation;
-using ModSorter.Architect.Preview;
-using System.Collections.Generic;
+using System.Windows.Controls;
 
 
 namespace ModSorter;
@@ -328,11 +329,31 @@ public partial class MainWindow
             .ToList();
         string blockId = blockIds.Count > 0 ? blockIds[0] : "minecraft:stone";
 
-        if (!int.TryParse(ArchWidthBox.Text.Trim(), out int resolution))
-            resolution = 48;
-        resolution = System.Math.Clamp(resolution, 8, 128);
+        int resolution = GetSculptResolution();
 
         await RunSculptureFromImagesAsync(gallery.SelectedForSculpt, resolution, blockId);
+    }
+
+    // モード切り替えで、サイズ3欄(建築/プリミティブ)と解像度コンボ(生成AI)を出し分ける。
+    private void ArchKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // 起動直後など、まだ要素が出来ていないことがあるので null チェック。
+        if (ArchSizePanel == null || ArchResolutionPanel == null) return;
+
+        bool isAi = ArchKindCombo.SelectedIndex == 2; // 2 = 生成AI（GLBから）
+        ArchSizePanel.Visibility = isAi ? Visibility.Collapsed : Visibility.Visible;
+        ArchResolutionPanel.Visibility = isAi ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // 生成AIモードで選ばれている解像度を返す。コンボのTagから取得、失敗時は48。
+    private int GetSculptResolution()
+    {
+        if (ArchResolutionCombo?.SelectedItem is ComboBoxItem item &&
+            item.Tag is string tag && int.TryParse(tag, out int res))
+        {
+            return System.Math.Clamp(res, 8, 128);
+        }
+        return 48;
     }
 
     // 生成結果を別ウィンドウの 3Dプレビューへ描画する。
@@ -431,9 +452,7 @@ public partial class MainWindow
             .ToList();
         string blockId = blockIds.Count > 0 ? blockIds[0] : "minecraft:stone";
 
-        if (!int.TryParse(ArchWidthBox.Text.Trim(), out int resolution))
-            resolution = 48;
-        resolution = System.Math.Clamp(resolution, 8, 128);
+        int resolution = GetSculptResolution();
 
         // 1. 画像選択ウィンドウを開いて画像生成→選択。
         ArchStatus.Text = "画像生成ウィンドウを開きました。画像を選んでください。";
