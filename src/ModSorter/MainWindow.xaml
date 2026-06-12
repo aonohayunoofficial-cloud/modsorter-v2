@@ -713,7 +713,7 @@
                                     <Button x:Name="ArchGalleryBtn" Content="画像ギャラリー"
                                             Style="{StaticResource McButtonGray}"
                                             Margin="8,0,0,0"
-                                            Click="ArchGallery_Click"/>
+                                            Click="ArchGallery_Click" Cursor=""/>
                                 </StackPanel>
                                 
                                 <TextBlock x:Name="ArchStatus"

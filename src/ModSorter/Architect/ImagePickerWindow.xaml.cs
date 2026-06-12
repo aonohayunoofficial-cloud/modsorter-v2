@@ -42,9 +42,23 @@ public partial class ImagePickerWindow : Window
         _prompt = prompt;
     }
 
-    // 表示直後に最初の生成を走らせる。
+    // 表示直後に、まず ComfyUI を確実に起動してから最初の生成を走らせる。
     public async Task StartAsync()
     {
+        StatusText.Text = "ComfyUI の起動を確認中...";
+        RetakeBtn.IsEnabled = false;
+
+        bool ok = await ComfyUiLauncher.EnsureRunningAsync(
+            line => Dispatcher.Invoke(() => StatusText.Text = line));
+
+        if (!ok)
+        {
+            StatusText.Text =
+                "ComfyUI を起動できませんでした。WSL や conda 環境(comfyui)を確認してください。";
+            RetakeBtn.IsEnabled = true;
+            return;
+        }
+
         await GenerateBatchAsync();
     }
 
