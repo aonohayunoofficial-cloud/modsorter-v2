@@ -11,6 +11,8 @@ public sealed class BlockCatalogItem
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("name")] public string Name { get; set; } = "";
+    // 代表色 [r, g, b]（0-255）。色マッチ用。未設定ならマッチ候補から除外。
+    [JsonPropertyName("color")] public int[]? Color { get; set; }
 }
 
 public sealed class BlockCategory

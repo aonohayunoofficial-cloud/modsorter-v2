@@ -69,5 +69,20 @@ public partial class PreviewWindow : Window
         }
     }
 
+    // ブロックID→テクスチャ(データURI)の辞書を渡す。renderBlocks より前に呼ぶ。
+    public async Task SetTexturesAsync(string texturesJson)
+    {
+        if (!_ready) return;
+        try
+        {
+            string jsArg = System.Text.Json.JsonSerializer.Serialize(texturesJson);
+            await PreviewWeb.ExecuteScriptAsync($"setTextures({jsArg})");
+        }
+        catch (Exception)
+        {
+            // 失敗は無視（ウィンドウが閉じられた直後など）
+        }
+    }
+
     public bool IsReady => _ready;
 }

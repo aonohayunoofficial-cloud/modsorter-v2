@@ -6,43 +6,53 @@
       "blocks": [
         {
           "id": "minecraft:oak_planks",
-          "name": "オークの板材"
+          "name": "オークの板材",
+          "color": [ 162, 130, 78 ]
         },
         {
           "id": "minecraft:spruce_planks",
-          "name": "トウヒの板材"
+          "name": "トウヒの板材",
+          "color": [ 114, 84, 48 ]
         },
         {
           "id": "minecraft:birch_planks",
-          "name": "シラカバの板材"
+          "name": "シラカバの板材",
+          "color": [ 196, 178, 123 ]
         },
         {
           "id": "minecraft:jungle_planks",
-          "name": "ジャングルの板材"
+          "name": "ジャングルの板材",
+          "color": [ 160, 115, 81 ]
         },
         {
           "id": "minecraft:acacia_planks",
-          "name": "アカシアの板材"
+          "name": "アカシアの板材",
+          "color": [ 168, 90, 50 ]
         },
         {
           "id": "minecraft:dark_oak_planks",
-          "name": "ダークオークの板材"
+          "name": "ダークオークの板材",
+          "color": [ 66, 43, 20 ]
         },
         {
           "id": "minecraft:oak_log",
-          "name": "オークの原木"
+          "name": "オークの原木",
+          "color": [ 109, 86, 50 ]
         },
         {
           "id": "minecraft:spruce_log",
-          "name": "トウヒの原木"
+          "name": "トウヒの原木",
+          "color": [ 58, 39, 20 ]
         },
         {
           "id": "minecraft:birch_log",
-          "name": "シラカバの原木"
+          "name": "シラカバの原木",
+          "color": [ 215, 213, 207 ]
         },
         {
           "id": "minecraft:dark_oak_log",
-          "name": "ダークオークの原木"
+          "name": "ダークオークの原木",
+          "color": [ 60, 47, 28 ]
         }
       ]
     },
@@ -52,43 +62,53 @@
       "blocks": [
         {
           "id": "minecraft:stone",
-          "name": "石"
+          "name": "石",
+          "color": [ 125, 125, 125 ]
         },
         {
           "id": "minecraft:cobblestone",
-          "name": "丸石"
+          "name": "丸石",
+          "color": [ 122, 122, 122 ]
         },
         {
           "id": "minecraft:mossy_cobblestone",
-          "name": "苔むした丸石"
+          "name": "苔むした丸石",
+          "color": [ 110, 118, 95 ]
         },
         {
           "id": "minecraft:andesite",
-          "name": "安山岩"
+          "name": "安山岩",
+          "color": [ 136, 136, 137 ]
         },
         {
           "id": "minecraft:diorite",
-          "name": "閃緑岩"
+          "name": "閃緑岩",
+          "color": [ 188, 188, 188 ]
         },
         {
           "id": "minecraft:granite",
-          "name": "花崗岩"
+          "name": "花崗岩",
+          "color": [ 149, 103, 85 ]
         },
         {
           "id": "minecraft:deepslate",
-          "name": "深層岩"
+          "name": "深層岩",
+          "color": [ 77, 77, 81 ]
         },
         {
           "id": "minecraft:cobbled_deepslate",
-          "name": "丸石の深層岩"
+          "name": "丸石の深層岩",
+          "color": [ 78, 78, 82 ]
         },
         {
           "id": "minecraft:smooth_stone",
-          "name": "滑らかな石"
+          "name": "滑らかな石",
+          "color": [ 158, 158, 158 ]
         },
         {
           "id": "minecraft:basalt",
-          "name": "玄武岩"
+          "name": "玄武岩",
+          "color": [ 73, 74, 79 ]
         }
       ]
     },
@@ -98,51 +118,63 @@
       "blocks": [
         {
           "id": "minecraft:stone_bricks",
-          "name": "石レンガ"
+          "name": "石レンガ",
+          "color": [ 122, 121, 122 ]
         },
         {
           "id": "minecraft:mossy_stone_bricks",
-          "name": "苔むした石レンガ"
+          "name": "苔むした石レンガ",
+          "color": [ 112, 119, 101 ]
         },
         {
           "id": "minecraft:cracked_stone_bricks",
-          "name": "ひび割れた石レンガ"
+          "name": "ひび割れた石レンガ",
+          "color": [ 118, 117, 117 ]
         },
         {
           "id": "minecraft:chiseled_stone_bricks",
-          "name": "模様入り石レンガ"
+          "name": "模様入り石レンガ",
+          "color": [ 120, 120, 120 ]
         },
         {
           "id": "minecraft:bricks",
-          "name": "レンガ"
+          "name": "レンガ",
+          "color": [ 150, 97, 83 ]
         },
         {
           "id": "minecraft:deepslate_bricks",
-          "name": "深層岩レンガ"
+          "name": "深層岩レンガ",
+          "color": [ 70, 70, 73 ]
         },
         {
           "id": "minecraft:deepslate_tiles",
-          "name": "深層岩タイル"
+          "name": "深層岩タイル",
+          "color": [ 54, 54, 57 ]
         },
         {
           "id": "minecraft:polished_deepslate",
-          "name": "磨かれた深層岩"
+          "name": "磨かれた深層岩",
+          "color": [ 72, 72, 76 ]
         },
         {
           "id": "minecraft:polished_andesite",
-          "name": "磨かれた安山岩"
+          "name": "磨かれた安山岩",
+          "color": [ 131, 132, 132 ]
         },
         {
           "id": "minecraft:polished_granite",
-          "name": "磨かれた花崗岩"
+          "name": "磨かれた花崗岩",
+          "color": [ 154, 107, 89 ]
         },
         {
           "id": "minecraft:nether_bricks",
-          "name": "ネザーレンガ"
+          "name": "ネザーレンガ",
+          "color": [ 44, 22, 26 ]
         },
         {
           "id": "minecraft:mud_bricks",
-          "name": "泥レンガ"
+          "name": "泥レンガ",
+          "color": [ 137, 105, 80 ]
         }
       ]
     },
@@ -152,43 +184,53 @@
       "blocks": [
         {
           "id": "minecraft:dirt",
-          "name": "土"
+          "name": "土",
+          "color": [ 134, 96, 67 ]
         },
         {
           "id": "minecraft:grass_block",
-          "name": "草ブロック"
+          "name": "草ブロック",
+          "color": [ 95, 159, 53 ]
         },
         {
           "id": "minecraft:coarse_dirt",
-          "name": "粗い土"
+          "name": "粗い土",
+          "color": [ 119, 85, 59 ]
         },
         {
           "id": "minecraft:sand",
-          "name": "砂"
+          "name": "砂",
+          "color": [ 219, 207, 163 ]
         },
         {
           "id": "minecraft:red_sand",
-          "name": "赤い砂"
+          "name": "赤い砂",
+          "color": [ 190, 102, 33 ]
         },
         {
           "id": "minecraft:gravel",
-          "name": "砂利"
+          "name": "砂利",
+          "color": [ 131, 127, 126 ]
         },
         {
           "id": "minecraft:clay",
-          "name": "粘土"
+          "name": "粘土",
+          "color": [ 159, 164, 177 ]
         },
         {
           "id": "minecraft:sandstone",
-          "name": "砂岩"
+          "name": "砂岩",
+          "color": [ 216, 203, 157 ]
         },
         {
           "id": "minecraft:smooth_sandstone",
-          "name": "滑らかな砂岩"
+          "name": "滑らかな砂岩",
+          "color": [ 218, 205, 159 ]
         },
         {
           "id": "minecraft:red_sandstone",
-          "name": "赤い砂岩"
+          "name": "赤い砂岩",
+          "color": [ 184, 98, 31 ]
         }
       ]
     },
@@ -198,43 +240,53 @@
       "blocks": [
         {
           "id": "minecraft:iron_block",
-          "name": "鉄ブロック"
+          "name": "鉄ブロック",
+          "color": [ 220, 220, 220 ]
         },
         {
           "id": "minecraft:gold_block",
-          "name": "金ブロック"
+          "name": "金ブロック",
+          "color": [ 246, 208, 61 ]
         },
         {
           "id": "minecraft:copper_block",
-          "name": "銅ブロック"
+          "name": "銅ブロック",
+          "color": [ 192, 107, 79 ]
         },
         {
           "id": "minecraft:weathered_copper",
-          "name": "錆びた銅"
+          "name": "錆びた銅",
+          "color": [ 108, 153, 122 ]
         },
         {
           "id": "minecraft:cut_copper",
-          "name": "切り込み入りの銅"
+          "name": "切り込み入りの銅",
+          "color": [ 191, 106, 80 ]
         },
         {
           "id": "minecraft:lapis_block",
-          "name": "ラピスラズリブロック"
+          "name": "ラピスラズリブロック",
+          "color": [ 38, 67, 137 ]
         },
         {
           "id": "minecraft:emerald_block",
-          "name": "エメラルドブロック"
+          "name": "エメラルドブロック",
+          "color": [ 42, 203, 115 ]
         },
         {
           "id": "minecraft:diamond_block",
-          "name": "ダイヤモンドブロック"
+          "name": "ダイヤモンドブロック",
+          "color": [ 110, 226, 219 ]
         },
         {
           "id": "minecraft:redstone_block",
-          "name": "レッドストーンブロック"
+          "name": "レッドストーンブロック",
+          "color": [ 175, 24, 5 ]
         },
         {
           "id": "minecraft:netherite_block",
-          "name": "ネザライトブロック"
+          "name": "ネザライトブロック",
+          "color": [ 66, 61, 64 ]
         }
       ]
     },
@@ -244,43 +296,53 @@
       "blocks": [
         {
           "id": "minecraft:white_concrete",
-          "name": "白いコンクリート"
+          "name": "白いコンクリート",
+          "color": [ 207, 213, 214 ]
         },
         {
           "id": "minecraft:gray_concrete",
-          "name": "灰色のコンクリート"
+          "name": "灰色のコンクリート",
+          "color": [ 54, 57, 61 ]
         },
         {
           "id": "minecraft:black_concrete",
-          "name": "黒いコンクリート"
+          "name": "黒いコンクリート",
+          "color": [ 8, 10, 15 ]
         },
         {
           "id": "minecraft:blue_concrete",
-          "name": "青いコンクリート"
+          "name": "青いコンクリート",
+          "color": [ 44, 46, 143 ]
         },
         {
           "id": "minecraft:red_concrete",
-          "name": "赤いコンクリート"
+          "name": "赤いコンクリート",
+          "color": [ 142, 32, 32 ]
         },
         {
           "id": "minecraft:green_concrete",
-          "name": "緑のコンクリート"
+          "name": "緑のコンクリート",
+          "color": [ 73, 91, 36 ]
         },
         {
           "id": "minecraft:yellow_concrete",
-          "name": "黄のコンクリート"
+          "name": "黄のコンクリート",
+          "color": [ 240, 175, 21 ]
         },
         {
           "id": "minecraft:terracotta",
-          "name": "テラコッタ"
+          "name": "テラコッタ",
+          "color": [ 152, 94, 67 ]
         },
         {
           "id": "minecraft:white_terracotta",
-          "name": "白いテラコッタ"
+          "name": "白いテラコッタ",
+          "color": [ 209, 178, 161 ]
         },
         {
           "id": "minecraft:orange_terracotta",
-          "name": "橙のテラコッタ"
+          "name": "橙のテラコッタ",
+          "color": [ 162, 84, 38 ]
         }
       ]
     },
@@ -290,39 +352,48 @@
       "blocks": [
         {
           "id": "minecraft:glass",
-          "name": "ガラス"
+          "name": "ガラス",
+          "color": [ 191, 216, 219 ]
         },
         {
           "id": "minecraft:white_stained_glass",
-          "name": "白の色付きガラス"
+          "name": "白の色付きガラス",
+          "color": [ 255, 255, 255 ]
         },
         {
           "id": "minecraft:light_gray_stained_glass",
-          "name": "薄灰色の色付きガラス"
+          "name": "薄灰色の色付きガラス",
+          "color": [ 153, 153, 153 ]
         },
         {
           "id": "minecraft:blue_stained_glass",
-          "name": "青の色付きガラス"
+          "name": "青の色付きガラス",
+          "color": [ 51, 76, 178 ]
         },
         {
           "id": "minecraft:light_blue_stained_glass",
-          "name": "水色の色付きガラス"
+          "name": "水色の色付きガラス",
+          "color": [ 102, 153, 216 ]
         },
         {
           "id": "minecraft:green_stained_glass",
-          "name": "緑の色付きガラス"
+          "name": "緑の色付きガラス",
+          "color": [ 102, 127, 51 ]
         },
         {
           "id": "minecraft:red_stained_glass",
-          "name": "赤の色付きガラス"
+          "name": "赤の色付きガラス",
+          "color": [ 153, 51, 51 ]
         },
         {
           "id": "minecraft:black_stained_glass",
-          "name": "黒の色付きガラス"
+          "name": "黒の色付きガラス",
+          "color": [ 25, 25, 25 ]
         },
         {
           "id": "minecraft:brown_stained_glass",
-          "name": "茶色の色付きガラス"
+          "name": "茶色の色付きガラス",
+          "color": [ 102, 76, 51 ]
         }
       ]
     },
@@ -332,43 +403,53 @@
       "blocks": [
         {
           "id": "minecraft:oak_leaves",
-          "name": "オークの葉"
+          "name": "オークの葉",
+          "color": [ 60, 143, 40 ]
         },
         {
           "id": "minecraft:spruce_leaves",
-          "name": "トウヒの葉"
+          "name": "トウヒの葉",
+          "color": [ 49, 92, 49 ]
         },
         {
           "id": "minecraft:birch_leaves",
-          "name": "シラカバの葉"
+          "name": "シラカバの葉",
+          "color": [ 128, 167, 85 ]
         },
         {
           "id": "minecraft:moss_block",
-          "name": "苔ブロック"
+          "name": "苔ブロック",
+          "color": [ 89, 110, 45 ]
         },
         {
           "id": "minecraft:mycelium",
-          "name": "菌糸"
+          "name": "菌糸",
+          "color": [ 111, 99, 101 ]
         },
         {
           "id": "minecraft:podzol",
-          "name": "ポドゾル"
+          "name": "ポドゾル",
+          "color": [ 91, 64, 26 ]
         },
         {
           "id": "minecraft:hay_block",
-          "name": "干し草の俵"
+          "name": "干し草の俵",
+          "color": [ 166, 138, 21 ]
         },
         {
           "id": "minecraft:mushroom_stem",
-          "name": "キノコの柄"
+          "name": "キノコの柄",
+          "color": [ 203, 196, 185 ]
         },
         {
           "id": "minecraft:red_mushroom_block",
-          "name": "赤いキノコ"
+          "name": "赤いキノコ",
+          "color": [ 198, 42, 41 ]
         },
         {
           "id": "minecraft:melon",
-          "name": "メロン"
+          "name": "メロン",
+          "color": [ 111, 144, 30 ]
         }
       ]
     },
@@ -379,43 +460,53 @@
       "blocks": [
         {
           "id": "minecraft:oak_stairs",
-          "name": "オークの階段"
+          "name": "オークの階段",
+          "color": [ 162, 130, 78 ]
         },
         {
           "id": "minecraft:stone_brick_stairs",
-          "name": "石レンガの階段"
+          "name": "石レンガの階段",
+          "color": [ 122, 121, 122 ]
         },
         {
           "id": "minecraft:cobblestone_stairs",
-          "name": "丸石の階段"
+          "name": "丸石の階段",
+          "color": [ 122, 122, 122 ]
         },
         {
           "id": "minecraft:deepslate_brick_stairs",
-          "name": "深層岩レンガの階段"
+          "name": "深層岩レンガの階段",
+          "color": [ 70, 70, 73 ]
         },
         {
           "id": "minecraft:oak_slab",
-          "name": "オークのハーフブロック"
+          "name": "オークのハーフブロック",
+          "color": [ 162, 130, 78 ]
         },
         {
           "id": "minecraft:stone_brick_slab",
-          "name": "石レンガのハーフブロック"
+          "name": "石レンガのハーフブロック",
+          "color": [ 122, 121, 122 ]
         },
         {
           "id": "minecraft:oak_fence",
-          "name": "オークの柵"
+          "name": "オークの柵",
+          "color": [ 162, 130, 78 ]
         },
         {
           "id": "minecraft:stone_brick_wall",
-          "name": "石レンガの壁"
+          "name": "石レンガの壁",
+          "color": [ 122, 121, 122 ]
         },
         {
           "id": "minecraft:cobblestone_wall",
-          "name": "丸石の壁"
+          "name": "丸石の壁",
+          "color": [ 122, 122, 122 ]
         },
         {
           "id": "minecraft:iron_bars",
-          "name": "鉄格子"
+          "name": "鉄格子",
+          "color": [ 120, 124, 125 ]
         }
       ]
     }

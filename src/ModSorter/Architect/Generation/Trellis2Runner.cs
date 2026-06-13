@@ -1,35 +1,36 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Web;
+using ModSorter.Architect.Generation;
 
-namespace ModSorter.Architect.Generation;
-
-// C# から WSL の TRELLIS.2 (conda 環境 trellis2) を呼び出すラッパー。
-// example.py に --input / --output を渡して画像→GLB変換を実行する。
+// C# から TRELLIS.2 常駐サーバー(trellis_server.py)を呼び出すラッパー。
+// サーバーが起きていなければ Trellis2Launcher で自動起動し、
+// /generate に画像パスと出力GLB名を渡して 3D 化を実行する。
+// 署名は従来(RunAsync(inputWsl, outputWsl, onLog))のまま。呼び出し側は変更不要。
 public static class Trellis2Runner
 {
     // 実行結果。成功なら Success=true、ログに全出力が入る。
     public sealed class RunResult
     {
         public bool Success;
-        public int ExitCode;
+        public int ExitCode;       // 0=成功、それ以外=失敗(互換のため残す)
         public string Log = "";
-        // WSL 側の出力GLBパス(相対 or 絶対)。動作確認では sample.glb。
         public string OutputGlbWsl = "";
     }
 
-    // WSL ディストリ名。環境に合わせる。
-    private const string Distro = "Ubuntu-22.04";
-    // TRELLIS.2 のプロジェクトディレクトリ(WSL側)。
-    private const string ProjectDir = "~/projects/TRELLIS.2";
-    // conda 環境名。
-    private const string CondaEnv = "trellis2";
+    private const string BaseUrl = "http://127.0.0.1:8189";
+
+    // 生成は重い(数分)ので、生成用 HttpClient は長めのタイムアウトにする。
+    private static readonly HttpClient _http =
+        new() { Timeout = TimeSpan.FromMinutes(10) };
 
     // 画像→GLB変換を実行する。
-    //   inputWsl : 入力画像の WSL 側パス (例 "assets/flux_test.png")
-    //   outputWsl: 出力GLBの WSL 側パス (例 "sample.glb")
-    //   onLog    : 進捗ログを受け取るコールバック(任意)。逐次UIへ流せる。
+    //   inputWsl : 入力画像の WSL 側相対パス (例 "assets/arch_xxx.png")
+    //   outputWsl: 出力GLBの WSL 側相対パス (例 "arch_case0.glb")
+    //   onLog    : 進捗ログを受け取るコールバック(任意)。
     public static async Task<RunResult> RunAsync(
         string inputWsl, string outputWsl, Action<string>? onLog = null)
     {
@@ -42,62 +43,62 @@ public static class Trellis2Runner
             onLog?.Invoke(line);
         }
 
-        // WSL 内で実行する bash コマンドを組み立てる。
-        // bash -lc では ~/.bashrc が読まれず conda が見つからないため、
-        // conda の初期化スクリプト(conda.sh)を明示的に source してから実行する。
-        // conda run の --no-capture-output で、出力をためこまず逐次流す。
-        // python -u で Python 側の出力バッファリングも無効化し、進捗を即時表示する。
-        // --no-video で動画書き出しをスキップし高速化する。
-        string innerCmd =
-            $"source ~/miniconda3/etc/profile.d/conda.sh && " +
-            $"cd {ProjectDir} && " +
-            $"conda run -n {CondaEnv} --no-capture-output python -u example.py " +
-            $"--input {inputWsl} --output {outputWsl} --no-video";
-
-        var psi = new ProcessStartInfo
+        // 1. サーバーを確保する(起きていなければ起動して応答を待つ)。
+        bool ready = await Trellis2Launcher.EnsureRunningAsync(Emit);
+        if (!ready)
         {
-            FileName = "wsl.exe",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-        };
-        // 引数は ArgumentList で1つずつ渡す(スペース等の取り扱いが安全)。
-        psi.ArgumentList.Add("-d");
-        psi.ArgumentList.Add(Distro);
-        psi.ArgumentList.Add("bash");
-        psi.ArgumentList.Add("-lc");
-        psi.ArgumentList.Add(innerCmd);
+            Emit("[Trellis2Runner] サーバーが利用できません。");
+            result.Success = false;
+            result.ExitCode = -1;
+            result.Log = logBuf.ToString();
+            return result;
+        }
 
+        // 2. /generate を叩いて 3D 化を依頼する。
+        string url = BaseUrl + "/generate"
+            + "?input=" + HttpUtility.UrlEncode(inputWsl)
+            + "&output=" + HttpUtility.UrlEncode(outputWsl);
+
+        Emit($"[Trellis2Runner] 3D化を依頼: {inputWsl} -> {outputWsl}");
         try
         {
-            using var proc = new Process { StartInfo = psi };
+            using var res = await _http.GetAsync(url);
+            string body = await res.Content.ReadAsStringAsync();
 
-            proc.OutputDataReceived += (_, e) =>
+            if (!res.IsSuccessStatusCode)
             {
-                if (e.Data != null) Emit(e.Data);
-            };
-            proc.ErrorDataReceived += (_, e) =>
+                Emit($"[Trellis2Runner] サーバーエラー (HTTP {(int)res.StatusCode}): {body}");
+                result.Success = false;
+                result.ExitCode = (int)res.StatusCode;
+                result.Log = logBuf.ToString();
+                return result;
+            }
+
+            // 応答 JSON から所要秒数を取り出してログに出す(任意)。
+            try
             {
-                // TRELLIS.2 は進捗バーを stderr に出すため、エラーとは限らない。
-                if (e.Data != null) Emit(e.Data);
-            };
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("seconds", out var sec))
+                    Emit($"[Trellis2Runner] 完了（{sec.GetDouble():F1} 秒）。");
+                else
+                    Emit("[Trellis2Runner] 完了。");
+            }
+            catch
+            {
+                Emit("[Trellis2Runner] 完了。");
+            }
 
-            Emit($"[Trellis2Runner] 実行: wsl -d {Distro} bash -lc \"{innerCmd}\"");
-
-            proc.Start();
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
-
-            await proc.WaitForExitAsync();
-
-            result.ExitCode = proc.ExitCode;
-            result.Success = proc.ExitCode == 0;
+            result.Success = true;
+            result.ExitCode = 0;
             result.Log = logBuf.ToString();
-
-            Emit($"[Trellis2Runner] 終了コード={proc.ExitCode}");
+            return result;
+        }
+        catch (TaskCanceledException)
+        {
+            Emit("[Trellis2Runner] タイムアウト(10分)しました。");
+            result.Success = false;
+            result.ExitCode = -1;
+            result.Log = logBuf.ToString();
             return result;
         }
         catch (Exception ex)
@@ -110,3 +111,4 @@ public static class Trellis2Runner
         }
     }
 }
+ 

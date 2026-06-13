@@ -675,7 +675,11 @@
                                     <ComboBox x:Name="ArchResolutionCombo" Margin="0,4,0,12"
                                   Style="{StaticResource McComboBox}"
                                   ItemContainerStyle="{StaticResource McComboBoxItem}"
-                                  SelectedIndex="1">
+                                  SelectedIndex="5">
+                                        <ComboBoxItem Content="9（小屋サイズ）" Tag="9"/>
+                                        <ComboBoxItem Content="12（極小・置物サイズ）" Tag="12"/>
+                                        <ComboBoxItem Content="16（小さい）" Tag="16"/>
+                                        <ComboBoxItem Content="24（やや小さい）" Tag="24"/>
                                         <ComboBoxItem Content="32（粗い・軽い）" Tag="32"/>
                                         <ComboBoxItem Content="48（標準）" Tag="48"/>
                                         <ComboBoxItem Content="64（精細・重い）" Tag="64"/>
@@ -683,6 +687,12 @@
                                         <ComboBoxItem Content="128（最高・かなり重い）" Tag="128"/>
                                     </ComboBox>
                                 </StackPanel>
+
+                                <CheckBox x:Name="ArchWindowToggle" IsChecked="True"
+                                          Content="窓をつける"
+                                          Foreground="{StaticResource TextMain}"
+                                          FontFamily="{StaticResource PixelFont}"
+                                          Margin="0,0,0,8"/>
 
                                 <TextBlock Text="作りたいものの指示（窓・ドア・雰囲気など）"
                                            Style="{StaticResource PixelText}"
@@ -737,10 +747,16 @@
 
 
                                 <Button x:Name="ArchOpenPreviewBtn"
-                                        Content="3Dプレビューを開く"
-                                        Style="{StaticResource McButtonGray}"
-                                        HorizontalAlignment="Left" Margin="0,0,0,8"
-                                        Click="ArchOpenPreview_Click"/>
+                            Content="3Dプレビューを開く"
+                            Style="{StaticResource McButtonGray}"
+                            HorizontalAlignment="Left" Margin="0,0,0,8"
+                            Click="ArchOpenPreview_Click"/>
+
+                                <Button x:Name="ArchTestTextureBtn"
+                            Content="テクスチャ取得テスト"
+                            Style="{StaticResource McButtonGray}"
+                            HorizontalAlignment="Left" Margin="0,0,0,8"
+                            Click="ArchTestTexture_Click"/>
 
                                 <TextBlock Text="生出力 / パース結果"
                                            Style="{StaticResource PixelText}"

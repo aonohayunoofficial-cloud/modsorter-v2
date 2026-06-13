@@ -116,6 +116,59 @@ function colorFor(id) {
   return h;
 }
 
+// テクスチャ(データURI)からマテリアルを作る。キャッシュ付き。
+const _texCache = {};   // baseId -> THREE.Texture
+const _matCache = {};   // baseId -> THREE.Material
+let _texMap = {};       // baseId -> dataURI（C#から受領）
+const _texLoader = (typeof THREE !== 'undefined') ? new THREE.TextureLoader() : null;
+
+function getTexture(baseId) {
+  if (_texCache[baseId] !== undefined) return _texCache[baseId];
+  const uri = _texMap[baseId];
+  if (!uri) { _texCache[baseId] = null; return null; }
+  const tex = new THREE.TextureLoader().load(uri);
+  // ブロックテクスチャはドット絵なので補間を切ってくっきり見せる。
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _texCache[baseId] = tex;
+  return tex;
+}
+
+function materialFor(baseId) {
+  if (_matCache[baseId] !== undefined) return _matCache[baseId];
+  const isGlass = (baseId === 'minecraft:glass');
+  const tex = getTexture(baseId);
+  let mat;
+  if (tex) {
+    // テクスチャあり。ガラスだけ半透明にする。
+    mat = new THREE.MeshLambertMaterial({
+      map: tex,
+      transparent: isGlass, opacity: isGlass ? 0.5 : 1.0
+    });
+  } else {
+    // テクスチャ無し（MOD未対応など）は従来の単色フォールバック。
+    mat = new THREE.MeshLambertMaterial({
+      color: colorFor(baseId),
+      transparent: isGlass, opacity: isGlass ? 0.4 : 1.0
+    });
+  }
+  _matCache[baseId] = mat;
+  return mat;
+}
+
+// C#から呼ばれる。textures(任意) = { baseId: dataURI, ... }
+function setTextures(json) {
+  try {
+    _texMap = json ? JSON.parse(json) : {};
+  } catch (e) {
+    _texMap = {};
+  }
+  // テクスチャが入れ替わったらキャッシュを捨てて作り直す。
+  for (const k in _texCache) delete _texCache[k];
+  for (const k in _matCache) delete _matCache[k];
+}
+
 // C#から呼ばれる。blocks = [{x,y,z,id}, ...]
 function renderBlocks(json) {
   // scene がまだ無ければ、準備できるまで繰り返し待ってから描く。
@@ -139,11 +192,7 @@ function renderBlocks(json) {
     // id に状態が付く場合がある（例: minecraft:oak_stairs[facing=north]）。
     // 色・ガラス判定は状態を剥がしたベースIDで行う。
     const baseId = b.id.split('[')[0];
-    const isGlass = (baseId === 'minecraft:glass');
-    const mat = new THREE.MeshLambertMaterial({
-      color: colorFor(baseId),
-      transparent: isGlass, opacity: isGlass ? 0.4 : 1.0
-    });
+    const mat = materialFor(baseId);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(b.x, b.y, b.z);
     group.add(mesh);

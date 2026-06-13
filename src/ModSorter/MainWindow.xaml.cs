@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         // アプリ終了時に、自動起動した ComfyUI を止める。
         // (手動で起動していた場合は ComfyUiLauncher.Stop が何もしないので安全)
         this.Closed += (_, __) => ModSorter.Architect.Generation.ComfyUiLauncher.Stop();
+        this.Closed += (_, __) => ModSorter.Architect.Generation.Trellis2Launcher.Stop();
 
         Log("ModSorter v0.1 を起動しました。");
     }

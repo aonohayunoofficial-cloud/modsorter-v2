@@ -391,9 +391,57 @@ public partial class MainWindow
             z = b.Z,
             id = b.Id
         }));
+
+        // この案で使われているブロックの実テクスチャ(PNG)を集めて、
+        // base64データURIの辞書にしてプレビューへ先に渡す。
+        // baseId(状態[...]を除いたID)単位で1枚あればよいので重複排除する。
+        try
+        {
+            var texMap = BuildTextureMap(blocks);
+            string texJson = JsonSerializer.Serialize(texMap);
+            Log($"プレビュー用テクスチャ: {texMap.Count} 種類を送信します。");
+            await _previewWindow.SetTexturesAsync(texJson);
+        }
+        catch (Exception ex)
+        {
+            // テクスチャ取得に失敗してもプレビュー自体は単色で続行する。
+            Log($"テクスチャ取得をスキップ: {ex.Message}");
+        }
+
         Log($"プレビュー描画: {blocks.Count} ブロックを送信します。");
         await _previewWindow.RenderAsync(json);
         _previewWindow.Activate(); // 結果が見えるよう前面へ
+    }
+
+    // 描画するブロック群から、使用ブロックの実テクスチャを集める。
+    // 戻り値: baseId(例 "minecraft:oak_planks") → "data:image/png;base64,...."
+    private Dictionary<string, string> BuildTextureMap(List<GeneratedBlock> blocks)
+    {
+        var result = new Dictionary<string, string>();
+
+        // ブロックIDから状態(例 "[facing=north]")を落とした baseId のユニーク集合。
+        var baseIds = blocks
+            .Select(b => b.Id.Split('[')[0])
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct()
+            .ToList();
+
+        var vanilla = FindVanillaJar();
+        var modJars = (_mods ?? new List<ModSorter.Models.ModEntry>())
+            .Select(m => m.FilePath)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        using var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars);
+
+        foreach (var id in baseIds)
+        {
+            var png = tp.GetTexture(id);
+            if (png != null && png.Length > 0)
+                result[id] = "data:image/png;base64," + System.Convert.ToBase64String(png);
+        }
+
+        return result;
     }
 
     // 彫刻モード(一気通貫): プロンプト → ComfyUIで画像を複数生成 → ユーザーが1枚選択
@@ -443,6 +491,21 @@ public partial class MainWindow
                           prompt.Length == 0) ? " " : ", ";
             prompt = prompt + sep + fixedWords;
             Log($"定型ワード連結後: 「{prompt}」");
+        }
+
+        // 0-C. 窓トグルに応じて、窓の指示を末尾に足す。
+        //      窓あり: ガラスを壁と分離させるため明るい水色・高コントラスト・影少なめ。
+        //      窓なし: 窓を作らせない。
+        //      影少なめ(flat lighting)は陰影でブロック色が濁る問題への対策で常に付ける。
+        bool withWindows = ArchWindowToggle.IsChecked == true;
+        string windowWords = withWindows
+            ? "large bright windows with clear light blue glass, high contrast windows, flat even lighting, minimal shadows"
+            : "no windows, solid walls, flat even lighting, minimal shadows";
+        {
+            string sep = (prompt.EndsWith(",") || prompt.EndsWith(".") ||
+                          prompt.Length == 0) ? " " : ", ";
+            prompt = prompt + sep + windowWords;
+            Log($"窓指示({(withWindows ? "あり" : "なし")})連結後: 「{prompt}」");
         }
 
         var blockIds = ArchBlocksBox.Text
@@ -496,6 +559,79 @@ public partial class MainWindow
         const string wslGlbUncDir =
             @"\\wsl$\Ubuntu-22.04\home\yuno\projects\TRELLIS.2";
 
+        // 色マッチ用の候補を作る。shape(階段/柵など形状物)は見た目が崩れるので除外。
+        // 指定が無い場合は全ブロックから選ぶ（NULL = ALL）。
+        // 指定があっても、その全てが代表色を持たない(shape系のみ等)と候補が空になり
+        // マッチ不能になるため、その場合だけ安全策で全体にフォールバックする。
+        var catColor = ModSorter.Architect.BlockCatalog.Load();
+        // 立方体でない形状ブロック(shape: 階段/ハーフ/柵/壁/鉄格子)だけ色マッチから除外。
+        // ボクセルに置くと向き/状態で崩れるため。金属やガラス等のフルブロックは候補に残す。
+        // 「使いたくない色」はユーザーが指定パレットから外せば自然に除外される。
+        var excludeKeys = new HashSet<string> { "shape" };
+        var allColorItems = catColor
+            .Where(c => !excludeKeys.Contains(c.Key))
+            .SelectMany(c => c.Blocks)
+            .ToList();
+
+        // ユーザーがUIで指定したブロックだけに候補を絞る。
+        // 「この色に一番近いのは、指定されたパレットの中ではこれ」を選べるようにする。
+        var pickedIds = ArchBlocksBox.Text
+            .Split(new[] { ',', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
+            .ToHashSet();
+
+        // 指定ブロックのうち、カタログに色情報があるものだけが色マッチに使える。
+        var colorItems = allColorItems
+            .Where(b => pickedIds.Contains(b.Id))
+            .ToList();
+
+        // 指定が無い／指定ブロックが全部色を持たない場合は、候補が空になって
+        // マッチ不能になるので、安全策としてカタログ全体にフォールバックする。
+        if (colorItems.Count == 0)
+        {
+            AppendLog("[注意] 指定ブロックに色マッチ可能なものが無いため、カタログ全体から選びます。");
+            colorItems = allColorItems;
+        }
+        else
+        {
+            AppendLog($"色マッチ候補: 指定ブロックのうち {colorItems.Count} 種類を使用。");
+        }
+
+        // 各候補ブロックの代表色を、テクスチャPNGの平均色で上書きする(遅延計算+キャッシュ)。
+        // PNGが取れないブロックは、カタログ手入力の color をそのまま使う(フォールバック)。
+        try
+        {
+            var vanilla = FindVanillaJar();
+            var modJars = (_mods ?? new List<ModSorter.Models.ModEntry>())
+                .Select(m => m.FilePath)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .ToList();
+
+            using var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars);
+
+            int sampled = 0;
+            foreach (var item in colorItems)
+            {
+                var avg = await Task.Run(() =>
+                    ModSorter.Architect.Generation.BlockColorSampler.GetAverageColor(tp, item.Id));
+                if (avg != null)
+                {
+                    item.Color = avg;   // テクスチャ平均色で代表色を上書き
+                    sampled++;
+                }
+                // null のときは手入力 color のまま(変更しない)
+            }
+            AppendLog($"テクスチャ平均色を適用: {sampled}/{colorItems.Count} 種類。");
+        }
+        catch (Exception ex)
+        {
+            // 平均色の取得に失敗してもカタログ手入力色で続行する。
+            AppendLog($"[注意] テクスチャ平均色の取得をスキップ: {ex.Message}");
+        }
+
+        var matcher = new ColorMatcher(colorItems);
+
         var cases = new List<GenerationResult>();
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -526,7 +662,7 @@ public partial class MainWindow
             AppendLog($"=== 案{i + 1}: ボクセル化 (解像度 {resolution}, ブロック {blockId}) ===");
             var vox = await Task.Run(() =>
                 MeshVoxelizer.Voxelize(
-                    glbUnc, resolution, MeshVoxelizer.FillMode.Hollow, blockId));
+                    glbUnc, resolution, MeshVoxelizer.FillMode.Hollow, blockId, matcher));
             if (vox.Blocks == null)
             {
                 AppendLog($"案{i + 1} ボクセル化失敗: {vox.Error}");
@@ -534,6 +670,22 @@ public partial class MainWindow
                 continue;
             }
             AppendLog($"案{i + 1} 完了: {vox.Blocks.Count} ブロック");
+            if (!string.IsNullOrEmpty(vox.MatchLog))
+            {
+                AppendLog(vox.MatchLog);
+                try
+                {
+                    string dump = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        $"colormatch_case{i}.txt");
+                    System.IO.File.WriteAllText(dump, vox.MatchLog);
+                    AppendLog($"(集計をファイル出力: {dump})");
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"(集計ファイル出力失敗: {ex.Message})");
+                }
+            }
             cases.Add(vox);
         }
 
@@ -569,5 +721,130 @@ public partial class MainWindow
             ArchResultBox.AppendText("\n全案が失敗しました。\n");
 
         Log($"彫刻(一気通貫): {ArchStatus.Text}");
+    }
+
+    // バニラのクライアント jar(テクスチャ入り)を探す。
+    // CurseForge は ...\minecraft\Install\versions に、公式型は <instance>\versions に入る。
+    // ローダー(neoforge/forge/fabric/quilt)やスナップショットは除外し、
+    // 純粋なバージョン番号(数字とドット)のフォルダを優先する。
+    private string? FindVanillaJar()
+    {
+        try
+        {
+            var dirsToScan = new List<string>();
+
+            // CurseForge: ...\Instances\<name> から2つ上がって Install\versions
+            var instancesParent = System.IO.Directory.GetParent(_instancePath ?? "")?.FullName;
+            var cfRoot = System.IO.Directory.GetParent(instancesParent ?? "")?.FullName;
+            if (cfRoot != null)
+                dirsToScan.Add(System.IO.Path.Combine(cfRoot, "Install", "versions"));
+
+            // 公式ランチャー型: <instance>\versions
+            if (!string.IsNullOrEmpty(_instancePath))
+                dirsToScan.Add(System.IO.Path.Combine(_instancePath, "versions"));
+
+            var candidates = new List<string>();
+            foreach (var versionsDir in dirsToScan)
+            {
+                if (!System.IO.Directory.Exists(versionsDir)) continue;
+                foreach (var dir in System.IO.Directory.GetDirectories(versionsDir))
+                {
+                    string ver = System.IO.Path.GetFileName(dir);
+
+                    // ローダー名を含むフォルダは除外(テクスチャが無い)。
+                    string lower = ver.ToLowerInvariant();
+                    if (lower.Contains("neoforge") || lower.Contains("forge") ||
+                        lower.Contains("fabric") || lower.Contains("quilt"))
+                        continue;
+
+                    // 純粋なバージョン番号(数字とドットのみ)を優先候補に。
+                    // 例: 1.21.1 はOK、26.2-pre-1 や snapshot は除外。
+                    bool isPureVersion = ver.All(c => char.IsDigit(c) || c == '.');
+                    if (!isPureVersion) continue;
+
+                    string jar = System.IO.Path.Combine(dir, ver + ".jar");
+                    if (System.IO.File.Exists(jar)) candidates.Add(jar);
+                }
+            }
+
+            // バージョン番号の文字列順で一番大きいもの(=新しめ)を選ぶ。
+            return candidates.OrderBy(p => p).LastOrDefault();
+        }
+        catch { return null; }
+    }
+
+    // テクスチャ取得の単体確認。結果を ArchResultBox に出す。
+    private void ArchTestTexture_Click(object sender, RoutedEventArgs e)
+    {
+        ArchResultBox.Text = "";
+        void Out(string s) { ArchResultBox.AppendText(s + "\n"); }
+
+        // 診断: インスタンスパスと、CurseForge共有のInstall\versionsを探す。
+        Out($"_instancePath: {_instancePath ?? "(null)"}");
+        try
+        {
+            // CurseForgeは Instances\<name> と並びに Install\versions がある。
+            // _instancePath = ...\Instances\Neo なので、2つ上がって Install\versions。
+            var instancesParent = System.IO.Directory.GetParent(_instancePath ?? "")?.FullName; // ...\Instances
+            var cfRoot = System.IO.Directory.GetParent(instancesParent ?? "")?.FullName;        // ...\minecraft
+            var installVersions = cfRoot == null ? null
+                : System.IO.Path.Combine(cfRoot, "Install", "versions");
+
+            Out($"探索候補(Install\\versions): {installVersions ?? "(算出不可)"}");
+
+            foreach (var versionsDir in new[]
+            {
+                installVersions,
+                System.IO.Path.Combine(_instancePath ?? "", "versions")
+            })
+            {
+                if (string.IsNullOrEmpty(versionsDir)) continue;
+                Out($"--- {versionsDir} ---");
+                if (System.IO.Directory.Exists(versionsDir))
+                {
+                    foreach (var dir in System.IO.Directory.GetDirectories(versionsDir))
+                    {
+                        Out($"  [フォルダ] {System.IO.Path.GetFileName(dir)}");
+                        foreach (var f in System.IO.Directory.GetFiles(dir, "*.jar"))
+                            Out($"      [jar] {System.IO.Path.GetFileName(f)}");
+                    }
+                }
+                else
+                {
+                    Out("  (存在しません)");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Out($"  診断エラー: {ex.Message}");
+        }
+
+        var vanilla = FindVanillaJar();
+        Out($"バニラjar: {vanilla ?? "(見つからない)"}");
+
+        var modJars = (_mods ?? new List<ModSorter.Models.ModEntry>())
+            .Select(m => m.FilePath)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+        Out($"MOD jar: {modJars.Count} 個");
+
+        using var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars);
+
+        string[] testIds =
+        {
+            "minecraft:oak_planks",
+            "minecraft:stone",
+            "minecraft:cobblestone",
+            "minecraft:glass",
+            "minecraft:dirt"
+        };
+        foreach (var id in testIds)
+        {
+            var png = tp.GetTexture(id);
+            Out($"{id}: {(png == null ? "× 取得失敗" : $"○ {png.Length} bytes")}");
+        }
+        if (!string.IsNullOrEmpty(tp.LastError))
+            Out($"LastError: {tp.LastError}");
     }
 }
