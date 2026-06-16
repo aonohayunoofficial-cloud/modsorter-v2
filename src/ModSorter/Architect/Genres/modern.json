@@ -1,27 +1,55 @@
 ﻿{
-  "display_name": "近代的",
-  "order": 30,
-  "style_prompt": "A modern building. Clean lines, flat roofs, lots of glass. Use concrete and quartz with large glass walls. Minimalist and bright.",
+  "display_name": "現代",
+  "order": 21,
+  "style_prompt": "modern style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
   "blocks": [
     {
       "id": "minecraft:white_concrete",
-      "name": "白色のコンクリート"
+      "name": "白いコンクリート"
     },
     {
-      "id": "minecraft:quartz_block",
-      "name": "クォーツブロック"
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
     },
     {
-      "id": "minecraft:glass",
-      "name": "ガラス"
+      "id": "minecraft:black_concrete",
+      "name": "黒いコンクリート"
     },
     {
       "id": "minecraft:smooth_stone",
       "name": "滑らかな石"
     },
     {
-      "id": "minecraft:gray_concrete",
-      "name": "灰色のコンクリート"
+      "id": "minecraft:diorite",
+      "name": "閃緑岩"
+    },
+    {
+      "id": "minecraft:polished_andesite",
+      "name": "磨かれた安山岩"
+    },
+    {
+      "id": "minecraft:white_terracotta",
+      "name": "白いテラコッタ"
+    },
+    {
+      "id": "minecraft:iron_block",
+      "name": "鉄ブロック"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:white_stained_glass",
+      "name": "白の色付きガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    },
+    {
+      "id": "minecraft:light_gray_stained_glass",
+      "name": "薄灰色の色付きガラス"
     }
   ]
 }

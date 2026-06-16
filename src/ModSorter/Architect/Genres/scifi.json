@@ -1,0 +1,55 @@
+﻿{
+  "display_name": "SF・未来",
+  "order": 31,
+  "style_prompt": "sci-fi futuristic style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:white_concrete",
+      "name": "白いコンクリート"
+    },
+    {
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
+    },
+    {
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
+    },
+    {
+      "id": "minecraft:diorite",
+      "name": "閃緑岩"
+    },
+    {
+      "id": "minecraft:iron_block",
+      "name": "鉄ブロック"
+    },
+    {
+      "id": "minecraft:diamond_block",
+      "name": "ダイヤモンドブロック"
+    },
+    {
+      "id": "minecraft:white_terracotta",
+      "name": "白いテラコッタ"
+    },
+    {
+      "id": "minecraft:black_concrete",
+      "name": "黒いコンクリート"
+    },
+    {
+      "id": "minecraft:netherite_block",
+      "name": "ネザライトブロック"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    },
+    {
+      "id": "minecraft:blue_stained_glass",
+      "name": "青の色付きガラス"
+    },
+    {
+      "id": "minecraft:white_stained_glass",
+      "name": "白の色付きガラス"
+    }
+  ]
+}

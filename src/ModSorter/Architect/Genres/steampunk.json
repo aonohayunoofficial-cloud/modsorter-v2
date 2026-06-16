@@ -1,0 +1,59 @@
+﻿{
+  "display_name": "スチームパンク",
+  "order": 30,
+  "style_prompt": "steampunk style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:copper_block",
+      "name": "銅ブロック"
+    },
+    {
+      "id": "minecraft:cut_copper",
+      "name": "切り込み入りの銅"
+    },
+    {
+      "id": "minecraft:weathered_copper",
+      "name": "錆びた銅"
+    },
+    {
+      "id": "minecraft:iron_block",
+      "name": "鉄ブロック"
+    },
+    {
+      "id": "minecraft:gold_block",
+      "name": "金ブロック"
+    },
+    {
+      "id": "minecraft:netherite_block",
+      "name": "ネザライトブロック"
+    },
+    {
+      "id": "minecraft:dark_oak_planks",
+      "name": "ダークオークの板材"
+    },
+    {
+      "id": "minecraft:spruce_planks",
+      "name": "トウヒの板材"
+    },
+    {
+      "id": "minecraft:granite",
+      "name": "花崗岩"
+    },
+    {
+      "id": "minecraft:polished_granite",
+      "name": "磨かれた花崗岩"
+    },
+    {
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    }
+  ]
+}

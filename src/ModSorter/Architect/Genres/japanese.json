@@ -1,0 +1,55 @@
+﻿{
+  "display_name": "和風",
+  "order": 14,
+  "style_prompt": "traditional Japanese style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:dark_oak_planks",
+      "name": "ダークオークの板材"
+    },
+    {
+      "id": "minecraft:dark_oak_log",
+      "name": "ダークオークの原木"
+    },
+    {
+      "id": "minecraft:spruce_planks",
+      "name": "トウヒの板材"
+    },
+    {
+      "id": "minecraft:spruce_log",
+      "name": "トウヒの原木"
+    },
+    {
+      "id": "minecraft:white_concrete",
+      "name": "白いコンクリート"
+    },
+    {
+      "id": "minecraft:white_terracotta",
+      "name": "白いテラコッタ"
+    },
+    {
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
+    },
+    {
+      "id": "minecraft:stone",
+      "name": "石"
+    },
+    {
+      "id": "minecraft:deepslate_tiles",
+      "name": "深層岩タイル"
+    },
+    {
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:white_stained_glass",
+      "name": "白の色付きガラス"
+    }
+  ]
+}

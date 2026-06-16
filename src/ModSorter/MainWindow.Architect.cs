@@ -137,6 +137,15 @@ public partial class MainWindow
         ArchBlocksBox.Text = string.Join(", ", _currentGenre.Blocks.Select(b => b.Id));
         UpdateBlocksSummary();
 
+        // 定型ワード欄を、このジャンルの style_prompt で自動入力する。
+        // style_prompt が空のジャンルなら欄は変更しない（ユーザーの入力を消さない）。
+        // ArchFixedWordsBox が未生成のタイミング(起動直後など)に備えて null チェック。
+        if (ArchFixedWordsBox != null &&
+            !string.IsNullOrWhiteSpace(_currentGenre.StylePrompt))
+        {
+            ArchFixedWordsBox.Text = _currentGenre.StylePrompt.Trim();
+        }
+
         // 分かりやすいように、ID→日本語名の対応をステータスに出す
         var pairs = _currentGenre.Blocks
             .Select(b => $"{b.Name}({b.Id})");
@@ -493,14 +502,13 @@ public partial class MainWindow
             Log($"定型ワード連結後: 「{prompt}」");
         }
 
-        // 0-C. 窓トグルに応じて、窓の指示を末尾に足す。
-        //      窓あり: ガラスを壁と分離させるため明るい水色・高コントラスト・影少なめ。
-        //      窓なし: 窓を作らせない。
-        //      影少なめ(flat lighting)は陰影でブロック色が濁る問題への対策で常に付ける。
+        // 0-C. 窓トグルに応じて、窓の有無だけを足す。
+        //      立体感を殺す flat lighting / minimal shadows はここでは付けない。
+        //      (陰影の濁りは MeshVoxelizer 側のガンマ補正で対処済み)
         bool withWindows = ArchWindowToggle.IsChecked == true;
         string windowWords = withWindows
-            ? "large bright windows with clear light blue glass, high contrast windows, flat even lighting, minimal shadows"
-            : "no windows, solid walls, flat even lighting, minimal shadows";
+            ? "with large windows"
+            : "without windows";
         {
             string sep = (prompt.EndsWith(",") || prompt.EndsWith(".") ||
                           prompt.Length == 0) ? " " : ", ";

@@ -1,0 +1,55 @@
+﻿{
+  "display_name": "ファンタジー",
+  "order": 11,
+  "style_prompt": "high fantasy style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:diorite",
+      "name": "閃緑岩"
+    },
+    {
+      "id": "minecraft:polished_andesite",
+      "name": "磨かれた安山岩"
+    },
+    {
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
+    },
+    {
+      "id": "minecraft:white_concrete",
+      "name": "白いコンクリート"
+    },
+    {
+      "id": "minecraft:white_terracotta",
+      "name": "白いテラコッタ"
+    },
+    {
+      "id": "minecraft:stone_bricks",
+      "name": "石レンガ"
+    },
+    {
+      "id": "minecraft:chiseled_stone_bricks",
+      "name": "模様入り石レンガ"
+    },
+    {
+      "id": "minecraft:gold_block",
+      "name": "金ブロック"
+    },
+    {
+      "id": "minecraft:emerald_block",
+      "name": "エメラルドブロック"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    },
+    {
+      "id": "minecraft:white_stained_glass",
+      "name": "白の色付きガラス"
+    }
+  ]
+}

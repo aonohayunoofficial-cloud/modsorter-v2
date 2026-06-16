@@ -1,15 +1,27 @@
 ﻿{
   "display_name": "中世・ファンタジー",
   "order": 10,
-  "style_prompt": "A medieval / fantasy building. Use stone and timber. Sloped (gable) roofs, small windows, a sturdy rustic look. Prefer cobblestone, stone bricks, and oak wood.",
+  "style_prompt": "medieval fantasy style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
   "blocks": [
     {
       "id": "minecraft:cobblestone",
       "name": "丸石"
     },
     {
+      "id": "minecraft:mossy_cobblestone",
+      "name": "苔むした丸石"
+    },
+    {
       "id": "minecraft:stone_bricks",
       "name": "石レンガ"
+    },
+    {
+      "id": "minecraft:mossy_stone_bricks",
+      "name": "苔むした石レンガ"
+    },
+    {
+      "id": "minecraft:cracked_stone_bricks",
+      "name": "ひび割れた石レンガ"
     },
     {
       "id": "minecraft:oak_planks",
@@ -20,8 +32,28 @@
       "name": "オークの原木"
     },
     {
+      "id": "minecraft:dark_oak_planks",
+      "name": "ダークオークの板材"
+    },
+    {
+      "id": "minecraft:spruce_planks",
+      "name": "トウヒの板材"
+    },
+    {
+      "id": "minecraft:bricks",
+      "name": "レンガ"
+    },
+    {
+      "id": "minecraft:andesite",
+      "name": "安山岩"
+    },
+    {
       "id": "minecraft:glass",
       "name": "ガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
     }
   ]
 }

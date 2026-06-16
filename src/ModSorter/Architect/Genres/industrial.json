@@ -1,27 +1,59 @@
 ﻿{
-  "display_name": "工業的",
+  "display_name": "工業",
   "order": 20,
-  "style_prompt": "An industrial / factory building. Use concrete, iron, and bricks. Flat roofs, large window openings, a utilitarian boxy look. Prefer stone, iron blocks, and bricks.",
+  "style_prompt": "industrial style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
   "blocks": [
+    {
+      "id": "minecraft:iron_block",
+      "name": "鉄ブロック"
+    },
+    {
+      "id": "minecraft:gray_concrete",
+      "name": "灰色のコンクリート"
+    },
     {
       "id": "minecraft:stone",
       "name": "石"
     },
     {
-      "id": "minecraft:bricks",
-      "name": "レンガ"
+      "id": "minecraft:smooth_stone",
+      "name": "滑らかな石"
     },
     {
-      "id": "minecraft:iron_block",
-      "name": "鉄ブロック"
+      "id": "minecraft:andesite",
+      "name": "安山岩"
+    },
+    {
+      "id": "minecraft:polished_andesite",
+      "name": "磨かれた安山岩"
+    },
+    {
+      "id": "minecraft:netherite_block",
+      "name": "ネザライトブロック"
+    },
+    {
+      "id": "minecraft:basalt",
+      "name": "玄武岩"
+    },
+    {
+      "id": "minecraft:copper_block",
+      "name": "銅ブロック"
+    },
+    {
+      "id": "minecraft:redstone_block",
+      "name": "レッドストーンブロック"
+    },
+    {
+      "id": "minecraft:yellow_concrete",
+      "name": "黄のコンクリート"
     },
     {
       "id": "minecraft:glass",
       "name": "ガラス"
     },
     {
-      "id": "minecraft:smooth_stone",
-      "name": "滑らかな石"
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
     }
   ]
 }

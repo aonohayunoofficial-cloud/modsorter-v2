@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 
 namespace ModSorter.Architect.Preview;
 
@@ -133,6 +134,53 @@ public partial class GalleryWindow : Window
         StatusText.Text =
             $"全 {_map.Count} 枚 / 選択 {_selected.Count} 枚。" +
             "クリックで選択、「選択を3D化」または「選択を削除」。";
+    }
+
+    // 手持ちの画像ファイルを選んで assets フォルダへコピーし、一覧に取り込む。
+    // コピー後は arch_*.png 命名に合わせるため、取り込み時刻でリネームする
+    // (一覧は arch_*.png のみ拾う＆3D化の命名規則に合わせるため)。
+    private void Import_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "3D化する画像を選択",
+            Filter = "画像ファイル (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|すべてのファイル (*.*)|*.*",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        if (!Directory.Exists(AssetsUnc))
+        {
+            StatusText.Text = $"コピー先が見つかりません: {AssetsUnc}";
+            return;
+        }
+
+        int imported = 0;
+        foreach (var src in dlg.FileNames)
+        {
+            try
+            {
+                // assets には arch_*.png として保存する。
+                // TRELLIS.2 は png を前提にしているので拡張子は png に統一する。
+                // (画像の中身が jpg/webp でもファイル名を png にするだけで TRELLIS 側は読める想定。
+                //  もし読めない場合はここで ImageSharp 等での変換を挟む)
+                string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                string dstName = $"arch_import_{stamp}_{imported}.png";
+                string dstUnc = Path.Combine(AssetsUnc, dstName);
+                File.Copy(src, dstUnc, overwrite: false);
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"取り込み失敗: {Path.GetFileName(src)} ({ex.Message})";
+            }
+        }
+
+        if (imported > 0)
+        {
+            LoadImages(); // 取り込んだ画像を一覧に反映
+            StatusText.Text = $"{imported} 枚を取り込みました。クリックで選んで「選択を3D化」。";
+        }
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => LoadImages();

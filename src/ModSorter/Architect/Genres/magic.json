@@ -1,0 +1,51 @@
+﻿{
+  "display_name": "魔法",
+  "order": 12,
+  "style_prompt": "arcane magic style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:polished_deepslate",
+      "name": "磨かれた深層岩"
+    },
+    {
+      "id": "minecraft:deepslate_bricks",
+      "name": "深層岩レンガ"
+    },
+    {
+      "id": "minecraft:deepslate_tiles",
+      "name": "深層岩タイル"
+    },
+    {
+      "id": "minecraft:blue_concrete",
+      "name": "青いコンクリート"
+    },
+    {
+      "id": "minecraft:lapis_block",
+      "name": "ラピスラズリブロック"
+    },
+    {
+      "id": "minecraft:diamond_block",
+      "name": "ダイヤモンドブロック"
+    },
+    {
+      "id": "minecraft:gold_block",
+      "name": "金ブロック"
+    },
+    {
+      "id": "minecraft:netherite_block",
+      "name": "ネザライトブロック"
+    },
+    {
+      "id": "minecraft:black_concrete",
+      "name": "黒いコンクリート"
+    },
+    {
+      "id": "minecraft:blue_stained_glass",
+      "name": "青の色付きガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    }
+  ]
+}

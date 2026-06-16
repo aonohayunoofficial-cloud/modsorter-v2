@@ -46,14 +46,52 @@ public partial class BlockPickerWindow : Window
 
         foreach (var cat in categories)
         {
+            // このカテゴリのチェックボックスを覚えておき、一括操作の対象にする。
+            var catChecks = new List<CheckBox>();
+
+            // 見出し行: カテゴリ名(左) と 全選択/全解除ボタン(右) を横並びにする。
+            var headerRow = new DockPanel { Margin = new Thickness(0, 10, 0, 4) };
+
+            var allBtn = new Button
+            {
+                Content = "全選択",
+                Style = (Style)FindResource("McButton"),
+                FontSize = 10,
+                Padding = new Thickness(6, 1, 6, 1),
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var noneBtn = new Button
+            {
+                Content = "全解除",
+                Style = (Style)FindResource("McButtonGray"),
+                FontSize = 10,
+                Padding = new Thickness(6, 1, 6, 1),
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            // クリックで、このカテゴリのチェックボックスだけ一括変更する。
+            allBtn.Click += (_, __) => { foreach (var c in catChecks) c.IsChecked = true; };
+            noneBtn.Click += (_, __) => { foreach (var c in catChecks) c.IsChecked = false; };
+
+            // ボタンは右端に寄せる。
+            DockPanel.SetDock(noneBtn, Dock.Right);
+            DockPanel.SetDock(allBtn, Dock.Right);
+            headerRow.Children.Add(noneBtn);
+            headerRow.Children.Add(allBtn);
+
             var header = new TextBlock
             {
                 Text = cat.DisplayName,
                 Foreground = (System.Windows.Media.Brush)FindResource("GrassGreen"),
-                Margin = new Thickness(0, 10, 0, 4),
-                FontFamily = (System.Windows.Media.FontFamily)FindResource("PixelFont")
+                FontFamily = (System.Windows.Media.FontFamily)FindResource("PixelFont"),
+                VerticalAlignment = VerticalAlignment.Center
             };
-            CategoryPanel.Children.Add(header);
+            // 見出しテキストは残り幅いっぱい(左側)に置く。
+            headerRow.Children.Add(header);
+
+            CategoryPanel.Children.Add(headerRow);
 
             if (!string.IsNullOrWhiteSpace(cat.Note))
             {
@@ -77,6 +115,7 @@ public partial class BlockPickerWindow : Window
                     Margin = new Thickness(8, 1, 0, 1)
                 };
                 _checks.Add((b.Id, cb));
+                catChecks.Add(cb);   // 一括操作の対象に登録
                 CategoryPanel.Children.Add(cb);
             }
         }

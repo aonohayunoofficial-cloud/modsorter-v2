@@ -1,0 +1,59 @@
+﻿{
+  "display_name": "RPG",
+  "order": 13,
+  "style_prompt": "classic fantasy RPG style, full view of the entire object, single centered subject, plain solid color background, no shadows, no shading, even flat lighting, no color variation, photo realistic",
+  "blocks": [
+    {
+      "id": "minecraft:oak_planks",
+      "name": "オークの板材"
+    },
+    {
+      "id": "minecraft:spruce_planks",
+      "name": "トウヒの板材"
+    },
+    {
+      "id": "minecraft:birch_planks",
+      "name": "シラカバの板材"
+    },
+    {
+      "id": "minecraft:oak_log",
+      "name": "オークの原木"
+    },
+    {
+      "id": "minecraft:cobblestone",
+      "name": "丸石"
+    },
+    {
+      "id": "minecraft:stone_bricks",
+      "name": "石レンガ"
+    },
+    {
+      "id": "minecraft:terracotta",
+      "name": "テラコッタ"
+    },
+    {
+      "id": "minecraft:white_terracotta",
+      "name": "白いテラコッタ"
+    },
+    {
+      "id": "minecraft:orange_terracotta",
+      "name": "橙のテラコッタ"
+    },
+    {
+      "id": "minecraft:bricks",
+      "name": "レンガ"
+    },
+    {
+      "id": "minecraft:hay_block",
+      "name": "干し草の俵"
+    },
+    {
+      "id": "minecraft:glass",
+      "name": "ガラス"
+    },
+    {
+      "id": "minecraft:light_blue_stained_glass",
+      "name": "水色の色付きガラス"
+    }
+  ]
+}

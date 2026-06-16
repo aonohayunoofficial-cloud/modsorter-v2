@@ -20,6 +20,8 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="2,8,2,2">
+            <Button x:Name="ImportBtn" Content="画像を取り込む" Width="130" Height="32"
+                    Margin="4,0" Click="Import_Click"/>
             <Button x:Name="RefreshBtn" Content="再読込" Width="90" Height="32"
                     Margin="4,0" Click="Refresh_Click"/>
             <Button x:Name="DeleteBtn" Content="選択を削除" Width="110" Height="32"
