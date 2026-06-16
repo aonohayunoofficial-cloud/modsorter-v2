@@ -5,40 +5,93 @@
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource BgDark}">
     <Grid Margin="12">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="ZoomScale" ScaleX="1.0" ScaleY="1.0"/>
+        </Grid.LayoutTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- 見出し -->
             <RowDefinition Height="*"/>
+            <!-- 手書きカタログ ScrollViewer -->
             <RowDefinition Height="Auto"/>
+            <!-- MODブロック見出し+検索 -->
+            <RowDefinition Height="2*"/>
+            <!-- MODブロック TreeView -->
             <RowDefinition Height="Auto"/>
+            <!-- ID直接指定 -->
+            <RowDefinition Height="Auto"/>
+            <!-- ボタン -->
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="使用するブロックを選んでください"
-                   Style="{StaticResource PixelText}"
-                   Foreground="{StaticResource GrassGreen}" Margin="0,0,0,8"/>
+        <!-- 見出し + 倍率スライダー -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,6">
+            <TextBlock Text="使用するブロックを選んでください"
+                       DockPanel.Dock="Left" VerticalAlignment="Center"
+                       Foreground="{StaticResource TextMain}"
+                       FontFamily="{StaticResource PixelFont}"/>
+            <TextBlock x:Name="ZoomLabel" Text="100%" DockPanel.Dock="Right" Width="42"
+                       VerticalAlignment="Center" Foreground="{StaticResource TextMain}"/>
+            <Slider x:Name="ZoomSlider" DockPanel.Dock="Right" Width="110"
+                    Minimum="1.0" Maximum="1.8" Value="1.0"
+                    TickFrequency="0.1" IsSnapToTickEnabled="True"
+                    VerticalAlignment="Center"
+                    ValueChanged="ZoomSlider_ValueChanged"
+                    ToolTip="表示倍率"/>
+            <TextBlock Text="倍率" DockPanel.Dock="Right" Margin="0,0,6,0"
+                       VerticalAlignment="Center" Foreground="{StaticResource TextDim}"/>
+        </DockPanel>
 
+        <!-- 系統1: 手書きカタログ(従来通り) -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="CategoryPanel"/>
         </ScrollViewer>
 
-        <!-- ID直接入力（指定追加） -->
-        <StackPanel Grid.Row="2" Margin="0,8,0,0">
-            <TextBlock Text="ID直接指定（カンマ区切りで追加）"
-                       Style="{StaticResource PixelText}"
-                       Foreground="{StaticResource GrassGreen}" FontSize="11"/>
-            <TextBox x:Name="ExtraIdBox"
+        <!-- 系統2: MODブロック(自動列挙) の見出しと絞り込み -->
+        <DockPanel Grid.Row="2" Margin="0,10,0,4">
+            <TextBlock Text="MODブロック(自動列挙)" DockPanel.Dock="Left"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource GrassGreen}"
+                       FontFamily="{StaticResource PixelFont}"/>
+            <TextBox x:Name="ModFilterBox" Width="160" DockPanel.Dock="Right"
+                     Margin="8,0,0,0" Padding="4"
                      Background="{StaticResource BgPanel}"
                      Foreground="{StaticResource TextMain}"
-                     FontFamily="{StaticResource PixelFont}"
-                     BorderThickness="0" Padding="6" Margin="0,4,0,0"
-                     TextWrapping="Wrap" AcceptsReturn="True" Height="48"/>
+                     FontFamily="{StaticResource PixelFont}" BorderThickness="0"
+                     TextChanged="ModFilter_TextChanged"
+                     ToolTip="MOD名やブロック名で絞り込み"/>
+            <TextBlock x:Name="ModFilterHint" Text="(絞り込み)" DockPanel.Dock="Right"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource TextDim}" FontSize="10"/>
+        </DockPanel>
+
+        <Border Grid.Row="3" Background="{StaticResource BgPanel}"
+                BorderThickness="0" Padding="2">
+            <TreeView x:Name="ModTree"
+                      Background="Transparent" BorderThickness="0"
+                      Foreground="{StaticResource TextMain}"
+                      FontFamily="{StaticResource PixelFont}"
+                      VirtualizingStackPanel.IsVirtualizing="True"
+                      VirtualizingStackPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </Border>
+
+        <StackPanel Grid.Row="4" Margin="0,8,0,0">
+            <TextBlock Text="ID直接指定（カンマ区切りで追加）"
+                       Foreground="{StaticResource TextMain}"
+                       FontFamily="{StaticResource PixelFont}"/>
+            <TextBox x:Name="ExtraIdBox" Height="48" Margin="0,4,0,0"
+                     Background="{StaticResource BgPanel}"
+                     Foreground="{StaticResource TextMain}"
+                     FontFamily="{StaticResource PixelFont}" BorderThickness="0"
+                     Padding="6" TextWrapping="Wrap" AcceptsReturn="True"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Content="キャンセル" Style="{StaticResource McButtonGray}"
-                    Margin="0,0,8,0" Click="Cancel_Click"/>
-            <Button Content="決定" Style="{StaticResource McButton}"
-                    Click="Ok_Click"/>
+        <StackPanel Grid.Row="5" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="キャンセル" Width="100" Height="32" Margin="4,0"
+                    Style="{StaticResource McButtonGray}" Click="Cancel_Click"/>
+            <Button Content="決定" Width="100" Height="32" Margin="4,0"
+                    Style="{StaticResource McButton}" Click="Ok_Click"/>
         </StackPanel>
     </Grid>
 </Window>

@@ -74,6 +74,44 @@ public partial class MainWindow : Window
         }
     }
 
+    // ===== 進捗バー共通ヘルパー =====
+    // 確定進捗(value/max が分かる)と不定進捗(グルグル)の両方に対応。
+    // UIスレッド外から呼ばれても落ちないよう Dispatcher で包む。
+
+    private void ProgressShow(string label, bool indeterminate)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ArchProgressArea.Visibility = Visibility.Visible;
+            ArchProgressBar.IsIndeterminate = indeterminate;
+            if (!indeterminate) ArchProgressBar.Value = 0;
+            ArchProgressText.Text = label;
+        });
+    }
+
+    private void ProgressUpdate(int current, int total, string? label = null)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (total <= 0) return;
+            ArchProgressBar.IsIndeterminate = false;
+            ArchProgressBar.Value = current * 100.0 / total;
+            ArchProgressText.Text = label
+                ?? $"{current} / {total} ({current * 100 / total}%)";
+        });
+    }
+
+    private void ProgressHide()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ArchProgressArea.Visibility = Visibility.Collapsed;
+            ArchProgressBar.IsIndeterminate = false;
+            ArchProgressBar.Value = 0;
+            ArchProgressText.Text = "";
+        });
+    }
+
     // ===== ナビゲーション =====
     private void NavMods_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 1;
     private void NavCrash_Click(object sender, RoutedEventArgs e)

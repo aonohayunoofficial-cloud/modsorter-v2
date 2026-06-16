@@ -200,13 +200,18 @@ public partial class MainWindow
             !int.TryParse(ArchHeightBox.Text.Trim(), out int h))
         {
             ArchStatus.Text = "幅・奥行・高さは数値で入力してください。";
+            ArchGenBtn.IsEnabled = true;
             return;
         }
         if (w < 2 || d < 2 || h < 2 || w > 64 || d > 64 || h > 64)
         {
             ArchStatus.Text = "幅・奥行・高さは 2〜64 の範囲で入力してください。";
+            ArchGenBtn.IsEnabled = true;
             return;
         }
+
+        // LLM生成は所要時間が読めないので不定進捗(グルグル)で表示する。
+        ProgressShow("3案を生成中...（少し時間がかかります）", indeterminate: true);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         // 種類で経路を分岐。0=建築(家)、1=プリミティブ(曲面)。
@@ -233,6 +238,9 @@ public partial class MainWindow
         }
 
         ArchGenBtn.IsEnabled = true;
+
+        // LLM生成が終わったので進捗バーを隠す。
+        ProgressHide();
 
         // 各案ボタンを成否に応じて有効化＋ブロック数をラベルに反映
         var caseButtons = new[] { ArchCase1Btn, ArchCase2Btn, ArchCase3Btn };
@@ -564,6 +572,8 @@ public partial class MainWindow
             ArchResultBox.ScrollToEnd();
         });
 
+        // 3D化は長時間処理。所要時間が読めないので不定進捗(グルグル)で表示する。
+        ProgressShow("3D化の準備中...", indeterminate: true);
         const string wslGlbUncDir =
             @"\\wsl$\Ubuntu-22.04\home\yuno\projects\TRELLIS.2";
 
@@ -618,6 +628,8 @@ public partial class MainWindow
 
             using var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars);
 
+            ProgressShow("ブロックの代表色を計算中...", indeterminate: true);
+
             int sampled = 0;
             foreach (var item in colorItems)
             {
@@ -647,6 +659,8 @@ public partial class MainWindow
         {
             string imageWsl = wslImagePaths[i];
             ArchStatus.Text = $"案{i + 1}/{wslImagePaths.Count} を 3D化中...（数分かかります）";
+            ProgressShow($"案 {i + 1}/{wslImagePaths.Count} を 3D化中...（数分）",
+                         indeterminate: true);
             AppendLog($"=== 案{i + 1}: TRELLIS.2 で 3D化: {imageWsl} ===");
 
             // 案ごとに別 GLB 名。
@@ -668,6 +682,8 @@ public partial class MainWindow
             }
 
             AppendLog($"=== 案{i + 1}: ボクセル化 (解像度 {resolution}, ブロック {blockId}) ===");
+            ProgressShow($"案 {i + 1}/{wslImagePaths.Count} をボクセル化中...",
+                         indeterminate: true);
             var vox = await Task.Run(() =>
                 MeshVoxelizer.Voxelize(
                     glbUnc, resolution, MeshVoxelizer.FillMode.Hollow, blockId, matcher));
@@ -699,6 +715,9 @@ public partial class MainWindow
 
         sw.Stop();
         _archCases = cases;
+
+        // 全案の処理が終わったので進捗バーを隠す。
+        ProgressHide();
 
         // 案ボタンを成否で有効化。
         var caseButtons = new[] { ArchCase1Btn, ArchCase2Btn, ArchCase3Btn };
@@ -782,7 +801,7 @@ public partial class MainWindow
     }
 
     // テクスチャ取得の単体確認。結果を ArchResultBox に出す。
-    private void ArchTestTexture_Click(object sender, RoutedEventArgs e)
+    private async void ArchTestTexture_Click(object sender, RoutedEventArgs e)
     {
         ArchResultBox.Text = "";
         void Out(string s) { ArchResultBox.AppendText(s + "\n"); }
@@ -837,6 +856,15 @@ public partial class MainWindow
             .ToList();
         Out($"MOD jar: {modJars.Count} 個");
 
+        // create 本体の jar が一覧に居るか確認する。
+        var createJars = modJars
+            .Where(p => System.IO.Path.GetFileName(p).ToLowerInvariant().StartsWith("create-")
+                     || System.IO.Path.GetFileName(p).ToLowerInvariant() == "create.jar")
+            .ToList();
+        Out($"create本体らしき jar: {createJars.Count} 個");
+        foreach (var j in createJars)
+            Out($"    {System.IO.Path.GetFileName(j)}");
+
         using var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars);
 
         string[] testIds =
@@ -845,7 +873,10 @@ public partial class MainWindow
             "minecraft:stone",
             "minecraft:cobblestone",
             "minecraft:glass",
-            "minecraft:dirt"
+            "minecraft:dirt",
+            "create:andesite_casing",   // create 本体のブロック
+            "create:brass_block",
+            "create:cogwheel"
         };
         foreach (var id in testIds)
         {
@@ -854,5 +885,103 @@ public partial class MainWindow
         }
         if (!string.IsNullOrEmpty(tp.LastError))
             Out($"LastError: {tp.LastError}");
+
+        // --- ここからブロック自動列挙の確認 ---
+        Out("");
+        Out("=== ブロック列挙テスト (blockstates から) ===");
+        try
+        {
+            var byMod = tp.EnumerateBlocks();
+            if (byMod.Count == 0)
+            {
+                Out("列挙できたブロックがありません（blockstates が見つからない可能性）。");
+            }
+            else
+            {
+                // MOD名(件数の多い順)で並べて、各MODの件数と先頭20件を出す。
+                foreach (var kv in byMod.OrderByDescending(k => k.Value.Count))
+                {
+                    Out($"[{kv.Key}] {kv.Value.Count} ブロック");
+                    foreach (var id in kv.Value.Take(20))
+                        Out($"    {id}");
+                    if (kv.Value.Count > 20)
+                        Out($"    ... 他 {kv.Value.Count - 20} 件");
+                }
+
+                int total = byMod.Sum(k => k.Value.Count);
+                Out($"--- 合計 {byMod.Count} MOD / {total} ブロック ---");
+            }
+        }
+        catch (Exception ex)
+        {
+            Out($"列挙エラー: {ex.Message}");
+        }
+
+        // --- パレットキャッシュ生成(テクスチャ実在フィルタ + 除外MOD + 代表色) ---
+        Out("");
+        Out("=== パレットキャッシュ生成 ===");
+
+        string fingerprint = ModSorter.Architect.Generation.BlockPaletteCache
+            .ComputeFingerprint(vanilla, modJars);
+
+        // 既存キャッシュが構成一致なら、再生成せずそれを使う。
+        var cached = ModSorter.Architect.Generation.BlockPaletteCache.TryLoad(fingerprint);
+        if (cached != null)
+        {
+            Out($"既存キャッシュが有効です（{cached.Entries.Count} ブロック）。再生成は不要。");
+            PaletteSummary(cached, Out);
+            return;
+        }
+
+        Out("キャッシュが無い/構成が変わったため再生成します。数十秒かかることがあります。");
+        ProgressShow("パレット生成を準備中...", indeterminate: true);
+
+        try
+        {
+            // 重い走査は別スレッドで。tp は走査中だけ使う使い捨てを作る
+            // (既存の using tp はテクスチャ確認用で、ここで Dispose 済みのことがあるため)。
+            var built = await Task.Run(() =>
+            {
+                using var tp2 = new ModSorter.Architect.Generation.BlockTextureProvider(
+                    vanilla, modJars);
+                return ModSorter.Architect.Generation.BlockPaletteCache.Build(
+                    tp2, fingerprint,
+                    (cur, tot, label) => ProgressUpdate(cur, tot, label));
+            });
+
+            built.Save();
+            ProgressHide();
+
+            Out($"生成完了: 採用 {built.Entries.Count} ブロック。");
+            Out($"保存先: {ModSorter.Architect.Generation.BlockPaletteCache.CachePath}");
+            PaletteSummary(built, Out);
+        }
+        catch (Exception ex)
+        {
+            ProgressHide();
+            Out($"パレット生成エラー: {ex.Message}");
+        }
+    }
+
+    // パレットの内訳(MOD別件数・カテゴリ別件数)をログに出す共通処理。
+    private void PaletteSummary(
+        ModSorter.Architect.Generation.BlockPaletteCache cache,
+        Action<string> Out)
+    {
+        var byMod = cache.Entries
+            .GroupBy(e => e.Mod)
+            .OrderByDescending(g => g.Count());
+        Out("--- MOD別件数(上位) ---");
+        foreach (var g in byMod.Take(30))
+            Out($"  [{g.Key}] {g.Count()}");
+        if (byMod.Count() > 30)
+            Out($"  ... 他 {byMod.Count() - 30} MOD");
+
+        var byCat = cache.Entries
+            .GroupBy(e => e.Category)
+            .OrderByDescending(g => g.Count());
+        Out("--- カテゴリ別件数 ---");
+        foreach (var g in byCat)
+            Out($"  {g.Key}: {g.Count()}");
     }
 }
