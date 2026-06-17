@@ -23,9 +23,11 @@ public static class Trellis2Runner
 
     private const string BaseUrl = "http://127.0.0.1:8189";
 
-    // 生成は重い(数分)ので、生成用 HttpClient は長めのタイムアウトにする。
+    // 生成は重い(数分〜十数分)ので、生成用 HttpClient は長めのタイムアウトにする。
+    // 再起動方式で毎回クリーンにしても、重いメッシュ+モデルロードで10分を超える
+    // ことがあるため余裕を持たせる。
     private static readonly HttpClient _http =
-        new() { Timeout = TimeSpan.FromMinutes(10) };
+        new() { Timeout = TimeSpan.FromMinutes(20) };
 
     // 画像→GLB変換を実行する。
     //   inputWsl : 入力画像の WSL 側相対パス (例 "assets/arch_xxx.png")
@@ -43,8 +45,10 @@ public static class Trellis2Runner
             onLog?.Invoke(line);
         }
 
-        // 1. サーバーを確保する(起きていなければ起動して応答を待つ)。
-        bool ready = await Trellis2Launcher.EnsureRunningAsync(Emit);
+        // 1. サーバーを毎回クリーンに再起動してから生成する。
+        //    後処理(to_glb)の累積劣化で生成のたびに遅くなるため、
+        //    1 推論ごとにプロセスを作り直して 1 回目の速度を維持する。
+        bool ready = await Trellis2Launcher.RestartAndWaitAsync(Emit);
         if (!ready)
         {
             Emit("[Trellis2Runner] サーバーが利用できません。");
@@ -95,7 +99,7 @@ public static class Trellis2Runner
         }
         catch (TaskCanceledException)
         {
-            Emit("[Trellis2Runner] タイムアウト(10分)しました。");
+            Emit("[Trellis2Runner] タイムアウト(20分)しました。");
             result.Success = false;
             result.ExitCode = -1;
             result.Log = logBuf.ToString();

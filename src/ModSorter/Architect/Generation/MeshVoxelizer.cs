@@ -66,6 +66,12 @@ public static class MeshVoxelizer
             // ブロックIDごとに「出現数・RGB合計」を集計してログ用に貯める。
             // 窓色と壁色が別RGB/別ブロックに分離できているかを後で確認するため。
             var stat = new Dictionary<string, (int n, long r, long g, long b)>();
+            // 診断: ガンマ補正を通す前の「生RGB」の彩度分布を見る。
+            // 生がそもそも無彩色なのか、後段で潰しているのかを切り分けるため。
+            int rawGray = 0, rawColored = 0;       // 彩度(max-min)が小さい/大きい生ピクセル数
+            long rawSatSum = 0;                     // 生の彩度合計(平均彩度を出す)
+            int rawSamples = 0;
+            long boostSatSum = 0;                   // 彩度ブースト後の彩度合計
 
             var blocks = new List<GeneratedBlock>();
             foreach (var c in grid.Cells
@@ -74,16 +80,27 @@ public static class MeshVoxelizer
                 string id = fallbackBlockId;
                 if (useColor && grid.ColorSum.TryGetValue(c, out var s) && s.n > 0)
                 {
-                    int sr = (int)(s.r / s.n);
-                    int sg = (int)(s.g / s.n);
-                    int sb = (int)(s.b / s.n);
+                    int rawR = (int)(s.r / s.n);
+                    int rawG = (int)(s.g / s.n);
+                    int rawB = (int)(s.b / s.n);
 
-                    // TRELLIS.2のテクスチャは陰影が焼き込まれて全体が暗く濁る。
-                    // 色マッチ前にガンマ補正で明度を持ち上げ、暗いブロックへの偏りを防ぐ。
-                    // Brightness を上げるほど明るくなる(1.0=無補正)。暗すぎるなら 1.6〜1.8。
-                    sr = Brighten(sr);
-                    sg = Brighten(sg);
-                    sb = Brighten(sb);
+                    // --- 診断: 生RGBの彩度(max-min)を集計 ---
+                    int sat = Math.Max(rawR, Math.Max(rawG, rawB))
+                            - Math.Min(rawR, Math.Min(rawG, rawB));
+                    rawSatSum += sat;
+                    rawSamples++;
+                    if (sat <= 12) rawGray++; else rawColored++;
+
+                    // TRELLIS.2は彩度が低い素材+陰影焼き込みで色が数値的に無彩色へ潰れる。
+                    // まず彩度を拡大して色相を立ててから、ガンマで明度を持ち上げる。
+                    var (br, bg, bb2) = Saturate(rawR, rawG, rawB);
+                    int sr = Brighten(br);
+                    int sg = Brighten(bg);
+                    int sb = Brighten(bb2);
+
+                    // 診断: ブースト+ガンマ後の彩度。これでも低いままなら処理不足。
+                    boostSatSum += Math.Max(sr, Math.Max(sg, sb))
+                                 - Math.Min(sr, Math.Min(sg, sb));
 
                     id = matcher!.Nearest(sr, sg, sb, fallbackBlockId);
 
@@ -97,6 +114,17 @@ public static class MeshVoxelizer
             // 出現数の多い順。各行: ブロックID  個数  平均RGB
             var sb2 = new System.Text.StringBuilder();
             sb2.AppendLine($"[色マッチ集計] useColor={useColor}  色付きセル {stat.Values.Sum(v => v.n)} 件  総セル {grid.Cells.Count} 件  → {stat.Count} 種類");
+            // 生RGB(ガンマ前)の彩度診断。これが「灰色だらけ」なら入力(GLBテクスチャ)が
+            // そもそも無彩色 = ボクセル側の問題。彩度があるのに結果が石なら距離/パレット側。
+            if (rawSamples > 0)
+            {
+                sb2.AppendLine(
+                    $"[生RGB診断] 生平均彩度={rawSatSum / rawSamples}  " +
+                    $"補正後平均彩度={boostSatSum / rawSamples}  " +
+                    $"ほぼ無彩色(<=12)={rawGray}  有彩色={rawColored}  / 計{rawSamples}");
+                sb2.AppendLine(
+                    $"[候補診断] 色マッチ候補ブロック数={matcher!.CandidateCount}");
+            }
             foreach (var kv in stat.OrderByDescending(kv => kv.Value.n))
             {
                 var v = kv.Value;
@@ -342,5 +370,31 @@ public static class MeshVoxelizer
         double n = c / 255.0;
         double g = Math.Pow(n, Gamma);
         return Math.Clamp((int)(g * 255.0 + 0.5), 0, 255);
+    }
+
+    // 彩度ブーストの強さ。TRELLIS素材は彩度がほぼ潰れている(生彩度4等)ため、
+    // 線形倍率だと色が立つ前に破綻する。彩度が小さいほど強く持ち上げる非線形にする。
+    // SatGamma<1.0 で弱い彩度を強調(小さいほど強い)。SatScale は全体倍率。
+    // 緑が出ないなら SatGamma を 0.4 へ、極彩色に荒れるなら 0.7 へ。
+    private const double SatGamma = 0.7;
+    private const double SatScale = 2.5;
+
+    // 輝度との色差を非線形(べき乗)で拡大して足し戻す彩度ブースト。
+    // 各チャンネルの「輝度からのズレ」を符号を保ったまま増幅する。
+    private static (int r, int g, int b) Saturate(int r, int g, int b)
+    {
+        // Rec.709 輝度。グレー成分。
+        double lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        int Boost(int c)
+        {
+            double diff = c - lum;                 // 輝度からのズレ(色味)
+            double sign = Math.Sign(diff);
+            double mag = Math.Abs(diff) / 255.0;   // 0-1 正規化
+            // 弱い色味を強く持ち上げる: mag^SatGamma を倍率に使う。
+            double boosted = Math.Pow(mag, SatGamma) * SatScale * 255.0;
+            double v = lum + sign * boosted;
+            return Math.Clamp((int)(v + 0.5), 0, 255);
+        }
+        return (Boost(r), Boost(g), Boost(b));
     }
 }

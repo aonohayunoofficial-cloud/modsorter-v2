@@ -33,6 +33,10 @@ namespace ModSorter.Architect.Generation
 
         public bool HasCandidates => _cands.Count > 0;
 
+        // 診断用: 実際に色マッチに使える(代表色を持つ)候補ブロックの数。
+        public int CandidateCount => _cands.Count;
+
+
         public string Nearest(int r, int g, int b, string fallback)
         {
             if (_cands.Count == 0) return fallback;

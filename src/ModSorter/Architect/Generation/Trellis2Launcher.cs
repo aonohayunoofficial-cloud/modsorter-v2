@@ -53,8 +53,11 @@ public static class Trellis2Launcher
         }
 
         // 2. 起動コマンドを WSL 経由でバックグラウンド実行。
+        // ATTN_BACKEND=sdpa: 新ドライバ(610系)と flash_attn 2.7.3 の相性で
+        // device not ready が出るため、安定する sdpa を明示指定する。
         onLog("TRELLIS.2 サーバーを起動します...（モデル読み込みに時間がかかります）");
         string innerCmd =
+            $"export ATTN_BACKEND=sdpa && " +
             $"source ~/miniconda3/etc/profile.d/conda.sh && " +
             $"conda activate {CondaEnv} && cd {ProjectDir} && " +
             $"python {ServerScript}";
@@ -94,6 +97,57 @@ public static class Trellis2Launcher
 
         onLog("TRELLIS.2 サーバーが時間内に応答しませんでした。");
         return false;
+    }
+
+    // WSL 内の trellis_server.py を名前で確実に停止する。
+    // _proc(wsl.exe ラッパー)の Kill だけでは中の python が残る場合があるため、
+    // pkill で確実に落として VRAM とプロセスを解放する。
+    public static async Task ForceKillServerAsync(Action<string> onLog)
+    {
+        // まず保持しているラッパープロセスを止める。
+        Stop();
+
+        // WSL 側の python プロセスを名前で kill。
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "wsl.exe",
+                Arguments = $"-d {Distro} bash -lc \"pkill -9 -f {ServerScript} || true\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var p = Process.Start(psi);
+            if (p != null)
+                await p.WaitForExitAsync();
+            onLog("TRELLIS.2 サーバープロセスを停止しました。");
+        }
+        catch (Exception ex)
+        {
+            onLog($"TRELLIS.2 サーバー停止時に警告: {ex.Message}");
+        }
+
+        // /health が落ちる(応答しなくなる)まで少し待つ。
+        for (int i = 0; i < 10; i++)
+        {
+            if (!await IsRunningAsync())
+                break;
+            await Task.Delay(500);
+        }
+    }
+
+    // サーバーを毎回クリーンに作り直してから起動待ちする。
+    // 後処理(to_glb)の累積劣化で生成のたびに遅くなるため、
+    // 1 推論ごとにプロセスを新品にして 1 回目の速度を維持する。
+    public static async Task<bool> RestartAndWaitAsync(
+        Action<string> onLog, int timeoutSec = 180)
+    {
+        onLog("TRELLIS.2 サーバーを再起動します（クリーンな状態で生成するため）。");
+        await ForceKillServerAsync(onLog);
+        // kill 後は必ず未起動なので EnsureRunningAsync が新規起動を行う。
+        return await EnsureRunningAsync(onLog, timeoutSec);
     }
 
     // アプリ終了時などに呼ぶ。起動したプロセスを止める。
