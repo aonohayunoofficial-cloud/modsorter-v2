@@ -217,6 +217,93 @@ public sealed class BlockTextureProvider : IDisposable
         return result;
     }
 
+    // 登録済み全 namespace のブロックについて、blockstates JSON を解析し
+    // ブロックID → プロパティ名 → 取りうる値リスト を返す。
+    // 例: "create:shaft" -> { "axis" -> ["x","y","z"] }
+    // variants を持たない multipart 形式や解析失敗は「プロパティなし」(空辞書)として扱う。
+    public Dictionary<string, Dictionary<string, List<string>>> ExtractBlockPalette()
+    {
+        var result = new Dictionary<string, Dictionary<string, List<string>>>(StringComparer.Ordinal);
+
+        foreach (var kv in _nsToJar)
+        {
+            string ns = kv.Key;
+            string jar = kv.Value;
+
+            try
+            {
+                var za = GetZip(ns, jar);
+                string prefix = $"assets/{ns}/blockstates/";
+                foreach (var e in za.Entries)
+                {
+                    if (!e.FullName.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    if (!e.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string rest = e.FullName.Substring(prefix.Length);
+                    if (rest.Contains('/')) continue;
+                    string name = rest.Substring(0, rest.Length - ".json".Length);
+                    if (name.Length == 0) continue;
+
+                    string blockId = $"{ns}:{name}";
+
+                    // プロパティ名 -> 値集合(重複排除しつつ出現順保持)
+                    var props = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+                    try
+                    {
+                        string json;
+                        using (var sr = new System.IO.StreamReader(e.Open()))
+                            json = sr.ReadToEnd();
+
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        var root = doc.RootElement;
+
+                        // variants 形式: { "variants": { "axis=x": {...}, "facing=north,half=top": {...} } }
+                        if (root.ValueKind == System.Text.Json.JsonValueKind.Object
+                            && root.TryGetProperty("variants", out var variants)
+                            && variants.ValueKind == System.Text.Json.JsonValueKind.Object)
+                        {
+                            foreach (var v in variants.EnumerateObject())
+                            {
+                                string key = v.Name;
+                                if (key.Length == 0) continue;
+
+                                foreach (var pair in key.Split(','))
+                                {
+                                    int eq = pair.IndexOf('=');
+                                    if (eq <= 0) continue;
+                                    string pName = pair.Substring(0, eq).Trim();
+                                    string pVal = pair.Substring(eq + 1).Trim();
+                                    if (pName.Length == 0) continue;
+
+                                    if (!props.TryGetValue(pName, out var list))
+                                    {
+                                        list = new List<string>();
+                                        props[pName] = list;
+                                    }
+                                    if (!list.Contains(pVal)) list.Add(pVal);
+                                }
+                            }
+                        }
+                        // multipart 形式は variants を持たない → props 空のまま。
+                    }
+                    catch
+                    {
+                        // 個別 JSON の解析失敗は黙殺し、プロパティなし扱いで続行。
+                    }
+
+                    result[blockId] = props;
+                }
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+            }
+        }
+
+        return result;
+    }
+
     public void Dispose()
     {
         foreach (var za in _zips.Values)

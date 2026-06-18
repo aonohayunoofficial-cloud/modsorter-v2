@@ -699,9 +699,7 @@ public partial class MainWindow
                 AppendLog(vox.MatchLog);
                 try
                 {
-                    string dump = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                        $"colormatch_case{i}.txt");
+                    string dump = DiagPath($"colormatch_case{i}.txt");
                     System.IO.File.WriteAllText(dump, vox.MatchLog);
                     AppendLog($"(集計をファイル出力: {dump})");
                 }
@@ -748,6 +746,16 @@ public partial class MainWindow
             ArchResultBox.AppendText("\n全案が失敗しました。\n");
 
         Log($"彫刻(一気通貫): {ArchStatus.Text}");
+    }
+
+    // 診断ファイルの保存先。実行ファイル直下の diagnostics フォルダに置く。
+    // 以前は Desktop に出していたが、ModSorter 配下にまとめる。
+    // (MeshVoxelizer 側にも同名ヘルパーがあるが、依存を増やさずローカルに持つ)
+    private static string DiagPath(string fileName)
+    {
+        string dir = System.IO.Path.Combine(System.AppContext.BaseDirectory, "diagnostics");
+        System.IO.Directory.CreateDirectory(dir);
+        return System.IO.Path.Combine(dir, fileName);
     }
 
     // バニラのクライアント jar(テクスチャ入り)を探す。
@@ -803,6 +811,33 @@ public partial class MainWindow
     // テクスチャ取得の単体確認。結果を ArchResultBox に出す。
     private async void ArchTestTexture_Click(object sender, RoutedEventArgs e)
     {
+        // --- PoC段階2: Create ブロックで Block State(axis 向き)が効くか確認 ---
+        try
+        {
+            var poc = new List<ModSorter.Architect.Generation.StructureNbtWriter.Block>
+    {
+        // X軸方向に寝かせた shaft
+        new() { Name = "create:shaft", X = 0, Y = 0, Z = 0,
+                Properties = new() { ["axis"] = "x" } },
+        // 縦（Y軸）の shaft
+        new() { Name = "create:shaft", X = 2, Y = 0, Z = 0,
+                Properties = new() { ["axis"] = "y" } },
+        // Z軸方向に寝かせた shaft
+        new() { Name = "create:shaft", X = 4, Y = 0, Z = 0,
+                Properties = new() { ["axis"] = "z" } },
+        // 参考: cogwheel も1個（軸 y）
+        new() { Name = "create:cogwheel", X = 6, Y = 0, Z = 0,
+                Properties = new() { ["axis"] = "y" } },
+    };
+            string outPath = DiagPath("poc_create_axis.nbt");
+            ModSorter.Architect.Generation.StructureNbtWriter.Save(poc, outPath);
+            Out($"PoC(Create axis)構造NBTを出力: {outPath}");
+        }
+        catch (System.Exception ex)
+        {
+            Out($"PoC出力失敗: {ex.Message}");
+        }
+
         ArchResultBox.Text = "";
         void Out(string s) { ArchResultBox.AppendText(s + "\n"); }
 
@@ -915,6 +950,100 @@ public partial class MainWindow
         catch (Exception ex)
         {
             Out($"列挙エラー: {ex.Message}");
+        }
+
+        // --- 全ブロックパレット抽出(Create+バニラ)。LLM へ渡す辞書の素 ---
+        Out("");
+        Out("=== ブロックパレット抽出 (blockstates の variants 解析) ===");
+        try
+        {
+            var palette = tp.ExtractBlockPalette();
+            string palJson = System.Text.Json.JsonSerializer.Serialize(
+                palette,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+            string palPath = DiagPath("block_palette.json");
+            System.IO.File.WriteAllText(palPath, palJson);
+            Out($"ブロックパレット出力: {palPath} (ブロック数 {palette.Count})");
+
+            // 動作確認用に代表的なブロックの状態を数件だけ表示。
+            foreach (var id in new[] { "create:shaft", "create:cogwheel", "minecraft:oak_log" })
+            {
+                if (palette.TryGetValue(id, out var p))
+                {
+                    string propStr = p.Count == 0
+                        ? "(状態なし)"
+                        : string.Join(", ", p.Select(kv => $"{kv.Key}=[{string.Join("/", kv.Value)}]"));
+                    Out($"    {id}: {propStr}");
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Out($"パレット抽出失敗: {ex.Message}");
+        }
+        // --- CORE-01-a: Qwen2.5 に手動粉砕モジュールを生成させる検証 ---
+        Out("");
+        Out("=== CORE-01: モジュール生成テスト (Qwen2.5) ===");
+        try
+        {
+            // メモリ上のパレットから、検証に使う数ブロックだけ抜き出す。
+            var fullPalette = tp.ExtractBlockPalette();
+            var allowed = new Dictionary<string, Dictionary<string, List<string>>>();
+            foreach (var id in new[] { "create:hand_crank", "create:millstone", "minecraft:magenta_wool" })
+            {
+                if (fullPalette.TryGetValue(id, out var p))
+                    allowed[id] = p;
+                else
+                    Out($"  警告: {id} がパレットに無い");
+            }
+
+            string request =
+                "手動粉砕モジュールを作る。手回しクランク create:hand_crank を (0,0,0) に facing=down で置く。" +
+                "その真上 (0,1,0) に粉砕機 create:millstone を置く" +
+                "(クランクが下、石臼が上。クランクが上の石臼に動力を伝えて回す正しい形)。" +
+                "動力入力の目印として minecraft:magenta_wool を機械から離して1つ置く。" +
+                "3x3x3 以内に収める。";
+
+            Out("Qwen2.5 に問い合わせ中...(数十秒かかることあり)");
+            var placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(request, allowed);
+
+            if (placed == null)
+            {
+                Out($"生成失敗: {ModSorter.Clients.ModuleGenerator.LastError}");
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(ModSorter.Clients.ModuleGenerator.LastError))
+                    Out($"  注記: {ModSorter.Clients.ModuleGenerator.LastError}");
+
+                Out($"生成ブロック数: {placed.Count}");
+                foreach (var b in placed)
+                {
+                    string propStr = (b.Properties == null || b.Properties.Count == 0)
+                        ? "{}"
+                        : string.Join(", ", b.Properties.Select(kv => $"{kv.Key}={kv.Value}"));
+                    Out($"    {b.Id} @({b.X},{b.Y},{b.Z}) {propStr}");
+                }
+
+                // 生成結果を構造NBTにして設置確認できるようにする。
+                var nbtBlocks = placed.Select(b => new ModSorter.Architect.Generation.StructureNbtWriter.Block
+                {
+                    Name = b.Id,
+                    X = b.X,
+                    Y = b.Y,
+                    Z = b.Z,
+                    Properties = b.Properties
+                }).ToList();
+
+                string modPath = DiagPath("module_handcrank_mill.nbt");
+                ModSorter.Architect.Generation.StructureNbtWriter.Save(nbtBlocks, modPath);
+                Out($"モジュール構造NBTを出力: {modPath}");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Out($"モジュール生成テスト失敗: {ex.Message}");
         }
 
         // --- パレットキャッシュ生成(テクスチャ実在フィルタ + 除外MOD + 代表色) ---

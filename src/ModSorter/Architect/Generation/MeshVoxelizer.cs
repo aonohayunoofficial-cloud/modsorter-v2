@@ -33,6 +33,16 @@ public static class MeshVoxelizer
         public Dictionary<(int, int, int), (long r, long g, long b, int n)> ColorSum = new();
     }
 
+    // 診断ファイルの保存先。実行ファイル直下の diagnostics フォルダに置く。
+    // 以前は Desktop に出していたが、ModSorter 配下にまとめる。
+    // フォルダが無ければ作成し、ファイルのフルパスを返す。
+    private static string DiagPath(string fileName)
+    {
+        string dir = System.IO.Path.Combine(AppContext.BaseDirectory, "diagnostics");
+        System.IO.Directory.CreateDirectory(dir);
+        return System.IO.Path.Combine(dir, fileName);
+    }
+
     // エントリポイント。matcher が null/候補無しのときは fallbackBlockId で単色。
     public static GenerationResult Voxelize(
         string glbPath, int resolution, FillMode fill,
@@ -133,12 +143,10 @@ public static class MeshVoxelizer
             }
             result.MatchLog = sb2.ToString().TrimEnd();
 
-            // ログが流れて消えても確認できるよう、デスクトップに必ず書き出す。
+            // ログが流れて消えても確認できるよう、診断フォルダに必ず書き出す。
             try
             {
-                string dump = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                    "colormatch_dump.txt");
+                string dump = DiagPath("colormatch_dump.txt");
                 System.IO.File.WriteAllText(dump, sb2.ToString());
             }
             catch { }
