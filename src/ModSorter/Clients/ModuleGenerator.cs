@@ -10,7 +10,7 @@ namespace ModSorter.Clients;
 public static class ModuleGenerator
 {
     private const string Endpoint = "http://localhost:11434/api/generate";
-    private const string Model = "qwen2.5:14b";
+    private const string Model = "gpt-oss:20b";
     private const int TimeoutSeconds = 180;
 
     public static string LastError = "";
@@ -26,6 +26,43 @@ public static class ModuleGenerator
         public int Y { get; set; }
         public int Z { get; set; }
         public Dictionary<string, string>? Properties { get; set; }
+    }
+
+    // 動力・機械系のブロックを判定するキーワード。
+    private static readonly string[] PowerKeywords =
+    {
+        "cogwheel", "shaft", "gearbox", "gearshift", "clutch",
+        "water_wheel", "windmill", "crank", "flywheel", "steam_engine",
+        "bearing", "belt", "press", "mixer", "encased_fan",
+        "millstone", "depot", "funnel", "chute", "mechanical",
+    };
+
+    // 単体で設置できない/モジュールに不向きなため除外するブロック。
+    private static readonly HashSet<string> PowerExcluded = new(StringComparer.Ordinal)
+    {
+        "create:water_wheel_structure",
+        "create:mechanical_piston_head",
+    };
+
+    // フルパレットから、create の動力・機械系ブロックだけを抜き出して許可リストを作る。
+    public static Dictionary<string, Dictionary<string, List<string>>> BuildPowerPalette(
+        IReadOnlyDictionary<string, Dictionary<string, List<string>>> fullPalette)
+    {
+        var result = new Dictionary<string, Dictionary<string, List<string>>>(StringComparer.Ordinal);
+        foreach (var kv in fullPalette)
+        {
+            string id = kv.Key;
+            if (!id.StartsWith("create:", StringComparison.Ordinal)) continue;
+            if (PowerExcluded.Contains(id)) continue;
+
+            bool hit = false;
+            foreach (var k in PowerKeywords)
+            {
+                if (id.Contains(k, StringComparison.Ordinal)) { hit = true; break; }
+            }
+            if (hit) result[id] = kv.Value;
+        }
+        return result;
     }
 
     // allowed: 使用可能ブロック ID → (プロパティ名 → 値リスト)。
@@ -64,8 +101,24 @@ public static class ModuleGenerator
         }
         string blockList = sb.ToString();
 
+        // 動力ルール集を読み込む(無ければ空文字で続行)。
+        string powerRules = "";
+        try
+        {
+            string rulesPath = System.IO.Path.Combine(
+                System.AppContext.BaseDirectory,
+                "Architect", "Rules", "create_power_rules.txt");
+            if (System.IO.File.Exists(rulesPath))
+                powerRules = System.IO.File.ReadAllText(rulesPath, Encoding.UTF8);
+        }
+        catch { /* 読めなければルール無しで続行 */ }
+
+        string powerRulesSection = string.IsNullOrWhiteSpace(powerRules)
+            ? ""
+            : $"Follow these Create-mod power rules when placing blocks:\n{powerRules}\n\n";
+
         string prompt =
-$@"You place Minecraft blocks for a Create-mod machine.
+$@"{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
 Output ONLY one JSON object. No explanation, no markdown.
 
 The JSON object MUST have a single key ""blocks"" whose value is an ARRAY.
@@ -100,7 +153,9 @@ JSON object:";
             model = Model,
             prompt,
             stream = false,
-            format = "json",
+            // reasoning モデル(gpt-oss 等)は format=json を付けると thinking 段階で
+            // 出力が破綻するため指定しない。代わりにプロンプトで JSON を強制し、
+            // 応答からコードブロックや前置きを除去してパースする。
             options = new { temperature = 0.0 }
         };
 
@@ -126,6 +181,12 @@ JSON object:";
             }
 
             string raw = (respProp.GetString() ?? "").Trim();
+            raw = ExtractJsonBlock(raw);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                LastError = "応答が空でした(reasoning のみで本文が無い可能性)。";
+                return null;
+            }
             return ParsePlacement(raw, allowed);
         }
         catch (TaskCanceledException)
@@ -147,6 +208,52 @@ JSON object:";
 
     // LLM の生 JSON をパースし、許可リストで検証する。
     // format=json により response は配列、または {""blocks"":[...]} 等の可能性があるため両対応。
+    // 応答テキストから JSON 本体だけを取り出す。
+    // ```json ... ``` のコードブロックや、前後の説明文を除去する。
+    private static string ExtractJsonBlock(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+
+        // ```json ... ``` または ``` ... ``` を剥がす。
+        int fence = text.IndexOf("```", StringComparison.Ordinal);
+        if (fence >= 0)
+        {
+            int start = text.IndexOf('\n', fence);
+            if (start >= 0)
+            {
+                int end = text.IndexOf("```", start, StringComparison.Ordinal);
+                if (end > start)
+                    return text.Substring(start + 1, end - start - 1).Trim();
+            }
+        }
+
+        // コードブロックが無い場合、最初の { または [ から、対応する最後の } または ] までを取る。
+        int objStart = text.IndexOf('{');
+        int arrStart = text.IndexOf('[');
+
+        int s;
+        char close;
+        if (objStart >= 0 && (arrStart < 0 || objStart < arrStart))
+        {
+            s = objStart;
+            close = '}';
+        }
+        else if (arrStart >= 0)
+        {
+            s = arrStart;
+            close = ']';
+        }
+        else
+        {
+            return text.Trim();
+        }
+
+        int e = text.LastIndexOf(close);
+        if (e > s) return text.Substring(s, e - s + 1).Trim();
+
+        return text.Trim();
+    }
+
     private static List<PlacedBlock>? ParsePlacement(
         string raw,
         IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed)

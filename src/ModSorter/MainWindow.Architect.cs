@@ -982,28 +982,166 @@ public partial class MainWindow
         {
             Out($"パレット抽出失敗: {ex.Message}");
         }
+
+        // --- Ponder NBT 一括読み取り (Create jar 内の全シーン) ---
+        Out("");
+        Out("=== Ponder NBT 一括読み取り (Create jar) ===");
+        try
+        {
+            // Create 本体 jar を探す。create- で始まり aeronautics 等の派生を除く。
+            string? createJar = modJars.FirstOrDefault(j =>
+            {
+                string fn = System.IO.Path.GetFileName(j).ToLowerInvariant();
+                return fn.StartsWith("create-") && !fn.Contains("aeronautics");
+            });
+
+            if (createJar == null)
+            {
+                Out("Create 本体 jar が見つかりませんでした。");
+            }
+            else
+            {
+                Out($"対象 jar: {System.IO.Path.GetFileName(createJar)}");
+
+                var entries = ModSorter.Architect.Generation.StructureNbtReader
+                    .ListPonderNbtEntries(createJar, "create");
+                Out($"Ponder NBT ファイル数: {entries.Count}");
+
+                int okCount = 0;
+                int totalBlocks = 0;
+                foreach (var ep in entries)
+                {
+                    try
+                    {
+                        var st = ModSorter.Architect.Generation.StructureNbtReader
+                            .ReadFromJar(createJar, ep);
+                        okCount++;
+                        totalBlocks += st.Blocks.Count;
+                    }
+                    catch (System.Exception exOne)
+                    {
+                        Out($"  読み取り失敗: {ep} ({exOne.Message})");
+                    }
+                }
+
+                Out($"読み取り成功: {okCount}/{entries.Count} ファイル, 合計 {totalBlocks} ブロック");
+
+                // サンプルとして millstone.nbt の中身だけ詳しく出す。
+                string sample = "assets/create/ponder/millstone.nbt";
+                if (entries.Contains(sample))
+                {
+                    Out($"--- サンプル: {sample} ---");
+                    var st = ModSorter.Architect.Generation.StructureNbtReader
+                        .ReadFromJar(createJar, sample);
+                    foreach (var b in st.Blocks)
+                    {
+                        if (!b.Name.StartsWith("create:", StringComparison.Ordinal)) continue;
+                        string props = b.Properties.Count == 0
+                            ? "{}"
+                            : "{" + string.Join(", ", b.Properties.Select(kv => $"{kv.Key}={kv.Value}")) + "}";
+                        Out($"    ({b.X},{b.Y},{b.Z}) {b.Name} {props}");
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex2)
+        {
+            Out($"Ponder一括読み取り失敗: {ex2.Message}");
+        }
+
+        // --- Ponder ルール抽出 (隣接統計を生成して JSON 出力) ---
+        Out("");
+        Out("=== Ponder ルール抽出 (隣接統計) ===");
+        try
+        {
+            string? createJar = modJars.FirstOrDefault(j =>
+            {
+                string fn = System.IO.Path.GetFileName(j).ToLowerInvariant();
+                return fn.StartsWith("create-") && !fn.Contains("aeronautics");
+            });
+
+            if (createJar == null)
+            {
+                Out("Create 本体 jar が見つかりませんでした。");
+            }
+            else
+            {
+                // 178件すべてを読み込んで (シーン名, 構造) のリストにする。
+                var entries = ModSorter.Architect.Generation.StructureNbtReader
+                    .ListPonderNbtEntries(createJar, "create");
+
+                var structures = new List<(string, ModSorter.Architect.Generation.StructureNbtReader.Structure)>();
+                foreach (var ep in entries)
+                {
+                    try
+                    {
+                        // シーン名は assets/create/ponder/ を取り除いた相対パス。
+                        string scene = ep.Replace("assets/create/ponder/", "")
+                                         .Replace(".nbt", "");
+                        var st = ModSorter.Architect.Generation.StructureNbtReader
+                            .ReadFromJar(createJar, ep);
+                        structures.Add((scene, st));
+                    }
+                    catch { /* 個別失敗は無視 */ }
+                }
+
+                var stats = ModSorter.Architect.Generation.PonderRuleExtractor.Analyze(structures);
+                Out($"統計対象ブロック種: {stats.Count}");
+
+                // JSON 出力(全件)。
+                string json = System.Text.Json.JsonSerializer.Serialize(
+                    stats,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        IncludeFields = true   // BlockStat はフィールドなので明示的に含める
+                    });
+                string outPath = DiagPath("ponder_rules_raw.json");
+                System.IO.File.WriteAllText(outPath, json);
+                Out($"隣接統計を出力: {outPath}");
+
+                // 動作確認: millstone の隣接統計をログに少し出す。
+                if (stats.TryGetValue("create:millstone", out var ms))
+                {
+                    Out("--- create:millstone の隣接 ---");
+                    foreach (var dir in ms.Neighbors)
+                    {
+                        // 各方向、出現回数の多い順に上位3件。
+                        var top = dir.Value.OrderByDescending(kv => kv.Value).Take(3);
+                        Out($"  {dir.Key}: " + string.Join(", ", top.Select(kv => $"{kv.Key}({kv.Value})")));
+                    }
+                    Out($"  登場シーン数: {ms.AppearedIn.Count}");
+                }
+            }
+        }
+        catch (System.Exception ex3)
+        {
+            Out($"ルール抽出失敗: {ex3.Message}");
+        }
+
         // --- CORE-01-a: Qwen2.5 に手動粉砕モジュールを生成させる検証 ---
         Out("");
         Out("=== CORE-01: モジュール生成テスト (Qwen2.5) ===");
         try
         {
-            // メモリ上のパレットから、検証に使う数ブロックだけ抜き出す。
+            // フルパレットから動力・機械系ブロックだけを抜いて許可リストにする。
             var fullPalette = tp.ExtractBlockPalette();
-            var allowed = new Dictionary<string, Dictionary<string, List<string>>>();
-            foreach (var id in new[] { "create:hand_crank", "create:millstone", "minecraft:magenta_wool" })
+            var allowed = ModSorter.Clients.ModuleGenerator.BuildPowerPalette(fullPalette);
+            Out($"動力ブロック許可リスト: {allowed.Count} 種");
+
+            // 入出力マーカー用の羊毛も許可リストに加える(機能ブロックではないので個別に追加)。
+            foreach (var mk in new[] { "minecraft:magenta_wool", "minecraft:lime_wool" })
             {
-                if (fullPalette.TryGetValue(id, out var p))
-                    allowed[id] = p;
-                else
-                    Out($"  警告: {id} がパレットに無い");
+                if (fullPalette.TryGetValue(mk, out var mp))
+                    allowed[mk] = mp;
             }
 
+            // ユーザーの自由な要望(将来は UI のテキスト入力から受け取る)。
             string request =
-                "手動粉砕モジュールを作る。手回しクランク create:hand_crank を (0,0,0) に facing=down で置く。" +
-                "その真上 (0,1,0) に粉砕機 create:millstone を置く" +
-                "(クランクが下、石臼が上。クランクが上の石臼に動力を伝えて回す正しい形)。" +
-                "動力入力の目印として minecraft:magenta_wool を機械から離して1つ置く。" +
-                "3x3x3 以内に収める。";
+                "水力で回る動力源モジュールを作って。水車(water_wheel)で動力を生み、" +
+                "shaft や cogwheel で動力を取り出せるようにする。" +
+                "動力の出力位置の目印として lime_wool を1つ置く。" +
+                "5x5x5 以内に収める。";
 
             Out("Qwen2.5 に問い合わせ中...(数十秒かかることあり)");
             var placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(request, allowed);
