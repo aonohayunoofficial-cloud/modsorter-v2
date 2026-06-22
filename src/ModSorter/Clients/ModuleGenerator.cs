@@ -10,8 +10,38 @@ namespace ModSorter.Clients;
 public static class ModuleGenerator
 {
     private const string Endpoint = "http://localhost:11434/api/generate";
-    private const string Model = "gpt-oss:20b";
+    private const string TagsEndpoint = "http://localhost:11434/api/tags";
+    private const string DefaultModel = "gpt-oss:20b";
     private const int TimeoutSeconds = 180;
+
+    // Ollama にインストール済みのモデル名一覧を取得する。
+    // 失敗時は空リストを返す(UI 側で既定モデルにフォールバックする)。
+    public static async Task<List<string>> ListModelsAsync()
+    {
+        var names = new List<string>();
+        try
+        {
+            using var resp = await Http.GetAsync(TagsEndpoint);
+            if (!resp.IsSuccessStatusCode) return names;
+
+            string body = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("models", out var arr)
+                && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in arr.EnumerateArray())
+                {
+                    if (m.TryGetProperty("name", out var n))
+                    {
+                        string? name = n.GetString();
+                        if (!string.IsNullOrWhiteSpace(name)) names.Add(name);
+                    }
+                }
+            }
+        }
+        catch { /* 取得失敗は空のまま返す */ }
+        return names;
+    }
 
     public static string LastError = "";
 
@@ -73,9 +103,13 @@ public static class ModuleGenerator
         IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed,
         int sizeX = 9,
         int sizeY = 9,
-        int sizeZ = 9)
+        int sizeZ = 9,
+        string? model = null)
     {
         LastError = "";
+
+        // モデル未指定なら既定モデルを使う。
+        string useModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 
         if (allowed == null || allowed.Count == 0)
         {
@@ -170,7 +204,7 @@ JSON object:";
 
         var payload = new
         {
-            model = Model,
+            model = useModel,
             prompt,
             stream = false,
             // reasoning モデル(gpt-oss 等)は format=json を付けると thinking 段階で

@@ -832,6 +832,20 @@
                                          TextWrapping="Wrap" AcceptsReturn="True" Height="70"
                                          Text="水力で回る動力源モジュールを作って。water_wheelで動力を生み、shaftやcogwheelで動力を取り出せるようにする。出力位置の目印として lime_wool を1つ置く。"/>
 
+
+                                <TextBlock Text="LLMモデル（Ollama）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <DockPanel Margin="0,4,0,12">
+                                    <Button DockPanel.Dock="Right" x:Name="MachineModelReloadBtn"
+                                            Content="再読込" Style="{StaticResource McButtonGray}"
+                                            Margin="6,0,0,0" Click="MachineModelReload_Click"/>
+                                    <ComboBox x:Name="MachineModelCombo"
+                                              Style="{StaticResource McComboBox}"
+                                              ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                              VerticalAlignment="Center"/>
+                                </DockPanel>
+
                                 <TextBlock Text="空間サイズ（X × Y × Z）"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>

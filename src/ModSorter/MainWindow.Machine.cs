@@ -118,7 +118,42 @@ public partial class MainWindow
         _architectHost ??= new ArchitectModeHost();
         MainTabs.SelectedIndex = 5;
         Log("Create機械モードを開きました。");
-        await Task.CompletedTask;
+
+        // モデル一覧が未取得なら読み込む。
+        if (MachineModelCombo.ItemsSource == null)
+            await LoadMachineModelsAsync();
+    }
+
+    // Ollama のモデル一覧を Tab5 のコンボに読み込む。
+    // 建築モードと同じ _architectHost.Generation.ListModelsAsync() を使い回す。
+    private async Task LoadMachineModelsAsync()
+    {
+        if (_architectHost == null) return;
+
+        MachineModelCombo.IsEnabled = false;
+        string? previous = MachineModelCombo.SelectedItem as string;
+
+        var models = await _architectHost.Generation.ListModelsAsync();
+        MachineModelCombo.ItemsSource = models;
+        MachineModelCombo.IsEnabled = true;
+
+        if (models.Count == 0)
+        {
+            MachineStatus.Text = "モデル一覧を取得できません（Ollama未起動の可能性）。";
+            return;
+        }
+
+        if (previous != null && models.Contains(previous))
+            MachineModelCombo.SelectedItem = previous;
+        else
+            MachineModelCombo.SelectedIndex = 0;
+
+        MachineStatus.Text = $"モデル {models.Count} 件を取得しました。";
+    }
+
+    private async void MachineModelReload_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadMachineModelsAsync();
     }
 
     // 「機械を生成」ボタン。
@@ -185,9 +220,12 @@ public partial class MainWindow
                 $"許可ブロック {allowed.Count} 種。生成中...(数十秒かかることあり)";
             ProgressShow("機械を生成中...", indeterminate: true);
 
+            string selectedModel = (MachineModelCombo.SelectedItem as string ?? "").Trim();
+
             var sw = Stopwatch.StartNew();
             var placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(
-                prompt, allowed, sx, sy, sz);
+                prompt, allowed, sx, sy, sz,
+                string.IsNullOrEmpty(selectedModel) ? null : selectedModel);
             sw.Stop();
 
             ProgressHide();
