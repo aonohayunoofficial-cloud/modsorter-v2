@@ -1104,14 +1104,36 @@ public partial class MainWindow
                 if (stats.TryGetValue("create:millstone", out var ms))
                 {
                     Out("--- create:millstone の隣接 ---");
-                    foreach (var dir in ms.Neighbors)
+                    // 主役の状態ごとに方向別の上位を出す。
+                    foreach (var state in ms.NeighborsByState)
                     {
-                        // 各方向、出現回数の多い順に上位3件。
-                        var top = dir.Value.OrderByDescending(kv => kv.Value).Take(3);
-                        Out($"  {dir.Key}: " + string.Join(", ", top.Select(kv => $"{kv.Key}({kv.Value})")));
+                        Out($"  when {state.Key}:");
+                        foreach (var dir in state.Value)
+                        {
+                            // 各方向、出現回数の多い順に上位3件。
+                            var top = dir.Value.OrderByDescending(kv => kv.Value).Take(3);
+                            Out($"    {dir.Key}: " + string.Join(", ", top.Select(kv => $"{kv.Key}({kv.Value})")));
+                        }
                     }
                     Out($"  登場シーン数: {ms.AppearedIn.Count}");
                 }
+
+                // 動作確認2: water_wheel を向きごとに出す(相関が保持されているか確認用)。
+                if (stats.TryGetValue("create:water_wheel", out var ww))
+                {
+                    Out("--- create:water_wheel の隣接(向き別) ---");
+                    foreach (var state in ww.NeighborsByState)
+                    {
+                        Out($"  when {state.Key}:");
+                        foreach (var dir in state.Value)
+                        {
+                            var top = dir.Value.OrderByDescending(kv => kv.Value).Take(3);
+                            Out($"    {dir.Key}: " + string.Join(", ", top.Select(kv => $"{kv.Key}({kv.Value})")));
+                        }
+                    }
+                    Out($"  登場シーン数: {ww.AppearedIn.Count}");
+                }
+
             }
         }
         catch (System.Exception ex3)

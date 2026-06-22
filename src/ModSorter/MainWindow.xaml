@@ -40,6 +40,9 @@
                                     Margin="0,0,0,10" Click="NavSettings_Click"/>
                             <Button Content="建築モード" Style="{StaticResource McButtonGray}"
                                     Click="NavArchitect_Click"/>
+                            <Button Content="Create機械" Style="{StaticResource McButtonGray}"
+                                    Margin="0,10,0,0" Click="NavMachine_Click"/>
+
 
                         </StackPanel>
                     </Border>
@@ -793,6 +796,110 @@
                     </Border>
                 </Grid>
             </TabItem>
+
+            <!-- ===== Tab 5: Create機械生成（独立パネル） ===== -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource BgPanel}">
+                        <StackPanel Margin="10">
+                            <Button Content="← 戻る" Style="{StaticResource McButtonGray}"
+                                    HorizontalAlignment="Left" Click="Back_Click"/>
+                            <TextBlock Text="Create機械" FontSize="18" Margin="0,20,0,0"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBlock Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Text="自然言語の指示と空間サイズから、向きの揃った動力機械の骨格を生成し、構造NBTとして出力します。"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="{StaticResource BgDark}" Padding="24">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Cursor="">
+                                <TextBlock Text="作りたい機械の指示"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <TextBox x:Name="MachinePromptBox"
+                                         Background="{StaticResource BgPanel}"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}"
+                                         BorderThickness="0" Padding="6" Margin="0,4,0,12"
+                                         TextWrapping="Wrap" AcceptsReturn="True" Height="70"
+                                         Text="水力で回る動力源モジュールを作って。water_wheelで動力を生み、shaftやcogwheelで動力を取り出せるようにする。出力位置の目印として lime_wool を1つ置く。"/>
+
+                                <TextBlock Text="空間サイズ（X × Y × Z）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+                                    <TextBlock Text="X" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBox x:Name="MachineSizeXBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center" Text="5"/>
+                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                    <TextBox x:Name="MachineSizeYBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center" Text="5"/>
+                                    <TextBlock Text="×" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" Margin="6,0,6,0"/>
+                                    <TextBox x:Name="MachineSizeZBox" Width="48"
+                                             Background="{StaticResource BgPanel}"
+                                             Foreground="{StaticResource TextMain}"
+                                             FontFamily="{StaticResource PixelFont}"
+                                             BorderThickness="0" Padding="4"
+                                             VerticalContentAlignment="Center" Text="5"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button x:Name="MachineGenBtn"
+                                            Content="機械を生成" Style="{StaticResource McButton}"
+                                            Click="MachineGenerate_Click"/>
+                                    <Button x:Name="MachineRescanPonderBtn"
+                                            Content="Ponder再スキャン"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="8,0,0,0"
+                                            Click="MachineRescanPonder_Click"/>
+                                    <Button x:Name="MachineOpenFolderBtn"
+                                            Content="出力フォルダを開く"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="8,0,0,0"
+                                            Click="MachineOpenFolder_Click"/>
+                                </StackPanel>
+                                
+                                <TextBlock x:Name="MachineStatus"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource TextDim}" FontSize="11"
+                                           TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
+
+                                <TextBlock Text="生成結果"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <TextBox x:Name="MachineResultBox" IsReadOnly="True"
+                                         Height="300"
+                                         Background="{StaticResource BgPanel}"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}" FontSize="11"
+                                         BorderThickness="0" Padding="6" Margin="0,4,0,0"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
         </TabControl>
 
         <Border Grid.Row="1" Background="{StaticResource BgPanel}" Height="120">

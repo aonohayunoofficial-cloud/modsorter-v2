@@ -51,9 +51,10 @@ public static class PonderRuleExtractor
         // 例: "axis=y" -> 12, "(none)" -> 3
         public Dictionary<string, int> OwnStates = new(StringComparer.Ordinal);
 
-        // 方向 -> (隣接ブロックの状態キー -> 出現回数)
-        // 例: "east" -> { "create:cogwheel|axis=y" -> 5 }
-        public Dictionary<string, Dictionary<string, int>> Neighbors =
+        // 自状態キー -> 方向 -> (隣接ブロックの状態キー -> 出現回数)
+        // 例: "facing=west" -> { "east" -> { "create:shaft|axis=x" -> 5 } }
+        // 主役の向きごとに隣接を分けることで、向きの相関を保持する。
+        public Dictionary<string, Dictionary<string, Dictionary<string, int>>> NeighborsByState =
             new(StringComparer.Ordinal);
 
         // このブロックが登場した Ponder シーン名の集合。
@@ -86,6 +87,15 @@ public static class PonderRuleExtractor
                 string ownState = StateKey(b);
                 stat.OwnStates[ownState] = stat.OwnStates.GetValueOrDefault(ownState) + 1;
 
+                // 主役の状態ごとに隣接を分けて集計する。
+                // これにより「facing=west の水車の east には axis=x の shaft」という
+                // 向きの相関が保持される。
+                if (!stat.NeighborsByState.TryGetValue(ownState, out var stateMap))
+                {
+                    stateMap = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+                    stat.NeighborsByState[ownState] = stateMap;
+                }
+
                 // 6方向の隣を見る。
                 foreach (var (dx, dy, dz, dirName) in Directions)
                 {
@@ -93,12 +103,12 @@ public static class PonderRuleExtractor
                     if (!byPos.TryGetValue(npos, out var nb)) continue;
                     if (IsDecoration(nb.Name)) continue; // 隣が装飾ならカウントしない
 
-                    string nKey = FullKey(nb); // 例 "create:cogwheel|axis=y"
+                    string nKey = FullKey(nb); // 例 "create:shaft|axis=x"
 
-                    if (!stat.Neighbors.TryGetValue(dirName, out var dirMap))
+                    if (!stateMap.TryGetValue(dirName, out var dirMap))
                     {
                         dirMap = new Dictionary<string, int>(StringComparer.Ordinal);
-                        stat.Neighbors[dirName] = dirMap;
+                        stateMap[dirName] = dirMap;
                     }
                     dirMap[nKey] = dirMap.GetValueOrDefault(nKey) + 1;
                 }
@@ -106,6 +116,77 @@ public static class PonderRuleExtractor
         }
 
         return result;
+    }
+
+    // 隣接統計を、LLM に渡せる英語ルール行へ変換する。
+    // allowedIds: 許可リストにあるブロックIDの集合。これに該当する主役のみ出力する。
+    // perBlockDirs: 1ブロックあたり何方向まで出すか。topPerDir: 各方向の上位何件まで。
+    // minCount: この回数以上観測された隣接だけ採用(ノイズ除去)。
+    public static string ToRuleText(
+        Dictionary<string, BlockStat> stats,
+        IEnumerable<string> allowedIds,
+        int perBlockDirs = 6,
+        int topPerDir = 2,
+        int minCount = 1)
+    {
+        var allow = new HashSet<string>(allowedIds, StringComparer.Ordinal);
+        var sb = new System.Text.StringBuilder();
+
+        // 出力順を安定させるため、登場シーン数の多い順→ID順で並べる。
+        var ordered = stats
+            .Where(kv => allow.Contains(kv.Key))
+            .OrderByDescending(kv => kv.Value.AppearedIn.Count)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal);
+
+        foreach (var (id, stat) in ordered)
+        {
+            // 主役の状態ごとに、観測回数の多い順で出力する。
+            // 状態の重み = その状態で観測された隣接カウントの合計。
+            var statesOrdered = stat.NeighborsByState
+                .OrderByDescending(s => s.Value.Sum(d => d.Value.Values.Sum()))
+                .ThenBy(s => s.Key, StringComparer.Ordinal);
+
+            bool wroteHeader = false;
+
+            foreach (var (ownState, stateMap) in statesOrdered)
+            {
+                var dirLines = new List<string>();
+                int dirsUsed = 0;
+                // 方向は up/down/east/west/south/north の順で安定化。
+                foreach (var dirName in new[] { "up", "down", "east", "west", "south", "north" })
+                {
+                    if (dirsUsed >= perBlockDirs) break;
+                    if (!stateMap.TryGetValue(dirName, out var dirMap)) continue;
+
+                    var top = dirMap
+                        .Where(kv => kv.Value >= minCount)
+                        .OrderByDescending(kv => kv.Value)
+                        .Take(topPerDir)
+                        .Select(kv => $"{kv.Key} (x{kv.Value})")
+                        .ToList();
+                    if (top.Count == 0) continue;
+
+                    dirLines.Add($"      {dirName}: {string.Join(", ", top)}");
+                    dirsUsed++;
+                }
+
+                if (dirLines.Count == 0) continue;
+
+                if (!wroteHeader)
+                {
+                    sb.Append("- ").Append(id).Append('\n');
+                    wroteHeader = true;
+                }
+
+                // 状態見出し。"(none)" のときは状態無しブロックなので簡略表記。
+                string stateLabel = ownState == "(none)" ? "(any orientation)" : ownState;
+                sb.Append("  when ").Append(stateLabel).Append(":\n");
+                foreach (var dl in dirLines)
+                    sb.Append(dl).Append('\n');
+            }
+        }
+
+        return sb.ToString();
     }
 
     private static BlockStat GetOrCreate(Dictionary<string, BlockStat> map, string id)
