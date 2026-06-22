@@ -27,6 +27,21 @@
   - 減速: cogwheel を伝達元、large_cogwheel を伝達先にすると、減速する。
 - large_cogwheel 同士は直角に噛み合わせ可能。回転の向きは逆になる。
 
+# 水車(water_wheel / large_water_wheel)の向きと動力取り出し
+- water_wheel と large_water_wheel の facing は「回転軸が向く方向」を表す。
+  facing が指す方向と同じ軸を持つ shaft でしか動力を取り出せない。
+- 対応関係（必ず守る）:
+  - facing=north または facing=south → 軸は Z。動力取り出しの shaft は axis=z。
+    水車の north 側または south 側の隣に置く。
+  - facing=east または facing=west → 軸は X。動力取り出しの shaft は axis=x。
+    水車の east 側または west 側の隣に置く。
+  - facing=up または facing=down → 軸は Y。動力取り出しの shaft は axis=y。
+    水車の up 側または down 側の隣に置く。
+- 動力取り出しの shaft に直結する cogwheel は、その shaft と同じ axis にする。
+- 禁止: 水車の facing が指す軸と、隣接する shaft の axis が食い違う配置。
+  例: facing=down(軸Y) の水車の east(横) に axis=x の shaft を置く → 繋がらない。
+  この場合は shaft を axis=y にして水車の真上(up)または真下(down)に置くこと。
+
 # 向きの変更・制御
 - gearbox: 水平方向に入出力2軸。回転数は変えず、入力と逆向きを出力する。
 - vertical_gearbox(垂直ギアボックス): 水平と垂直に各1軸。入力と逆向きを出力。

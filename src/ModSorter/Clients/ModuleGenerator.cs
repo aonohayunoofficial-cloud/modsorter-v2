@@ -67,9 +67,13 @@ public static class ModuleGenerator
 
     // allowed: 使用可能ブロック ID → (プロパティ名 → 値リスト)。
     // userRequest: 例 "shaftを3本、X軸方向に一直線に並べて"。
+    // sizeX/sizeY/sizeZ: 生成を許す空間サイズ。座標は 0..size-1 に収める。
     public static async Task<List<PlacedBlock>?> GenerateAsync(
         string userRequest,
-        IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed)
+        IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed,
+        int sizeX = 9,
+        int sizeY = 9,
+        int sizeZ = 9)
     {
         LastError = "";
 
@@ -78,6 +82,17 @@ public static class ModuleGenerator
             LastError = "使用可能ブロックの定義が空です。";
             return null;
         }
+
+        if (string.IsNullOrWhiteSpace(userRequest))
+        {
+            LastError = "お題(userRequest)が空です。";
+            return null;
+        }
+
+        // サイズは最低 1。異常値は 1 に丸める。
+        if (sizeX < 1) sizeX = 1;
+        if (sizeY < 1) sizeY = 1;
+        if (sizeZ < 1) sizeZ = 1;
 
         // 使用可能ブロックを LLM が読みやすい行に整形。
         // 例: create:shaft  (axis: x|y|z)
@@ -117,6 +132,10 @@ public static class ModuleGenerator
             ? ""
             : $"Follow these Create-mod power rules when placing blocks:\n{powerRules}\n\n";
 
+        int maxX = sizeX - 1;
+        int maxY = sizeY - 1;
+        int maxZ = sizeZ - 1;
+
         string prompt =
 $@"{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
 Output ONLY one JSON object. No explanation, no markdown.
@@ -137,7 +156,8 @@ Rules:
 - ""id"" MUST be chosen exactly from the allowed block list below.
 - ""properties"" may ONLY use the property names and values listed for that block.
 - If a block has no properties listed, use ""properties"": {{}}.
-- Coordinates are integers, keep them small (0 to 8).
+- Coordinates are integers. The build volume is {sizeX} x {sizeY} x {sizeZ}.
+  x MUST be 0..{maxX}, y MUST be 0..{maxY}, z MUST be 0..{maxZ}. Do NOT exceed these.
 - Put EVERY block as a separate element inside the ""blocks"" array.
 - Output the single JSON object only.
 
@@ -187,7 +207,7 @@ JSON object:";
                 LastError = "応答が空でした(reasoning のみで本文が無い可能性)。";
                 return null;
             }
-            return ParsePlacement(raw, allowed);
+            return ParsePlacement(raw, allowed, sizeX, sizeY, sizeZ);
         }
         catch (TaskCanceledException)
         {
@@ -256,7 +276,10 @@ JSON object:";
 
     private static List<PlacedBlock>? ParsePlacement(
         string raw,
-        IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed)
+        IReadOnlyDictionary<string, Dictionary<string, List<string>>> allowed,
+        int sizeX,
+        int sizeY,
+        int sizeZ)
     {
         JsonElement arr;
         try
@@ -316,6 +339,13 @@ JSON object:";
             int x = el.TryGetProperty("x", out var xe) && xe.TryGetInt32(out var xi) ? xi : 0;
             int y = el.TryGetProperty("y", out var ye) && ye.TryGetInt32(out var yi) ? yi : 0;
             int z = el.TryGetProperty("z", out var ze) && ze.TryGetInt32(out var zi) ? zi : 0;
+
+            // 指定空間サイズの外に出たブロックは弾く(プロパティ処理の前に判定)。
+            if (x < 0 || x >= sizeX || y < 0 || y >= sizeY || z < 0 || z >= sizeZ)
+            {
+                rejected.Add($"{id} 範囲外 ({x},{y},{z})");
+                continue;
+            }
 
             Dictionary<string, string>? props = null;
             if (el.TryGetProperty("properties", out var pe) && pe.ValueKind == JsonValueKind.Object)
