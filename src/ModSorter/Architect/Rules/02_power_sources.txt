@@ -1,0 +1,26 @@
+﻿# ===== 第2層: 動力源 =====
+# 各動力源の「出力応力(SU)」「回転数(RPM)」と、動力の取り出し方を定める。
+
+# --- water_wheel(水車) ---
+- 出力: 128 SU / 8 RPM。
+- facing は「回転軸が向く方向」を表す。facing と同じ軸の shaft でしか動力を取り出せない。
+  - facing=north / south → 軸は z。shaft は axis=z、水車の north 側または south 側の隣に置く。
+  - facing=east / west  → 軸は x。shaft は axis=x、水車の east 側または west 側の隣に置く。
+  - facing=up / down    → 軸は y。shaft は axis=y、水車の up 側または down 側の隣に置く。
+- 禁止: facing が指す軸と、隣接 shaft の axis が食い違う配置。
+
+# --- large_water_wheel(大水車) ---
+- 出力: 512 SU / 4 RPM。3x3 の多ブロック構造。
+- axis を持つ。動力取り出しの shaft は同じ axis で、中心軸の延長線上の隣に置く。
+
+# --- hand_crank(ハンドクランク) ---
+- 出力: 256 SU / 32 RPM(プレイヤーが回している間のみ)。
+- facing が指す面に動力を出す。取り出す shaft は facing と同じ軸にする。
+
+# --- windmill_bearing(風車ベアリング) ---
+- 出力: 基本 512 SU / 1 RPM。帆(sail)8枚ごとに +512 SU / +1 RPM。最大 8192 SU / 16 RPM。
+- facing が回転軸の方向。取り出す shaft は facing と同じ軸で正面に置く。
+
+# --- steam_engine(蒸気機関) ---
+- 出力: 2048 SU / 16 RPM 以上(供給する熱と水で増大)。
+- fluid_tank の側面に取り付け、shaft_input から動力を取り出す。

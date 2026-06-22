@@ -1,0 +1,31 @@
+﻿# ===== 第5層: アイテム・流体の搬送 =====
+
+# --- mechanical_belt(ベルト) ---
+- shaft で駆動する。始点の shaft に belt を接続して敷設する。
+- 水平・斜め(対角)に設置できる。アイテムは回転方向に沿って流れる。
+- 始点か終点の片方を shaft で駆動すればベルト全体が動く。
+
+# --- depot(デポ) ---
+- アイテムを1つ置く台。belt の終点や press/deployer の加工対象置き場に使う。
+- 動力は不要。
+
+# --- funnel(ファンネル) ---
+- アイテムの入口/出口。facing の向きで吸う/出すを決める。
+  - インベントリに貼り付けた面から吸い出す、または belt/depot へ落とす。
+- andesite_funnel と brass_funnel があり、brass はフィルター指定可。
+
+# --- chute(シュート) ---
+- 縦方向にアイテムを落とす/吸い上げる。垂直搬送に使う。
+- 上下の hopper/belt/depot と組み合わせる。
+
+# --- mechanical_arm(メカニカルアーム) ---
+- 動力入力: 下面。shaft を axis=y で接続。
+- 複数の入力地点(depot/belt/funnel)から出力地点へアイテムを振り分ける。
+
+# --- 流体搬送(fluid_pipe / mechanical_pump) ---
+- fluid_pipe で流体を繋ぐ。mechanical_pump は shaft で駆動し、流れる向きを作る。
+- pump は pipe の途中に軸合わせで挟む。
+
+# --- 搬送ラインの基本 ---
+- 加工機械の「排出面」から funnel/belt/chute でアイテムを受け、次の機械の「投入面」へ運ぶ。
+- 投入面と排出面の向きが搬送方向と一致するように配置する。

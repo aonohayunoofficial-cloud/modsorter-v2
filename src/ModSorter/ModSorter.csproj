@@ -24,9 +24,25 @@
 		</None>
 	</ItemGroup>
 	<ItemGroup>
-		<None Update="Architect\Rules\create_power_rules.txt">
+		<None Update="Architect\Rules\01_power_transmission.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Architect\Rules\02_power_sources.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Architect\Rules\03_power_control.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Architect\Rules\04_machines_processing.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Architect\Rules\05_transport.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Architect\Rules\06_layout_constraints.txt">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
+
 
 </Project>

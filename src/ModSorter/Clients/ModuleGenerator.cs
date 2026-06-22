@@ -111,10 +111,13 @@ public static class ModuleGenerator
         // モデル未指定なら既定モデルを使う。
         string useModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 
-        if (allowed == null || allowed.Count == 0)
+        // 全ルールファイルを Architect/Rules/ から一括読込（番号順に結合）。
+        string powerRulesSection = "";
+        var rules = ModSorter.Architect.Generation.RuleLoader.LoadAllRules();
+        if (!string.IsNullOrWhiteSpace(rules))
         {
-            LastError = "使用可能ブロックの定義が空です。";
-            return null;
+            powerRulesSection =
+                "\n# Create MOD 配置ルール（必ず守ること）\n" + rules + "\n";
         }
 
         if (string.IsNullOrWhiteSpace(userRequest))
@@ -150,21 +153,12 @@ public static class ModuleGenerator
         }
         string blockList = sb.ToString();
 
-        // 動力ルール集を読み込む(無ければ空文字で続行)。
-        string powerRules = "";
-        try
-        {
-            string rulesPath = System.IO.Path.Combine(
-                System.AppContext.BaseDirectory,
-                "Architect", "Rules", "create_power_rules.txt");
-            if (System.IO.File.Exists(rulesPath))
-                powerRules = System.IO.File.ReadAllText(rulesPath, Encoding.UTF8);
-        }
-        catch { /* 読めなければルール無しで続行 */ }
+        // 全ルールファイルを Architect/Rules/ から一括読込(番号順に結合)。無ければ空で続行。
+        string powerRules = ModSorter.Architect.Generation.RuleLoader.LoadAllRules();
 
-        string powerRulesSection = string.IsNullOrWhiteSpace(powerRules)
+        powerRulesSection = string.IsNullOrWhiteSpace(powerRules)
             ? ""
-            : $"Follow these Create-mod power rules when placing blocks:\n{powerRules}\n\n";
+            : $"Follow these Create-mod placement rules when placing blocks:\n{powerRules}\n\n";
 
         int maxX = sizeX - 1;
         int maxY = sizeY - 1;
