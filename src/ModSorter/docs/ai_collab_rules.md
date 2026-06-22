@@ -31,6 +31,16 @@
 - 必要なコードがある場合は憶測で話さずに必要なものをいう
 - 憶測での話を禁じる
 
+## コード参照ルール（厳守）
+
+- コードの追加・差し替え・新規作成が発生する場合、該当箇所の現物は
+  ユーザーに貼らせる前に AI 自身が Git(raw) を参照して確認してから出すこと。
+  raw URL 例: https://raw.githubusercontent.com/aonohayunoofficial-cloud/modsorter-v2/main/<パス>
+- 着手前に見ておくべき関連実装（呼び出し先、既存の同種メソッド、対応するUI要素など）も、
+  憶測で書かず必ず先に Git を参照して確認すること。
+- 既存に同じ機能のメソッドがある場合は新規実装せず既存を使い回す。
+  （例: モデル一覧取得は _architectHost.Generation.ListModelsAsync() を使う）
+- 
 ## プロジェクト概要（背景メモ）
 
 - 目的: 導入済み MOD をスキャンし、その MOD ブロックを使って自然言語の
@@ -48,8 +58,11 @@
   - create_power_rules.txt は Architect/Rules/ に置き、ビルド時に出力フォルダへコピー。
   - 実行時は AppContext.BaseDirectory 基準で読み込み、ModuleGenerator が
     プロンプト先頭に powerRulesSection として添付する。
-  - Ponder 隣接ルールは PonderRuleExtractor.ToRuleText で英語ルール文化し、
-    ModuleGenerator の adjacencySection としてプロンプトに合流する。
+  - 【重要・確定方針】Ponder 隣接統計を生成プロンプトに合流させる路線
+    （adjacencySection / ToRuleText / GetPonderAdjacencyRules）は試して失敗し、撤回済み。
+    動いていた生成を壊しただけだったため、生成プロンプトには Ponder を渡さない。
+    配置精度は create_power_rules.txt の人間語ルールを足す方向で詰める。
+    この路線には戻らないこと。
 - ブロックID表記: create: 付きの完全ID に統一する。
 - 動力源の出力数値: 0.5.1 wiki 基準の「目安」のまま保持（後でゲーム内実値に更新予定）。
 
@@ -58,10 +71,14 @@
 - 完了: PoC（向き検証）、create_power_rules.txt 第1層、ModuleGenerator へのルール添付。
 - 完了: Tab5（Create機械）を独立パネルとして新設。お題＋空間サイズ(X/Y/Z)入力 →
   生成 → 構造NBT出力 → 出力フォルダを開く、まで結線。範囲外バリデーションも動作。
-- 完了: Ponder隣接ルールを ToRuleText で英語化し、生成プロンプトへ合流。
-  初回のみ解析してメモリキャッシュ、MOD追加時は「Ponder再スキャン」ボタンで再構築。
-- 課題: 動力の接続位置（駆動元の軸延長線上に shaft/cogwheel を置く）がまだ甘く、
-  water_wheel の facing 解釈ミスや横置きが出る。隣接ルール合流の効果を検証中。
+- 撤回: Ponder隣接ルールの生成プロンプト合流は失敗のため撤回（ModuleGenerator から削除）。
+  GetPonderAdjacencyRules 等のコードは未使用のまま残置、フェーズGで掃除予定。
+- 完了: create_power_rules.txt に water_wheel / large_water_wheel の facing と軸の
+  対応ルールを追加し、facing と shaft の axis・配置方向が一致するよう改善。
+- 完了: Tab5 に LLMモデル選択欄（Ollama）を追加。建築モードと同じ
+  _architectHost.Generation.ListModelsAsync() を使い回し、選択モデルで生成。
+- 課題: cogwheel の直列は「ここから繋がる」表現として許容（仕様内）。
+  出力マーカー(lime_wool)の置き場所の精緻化は後回しで可。
 
 ## 次回やるべきこと（TODO）
 
