@@ -846,6 +846,52 @@
                                               VerticalAlignment="Center"/>
                                 </DockPanel>
 
+                                <TextBlock Text="作るジャンル（複数選択可。単一が基本）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <WrapPanel Margin="0,4,0,12">
+                                    <CheckBox x:Name="GenrePowerSource" Content="動力源"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenrePowerTransmit" Content="動力伝達・分配"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenrePowerControl" Content="動力制御"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreProcessing" Content="加工"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreTransport" Content="搬送"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreStorage" Content="保管"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreFluid" Content="流体"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreContraption" Content="可動・構造"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreMeter" Content="計測・表示"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                    <CheckBox x:Name="GenreRedstone" Content="レッドストーン連動"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontFamily="{StaticResource PixelFont}"
+                                              Margin="0,0,12,4"/>
+                                </WrapPanel>
+
                                 <TextBlock Text="空間サイズ（X × Y × Z）"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>

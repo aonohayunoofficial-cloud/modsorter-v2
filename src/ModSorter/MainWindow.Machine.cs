@@ -222,10 +222,24 @@ public partial class MainWindow
 
             string selectedModel = (MachineModelCombo.SelectedItem as string ?? "").Trim();
 
+            // 選択されたジャンルを集める(チェックされたものだけ)。
+            var genres = new List<string>();
+            if (GenrePowerSource.IsChecked == true) genres.Add("動力源");
+            if (GenrePowerTransmit.IsChecked == true) genres.Add("動力伝達・分配");
+            if (GenrePowerControl.IsChecked == true) genres.Add("動力制御");
+            if (GenreProcessing.IsChecked == true) genres.Add("加工");
+            if (GenreTransport.IsChecked == true) genres.Add("搬送");
+            if (GenreStorage.IsChecked == true) genres.Add("保管");
+            if (GenreFluid.IsChecked == true) genres.Add("流体");
+            if (GenreContraption.IsChecked == true) genres.Add("可動・構造");
+            if (GenreMeter.IsChecked == true) genres.Add("計測・表示");
+            if (GenreRedstone.IsChecked == true) genres.Add("レッドストーン連動");
+
             var sw = Stopwatch.StartNew();
             var placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(
                 prompt, allowed, sx, sy, sz,
-                string.IsNullOrEmpty(selectedModel) ? null : selectedModel);
+                string.IsNullOrEmpty(selectedModel) ? null : selectedModel,
+                genres);
             sw.Stop();
 
             ProgressHide();

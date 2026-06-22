@@ -58,23 +58,34 @@ public static class ModuleGenerator
         public Dictionary<string, string>? Properties { get; set; }
     }
 
-    // 動力・機械系のブロックを判定するキーワード。
-    private static readonly string[] PowerKeywords =
+    // 機械骨格に不要な「装飾・建材・純素材」を判定する除外キーワード。
+    // create の機能ブロックは原則すべて許可し、ここに該当するものだけ落とす(ブラックリスト方式)。
+    private static readonly string[] DecorationKeywords =
     {
-        "cogwheel", "shaft", "gearbox", "gearshift", "clutch",
-        "water_wheel", "windmill", "crank", "flywheel", "steam_engine",
-        "bearing", "belt", "press", "mixer", "encased_fan",
-        "millstone", "depot", "funnel", "chute", "mechanical",
+        "_planks", "_log", "_wood", "_stairs", "_slab", "_fence", "_wall",
+        "_door", "_trapdoor", "_window", "_glass", "_pane", "_bars",
+        "_tile", "_tiles", "_brick", "_bricks", "_paving", "_pillar",
+        "_polished", "_cut_", "_layer", "_palette", "_seat",
+        "_sail", "_train_door", "_girder_encased", "copycat",
     };
 
-    // 単体で設置できない/モジュールに不向きなため除外するブロック。
+    // 単体で設置できない/モジュールに不向きなため明示的に除外する個別ブロック。
     private static readonly HashSet<string> PowerExcluded = new(StringComparer.Ordinal)
     {
         "create:water_wheel_structure",
+        "create:large_water_wheel_structure",
         "create:mechanical_piston_head",
+        "create:sticky_mechanical_piston_head",
+        "create:piston_extension_pole",   // 単体不可の延長パーツ
+        "create:gantry_shaft",            // gantry本体と組でないと意味を持たない補助
+        "create:contraption_controls",
+        "create:minecart_anchor",
     };
 
-    // フルパレットから、create の動力・機械系ブロックだけを抜き出して許可リストを作る。
+    // フルパレットから、create の機能ブロックを「原則すべて」許可リストに入れる。
+    // 装飾・建材・純素材(DecorationKeywords該当)と、単体設置不可の個別ブロック
+    // (PowerExcluded)だけを除外する。これで funnel/chain_drive/vault/pipe 等の
+    // 機能ブロックがキーワード漏れで消える問題をなくす。
     public static Dictionary<string, Dictionary<string, List<string>>> BuildPowerPalette(
         IReadOnlyDictionary<string, Dictionary<string, List<string>>> fullPalette)
     {
@@ -85,12 +96,15 @@ public static class ModuleGenerator
             if (!id.StartsWith("create:", StringComparison.Ordinal)) continue;
             if (PowerExcluded.Contains(id)) continue;
 
-            bool hit = false;
-            foreach (var k in PowerKeywords)
+            // 装飾・建材・純素材は除外。
+            bool isDecoration = false;
+            foreach (var k in DecorationKeywords)
             {
-                if (id.Contains(k, StringComparison.Ordinal)) { hit = true; break; }
+                if (id.Contains(k, StringComparison.Ordinal)) { isDecoration = true; break; }
             }
-            if (hit) result[id] = kv.Value;
+            if (isDecoration) continue;
+
+            result[id] = kv.Value;
         }
         return result;
     }
@@ -104,7 +118,8 @@ public static class ModuleGenerator
         int sizeX = 9,
         int sizeY = 9,
         int sizeZ = 9,
-        string? model = null)
+        string? model = null,
+        IReadOnlyList<string>? genres = null)
     {
         LastError = "";
 
@@ -160,12 +175,35 @@ public static class ModuleGenerator
             ? ""
             : $"Follow these Create-mod placement rules when placing blocks:\n{powerRules}\n\n";
 
+        // ジャンル制約。動力・加工・搬送・保管などは「別モジュール」が基本。
+        // チェックされたジャンルだけを作らせ、それ以外の役割のブロックは混ぜさせない。
+        string genreSection = "";
+        if (genres != null && genres.Count > 0)
+        {
+            string list = string.Join("、", genres);
+            if (genres.Count == 1)
+            {
+                genreSection =
+                    $"このモジュールのジャンルは「{list}」だけです。\n" +
+                    "このジャンルの機能を持つブロックだけで構成してください。\n" +
+                    "他のジャンル(動力源/動力伝達/動力制御/加工/搬送/保管/流体/可動・構造/計測・表示/レッドストーン連動)の" +
+                    "ブロックを混ぜてはいけません。完成品ではなく、後で他モジュールと接続できる単機能の骨格を作ります。\n\n";
+            }
+            else
+            {
+                genreSection =
+                    $"このモジュールのジャンルは「{list}」です。\n" +
+                    "指定されたジャンルの機能だけで構成し、それ以外のジャンルのブロックは混ぜないでください。\n" +
+                    "後で他モジュールと接続できる骨格として作ります。\n\n";
+            }
+        }
+
         int maxX = sizeX - 1;
         int maxY = sizeY - 1;
         int maxZ = sizeZ - 1;
 
         string prompt =
-$@"{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
+$@"{genreSection}{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
 Output ONLY one JSON object. No explanation, no markdown.
 
 The JSON object MUST have a single key ""blocks"" whose value is an ARRAY.
