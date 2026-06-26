@@ -119,21 +119,13 @@ public static class ModuleGenerator
         int sizeY = 9,
         int sizeZ = 9,
         string? model = null,
-        IReadOnlyList<string>? genres = null)
+        IReadOnlyList<string>? genres = null,
+        string? refinementNotes = null)
     {
         LastError = "";
 
         // モデル未指定なら既定モデルを使う。
         string useModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
-
-        // 全ルールファイルを Architect/Rules/ から一括読込（番号順に結合）。
-        string powerRulesSection = "";
-        var rules = ModSorter.Architect.Generation.RuleLoader.LoadAllRules();
-        if (!string.IsNullOrWhiteSpace(rules))
-        {
-            powerRulesSection =
-                "\n# Create MOD 配置ルール（必ず守ること）\n" + rules + "\n";
-        }
 
         if (string.IsNullOrWhiteSpace(userRequest))
         {
@@ -171,7 +163,7 @@ public static class ModuleGenerator
         // 全ルールファイルを Architect/Rules/ から一括読込(番号順に結合)。無ければ空で続行。
         string powerRules = ModSorter.Architect.Generation.RuleLoader.LoadAllRules();
 
-        powerRulesSection = string.IsNullOrWhiteSpace(powerRules)
+        string powerRulesSection = string.IsNullOrWhiteSpace(powerRules)
             ? ""
             : $"Follow these Create-mod placement rules when placing blocks:\n{powerRules}\n\n";
 
@@ -198,12 +190,21 @@ public static class ModuleGenerator
             }
         }
 
+        // 前回生成の結合不正を次のプロンプトに反映する(再生成時のみ)。
+        string refinementSection = "";
+        if (!string.IsNullOrWhiteSpace(refinementNotes))
+        {
+            refinementSection =
+                "前回の配置には次の不具合があった。今回は必ず直すこと:\n" +
+                refinementNotes + "\n\n";
+        }
+
         int maxX = sizeX - 1;
         int maxY = sizeY - 1;
         int maxZ = sizeZ - 1;
 
         string prompt =
-$@"{genreSection}{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
+$@"{refinementSection}{genreSection}{powerRulesSection}You place Minecraft blocks for a Create-mod machine.
 Output ONLY one JSON object. No explanation, no markdown.
 
 The JSON object MUST have a single key ""blocks"" whose value is an ARRAY.
@@ -422,6 +423,13 @@ JSON object:";
                     string pVal = p.Value.ValueKind == JsonValueKind.String
                         ? (p.Value.GetString() ?? "")
                         : p.Value.ToString();
+
+                    // bool 値の表記ゆれを正規化(True/False/TRUE → true/false)。
+                    // Minecraft の blockstate は小文字なので、大文字だと許可リストと一致せず弾かれる。
+                    if (string.Equals(pVal, "true", StringComparison.OrdinalIgnoreCase))
+                        pVal = "true";
+                    else if (string.Equals(pVal, "false", StringComparison.OrdinalIgnoreCase))
+                        pVal = "false";
 
                     // 許可リストに無いプロパティ/値は捨てる(無効な状態を防ぐ)。
                     if (validProps.TryGetValue(pName, out var allowedVals)

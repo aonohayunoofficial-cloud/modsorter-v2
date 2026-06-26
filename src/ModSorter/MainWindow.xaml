@@ -866,10 +866,6 @@
                                               Foreground="{StaticResource TextMain}"
                                               FontFamily="{StaticResource PixelFont}"
                                               Margin="0,0,12,4"/>
-                                    <CheckBox x:Name="GenreTransport" Content="搬送"
-                                              Foreground="{StaticResource TextMain}"
-                                              FontFamily="{StaticResource PixelFont}"
-                                              Margin="0,0,12,4"/>
                                     <CheckBox x:Name="GenreStorage" Content="保管"
                                               Foreground="{StaticResource TextMain}"
                                               FontFamily="{StaticResource PixelFont}"

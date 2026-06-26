@@ -228,20 +228,66 @@ public partial class MainWindow
             if (GenrePowerTransmit.IsChecked == true) genres.Add("動力伝達・分配");
             if (GenrePowerControl.IsChecked == true) genres.Add("動力制御");
             if (GenreProcessing.IsChecked == true) genres.Add("加工");
-            if (GenreTransport.IsChecked == true) genres.Add("搬送");
             if (GenreStorage.IsChecked == true) genres.Add("保管");
             if (GenreFluid.IsChecked == true) genres.Add("流体");
             if (GenreContraption.IsChecked == true) genres.Add("可動・構造");
             if (GenreMeter.IsChecked == true) genres.Add("計測・表示");
             if (GenreRedstone.IsChecked == true) genres.Add("レッドストーン連動");
 
+            const int MAX_ATTEMPTS = 3;
             var sw = Stopwatch.StartNew();
-            var placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(
-                prompt, allowed, sx, sy, sz,
-                string.IsNullOrEmpty(selectedModel) ? null : selectedModel,
-                genres);
-            sw.Stop();
 
+            List<ModSorter.Clients.ModuleGenerator.PlacedBlock>? placed = null;
+            List<ModSorter.Architect.Generation.ValidationIssue> issues = new();
+            string? refinementNotes = null;
+
+            for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)
+            {
+                MachineStatus.Text =
+                    $"生成中... ({attempt}/{MAX_ATTEMPTS} 回目)";
+
+                placed = await ModSorter.Clients.ModuleGenerator.GenerateAsync(
+                    prompt, allowed, sx, sy, sz,
+                    string.IsNullOrEmpty(selectedModel) ? null : selectedModel,
+                    genres, refinementNotes);
+
+                if (placed == null)
+                {
+                    Log($"生成失敗({attempt}回目): {ModSorter.Clients.ModuleGenerator.LastError}");
+                    continue; // 次の試行へ
+                }
+
+                // 接続検証 → 自動補正。補正で新たな補正対象が出る(shaft削除→funnel位置再評価 等)
+                // ため、AutoFixできるものが無くなるまで収束ループを回す。
+                issues = ModSorter.Architect.Generation.ConnectionValidator.Validate(placed);
+                int totalFixed = 0;
+                for (int pass = 0; pass < 8 && issues.Count > 0; pass++)
+                {
+                    int fixedCount =
+                        ModSorter.Architect.Generation.ConnectionValidator.AutoFix(placed, issues);
+                    if (fixedCount == 0) break; // これ以上AutoFixできない → 残りは再生成行き
+                    totalFixed += fixedCount;
+                    issues = ModSorter.Architect.Generation.ConnectionValidator.Validate(placed);
+                }
+
+                if (totalFixed > 0)
+                    Log($"接続検証({attempt}回目): 計 {totalFixed} 件を自動補正。残 {issues.Count} 件。");
+                else if (issues.Count == 0)
+                    Log($"接続検証({attempt}回目): 問題なし。");
+                else
+                    Log($"接続検証({attempt}回目): 自動補正できる項目なし。残 {issues.Count} 件。");
+
+                foreach (var iss in issues)
+                    Log($"  [接続] {iss.CategoryId}: {iss.HumanMessage}");
+
+                if (issues.Count == 0) break; // 合格 → ループ終了
+
+                // 残存(AutoFix不可)があれば不具合点を次回プロンプトへ渡して再生成。
+                refinementNotes = string.Join("\n",
+                    issues.Select(i => "- " + i.HumanMessage));
+            }
+
+            sw.Stop();
             ProgressHide();
             MachineGenBtn.IsEnabled = true;
 
@@ -252,6 +298,8 @@ public partial class MainWindow
                 return;
             }
 
+            if (issues.Count > 0)
+                Log($"上限 {MAX_ATTEMPTS} 回でも結合不正が {issues.Count} 件残りました。最良案を出力します。");
             // 結果テキストを組み立て。
             var lines = new List<string>
             {

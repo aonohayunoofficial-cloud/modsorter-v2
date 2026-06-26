@@ -24,6 +24,9 @@
 		</None>
 	</ItemGroup>
 	<ItemGroup>
+		<None Update="Architect\Rules\00_module_principle.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Update="Architect\Rules\01_power_transmission.txt">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
