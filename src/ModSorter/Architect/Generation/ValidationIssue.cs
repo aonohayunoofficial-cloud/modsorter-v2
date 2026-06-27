@@ -29,4 +29,8 @@ public sealed class ValidationIssue
 
     // 不要プロパティの削除(例 無印funnelに紛れた shape)。AutoFix で適用。
     public List<string>? RemoveProps { get; init; }
+
+    // 新規ブロックの追加(例 mixerの側面にcogwheelを補う)。AutoFix で placed に足す。
+    // 追加先座標に既存ブロックがあればスキップする。
+    public List<ModSorter.Clients.ModuleGenerator.PlacedBlock>? AddBlocks { get; init; }
 }

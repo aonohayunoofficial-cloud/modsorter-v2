@@ -200,6 +200,28 @@ public partial class MainWindow
                 var fullPalette = tp.ExtractBlockPalette();
                 allowed = ModSorter.Clients.ModuleGenerator.BuildPowerPalette(fullPalette);
 
+                // [一時確認] press/mixer/basin/belt等のプロパティをログ出力。仕様確定後に削除する。
+                foreach (var checkId in new[]
+                {
+                    "create:mechanical_press", "create:mechanical_mixer", "create:basin",
+                    "create:depot", "create:belt", "create:andesite_funnel", "create:chute",
+                })
+                {
+                    // fullPalette(生)に存在するか。存在すればプロパティ、無ければ「パレット自体に無い」。
+                    if (fullPalette.TryGetValue(checkId, out var pp))
+                    {
+                        string dump = pp.Count == 0
+                            ? "(プロパティなし=向き等を持たないブロック)"
+                            : string.Join(", ",
+                                pp.Select(kv => $"{kv.Key}=[{string.Join("|", kv.Value)}]"));
+                        Log($"[プロパティ] {checkId}: fullPaletteにあり / {dump}");
+                    }
+                    else
+                    {
+                        Log($"[プロパティ] {checkId}: fullPalette自体に無い(blockstates未抽出)");
+                    }
+                }
+
                 // 入出力マーカー用の羊毛を許可リストに加える。
                 foreach (var mk in new[] { "minecraft:magenta_wool", "minecraft:lime_wool" })
                 {

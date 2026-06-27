@@ -33,8 +33,17 @@ public sealed class RotationSpec
     public bool IsSource = false;            // 動力源(自分で回転を生む)
 
     // 動力入力面の制約。指定が無い面は「制約なし(判定しない)」。
-    // 機械(millstone/press 等)で「側面はcog、底面はshaft」のような縛りを表現する。
+    // 機械(millstone/mixer 等)で「側面はcog、底面はshaft」のような縛りを表現する。
     public Dictionary<Dir, PowerInputKind>? PowerInputFaces;
+
+    // press のように「facing軸に沿った両端2面だけがshaft動力入力で、残り4面は不可」
+    // という動的な制約を表す。true のとき PowerInputFaces より優先して判定する。
+    // 軸は GetRotationAxis(=facingから算出) を使う。
+    public bool PowerOnAxisEnds = false;
+
+    // 動力入力の正しいやり方をLLMへ伝える具体文(再生成プロンプト用)。
+    // 「どこにどの部材をどの向きで置けば動くか」を明記する。
+    public string PowerInputHint = "";
 }
 
 public static class ConnectionCatalog
@@ -98,37 +107,43 @@ public static class ConnectionCatalog
                     [Dir.South] = PowerInputKind.CogOnly,
                     [Dir.East] = PowerInputKind.CogOnly,
                     [Dir.West] = PowerInputKind.CogOnly,
-                }
+                },
+                PowerInputHint =
+                    "millstoneの動力は、側面(north/south/east/west)のいずれかにcreate:cogwheel(axis=y)を" +
+                    "噛み合わせるか、底面(下)にcreate:shaft(axis=y)を縦に挿す。上面はアイテム投入口なので動力不可。"
             },
-            // mechanical_press: 上面=動力不可, 側面の貫通軸で入力。
+            // mechanical_press: facingで軸が決まる(facing=south→z軸)。
+            //  動力入力はfacing軸の両端2面のみ(shaft/cog可)。残り4面は不可。
+            //  実機: facingとその反対の2側面にshaftが繋がる。
             ["create:mechanical_press"] = new()
             {
                 BlockId = "create:mechanical_press",
-                AxisSource = AxisSource.FixedY,
-                PowerInputFaces = new()
-                {
-                    [Dir.Up] = PowerInputKind.None,
-                    [Dir.Down] = PowerInputKind.None,
-                    [Dir.North] = PowerInputKind.ShaftOrCog,
-                    [Dir.South] = PowerInputKind.ShaftOrCog,
-                    [Dir.East] = PowerInputKind.ShaftOrCog,
-                    [Dir.West] = PowerInputKind.ShaftOrCog,
-                }
+                AxisSource = AxisSource.FacingAxis,
+                PowerOnAxisEnds = true,
+                PowerInputHint =
+                    "pressの動力は、facingの向きとその反対の2側面(facing軸の両端)にcreate:shaftを" +
+                    "press同じ軸で挿す(facing=south/northなら相手はaxis=z、facing=east/westならaxis=x)。" +
+                    "上面・下面やfacingに垂直な側面には繋がらない。"
             },
-            // mechanical_mixer: 上面=shaft, それ以外=不可。
+            // mechanical_mixer: 向きを持たない(プロパティなし)。軸はy固定。
+            //  動力は側面4面からcogで入力(millstoneと同型)。上面=basin連動部, 下面=basin方向で不可。
             ["create:mechanical_mixer"] = new()
             {
                 BlockId = "create:mechanical_mixer",
                 AxisSource = AxisSource.FixedY,
                 PowerInputFaces = new()
                 {
-                    [Dir.Up] = PowerInputKind.ShaftOnly,
+                    [Dir.Up] = PowerInputKind.None,
                     [Dir.Down] = PowerInputKind.None,
-                    [Dir.North] = PowerInputKind.None,
-                    [Dir.South] = PowerInputKind.None,
-                    [Dir.East] = PowerInputKind.None,
-                    [Dir.West] = PowerInputKind.None,
-                }
+                    [Dir.North] = PowerInputKind.CogOnly,
+                    [Dir.South] = PowerInputKind.CogOnly,
+                    [Dir.East] = PowerInputKind.CogOnly,
+                    [Dir.West] = PowerInputKind.CogOnly,
+                },
+                PowerInputHint =
+                    "mixerの動力は、側面(north/south/east/west)のいずれかにcreate:cogwheel(axis=y)を" +
+                    "噛み合わせる。上面・下面には動力を繋げない(上は本体、下はbasin方向)。" +
+                    "mixerは向きプロパティを持たないので置くだけでよい。"
             },
             // 必要に応じて拡充。
         };

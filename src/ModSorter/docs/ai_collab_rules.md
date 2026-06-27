@@ -30,6 +30,14 @@
 - 前回までの内容が分からない場合は分からないことを言う
 - 必要なコードがある場合は憶測で話さずに必要なものをいう
 - 憶測での話を禁じる
+- 【追加】一回一回ユーザーに確認を取らない。自分で3回検討して判断し、完成品だけを出す。
+  判断に必要な現物が足りないときだけ、その現物を要求する（確認の往復はしない）。
+- 【追加】ユーザーへの命令・指示形を禁じる。手順はユーザーが実行する前提で、淡々と提示する。
+- 【追加】生成依頼を出すときはプロンプト文を貼るだけでよい。余計な会話を足さない。
+- 【追加】ユーザーが実機で生成・設置する。AIはアプリを動かせない。
+  AIの仕事はコードと判断の提示まで。結果（ログ・ブロックリスト）はユーザーが貼る。
+- 自身でGitをみて、差し替えや追加する場所、するべき内容を確認する。
+- コミット・プッシュから次のコミット・プッシュまでの期間はローカルの内容を最新として、差し替え追加をした内容を最新として進める。
 
 ## コード参照ルール（厳守）
 
@@ -74,11 +82,49 @@
 - 撤回: Ponder隣接ルールの生成プロンプト合流は失敗のため撤回（ModuleGenerator から削除）。
   GetPonderAdjacencyRules 等のコードは未使用のまま残置、フェーズGで掃除予定。
 - 完了: create_power_rules.txt に water_wheel / large_water_wheel の facing と軸の
-  対応ルールを追加し、facing と shaft の axis・配置方向が一致するよう改善。
-- 完了: Tab5 に LLMモデル選択欄（Ollama）を追加。建築モードと同じ
+  対応ルールを追加。
+- 完了: Tab5 に LLMモデル選択欄（Ollama）を追加。
   _architectHost.Generation.ListModelsAsync() を使い回し、選択モデルで生成。
+
+- 完了【接続検証 ConnectionValidator】: shaft/cogwheel の軸整合 と 動力入力面 と
+  出力経路を検証し、機械的に直せるものは AutoFix で補正する仕組みを実装。
+  ファイル: Architect/Generation/ConnectionValidator.cs / ConnectionSpec.cs / ValidationIssue.cs
+
+- 完了【実機で確定した Create 機械の正しい構成】（全て実機 or 公式Wikiで確認済み）:
+  ・millstone … 隣接 andesite_funnel(extracting=true, 外向き facing) →
+                funnel の真下(y-1) に depot/chest。funnel の横はダメ。
+  ・無印funnel … facing(取り付け面) と extracting で向きが決まる。shape は持たない
+                （shape は belt funnel 専用。無印に付けたら削除する）。
+  ・mechanical_press … 動力は facing軸の両端2面のみ（south→north/south, west→east/west）。
+                出力は press 真下(y-1) の depot（板材デフォルト）。
+  ・mechanical_mixer … プロパティ無し・軸はY固定。動力は側面4面に cogwheel(axis=y)。
+                上下面は動力不可。出力は mixer(y)→空気(y-1)→basin(y-2) の縦並び。
+  ・basin … 出力に funnel 不要。basin 横の空気ブロックの真下にある belt/depot へ
+                spout で自動排出（公式Wiki: Basin）。
+
+- 完了【AutoFix の機能】:
+  ・RemoveTarget … 不正ブロック削除
+  ・SuggestedBlockId / SuggestedAxis … 種別変換・軸補正
+  ・SuggestedProps … 任意プロパティ上書き（funnel の facing/extracting 等）
+  ・RemoveProps … 不要プロパティ削除（無印funnel の shape 等）
+  ・AddBlocks … 新規ブロック追加（mixer 側面 cogwheel、mixer 下 basin）
+  ・mixer 専用: 上下面の不正 shaft を削除し、空き側面に cogwheel(axis=y) を追加
+  ・MainWindow.Machine.cs: AutoFix 収束ループ（issue が出続ける限り再 AutoFix）
+
 - 課題: cogwheel の直列は「ここから繋がる」表現として許容（仕様内）。
   出力マーカー(lime_wool)の置き場所の精緻化は後回しで可。
+- 課題: press の basin 構成（圧縮レシピ）は未実装。生成段階でレシピ判別不可のため
+  press はデフォルト「真下 depot」固定。basin 化は mixer の C-2 と同形で後付け可能。
+- 課題: mixer 横に LLM が millstone のクセで置く funnel+depot は basin 構成では不要だが、
+  害がない（動力・出力に干渉しない）ため強制削除しない方針（補正回数の節約）。
+
+    ・mechanical_press … 動力は facing軸の両端2面のみ（south/north→相手axis=z,
+                east/west→相手axis=x）。出力は press(y)→空気(y-1)→depot/belt(y-2)。
+                press は真下に1マス作業空間を空け、その下のアイテムを叩く（直下密着は不作動）。
+                press 隣接の funnel は不要なので撤去する。
+  ・完了【検証＆AutoFix 対応機種】: millstone / mechanical_mixer / mechanical_press の
+                3機種すべて、動力入力面と出力経路を実機準拠で検証・自動補正・収束まで確認済み。
+
 
 ## 次回やるべきこと（TODO）
 
@@ -187,26 +233,31 @@ G-5. 最終確認
    - Tab5 に「Ponder再スキャン」ボタンを置き、MOD追加時は手動で再構築。
    - キャッシュのフィンガープリントは Create本体jarのパス＋更新日時で判定。
 
-## 明日の進め方（段階ゴール）
+## 進め方（段階ゴール）
 
-明日は以下の順で、各段階で「動く状態」を確保しながら進める。
+各段階で「動く状態」を確保しながら進める。
 
-第1段階(MVP・最優先):
-  UIでお題＋空間サイズを入力 → ルール添付で生成 → 指定サイズ内に
-  向きの揃った機械骨格を生成 → NBT出力 → ゲーム内へ設置できるところまで通す。
-  （フェーズA→C→D→E の主要パスを一本に繋ぐ）
+第1段階(機械接続の正確化・進行中):
+  millstone / press / mixer の「動力入力・出力経路」を実機準拠で検証＆自動補正する。
+  ・millstone … 完了（funnel→真下depot）
+  ・press … 動力入力（facing軸両端）完了。出力は真下depot。
+  ・mixer … 動力入力（側面cog自動追加）完了。出力 basin（C-2）実装し実機確認待ち。
+  次の対象機械が出たら、同じく実機で構成を確定してから検証ルールを足す。
 
-第2段階(実用化):
+第2段階(MVPの通し):
+  UIでお題＋空間サイズ入力 → ルール添付で生成 → 検証＆AutoFix → NBT出力 →
+  ゲーム内設置まで一本で通す（フェーズA→C→D→E）。
+
+第3段階(実用化):
   MODスキャンの汎用化とルール層のMOD非依存化（フェーズB残り＋F-1/F-2）。
 
-第3段階(発表準備):
-  コード掃除・テスト除去・整理（フェーズG）→ パス設定UI・仕上げ・
-  リリース確認（F-3〜F-5）。掃除はフェーズEまで動く状態を確認した後に行い、
-  掃除後に主要パスを再度通して壊れていないことを確認する。
-  時間が尽きた場合はここを翌日へ持ち越す。
+第4段階(発表準備):
+  コード掃除・テスト除去（フェーズG）→ パス設定UI・仕上げ・リリース確認（F-3〜F-5）。
+  掃除は主要パスが動く状態を確認した後に行い、掃除後に再度通して壊れていないことを確認する。
 
-## 明日のゴール
+## ゴール
 
-UI上で自然言語のお題と空間サイズ(X/Y/Z)を入力し、「生成」を押すと、
-指定サイズ内に向きの揃った機械の骨格（shaft/cogwheel/動力源が axis/facing 付きで接続）が
-生成され、NBTとして出力し、ゲーム内へ設置できるところまでを通しで完成させる。
+UI上で自然言語のお題と空間サイズ(X/Y/Z)を入力し「生成」を押すと、
+指定サイズ内に、動力が正しく繋がり加工物が正しく出力される機械（shaft/cogwheel/動力源/
+funnel/basin が axis/facing 付きで接続）が生成され、NBT出力し、ゲーム内へ設置できる
+ところまでを通しで完成させる。

@@ -29,7 +29,64 @@ public static class ConnectionValidator
             var spec = ConnectionCatalog.GetRotation(b.Id);
             if (spec == null) continue;
 
-            // --- (A) 入力面の制約を持つ機械(millstone/press/mixer 等) ---
+            // --- (A') press型: facing軸の両端2面だけがshaft/cog動力入力。残りは不可。 ---
+            if (spec.PowerOnAxisEnds)
+            {
+                string coreAxis = ConnectionCatalog.GetRotationAxis(b) ?? "z";
+                var (endA, endB) = ConnectionCatalog.AxisToDirs(coreAxis);
+                foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                {
+                    var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                    var npos = (b.X + dx, b.Y + dy, b.Z + dz);
+                    if (!idx.TryGetValue(npos, out var n)) continue;
+
+                    bool nIsPart = n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel";
+                    if (!nIsPart) continue;
+
+                    bool isAxisEnd = d == endA || d == endB;
+                    if (isAxisEnd)
+                    {
+                        // 軸端に繋がる部材は、軸がコア(=facing軸)と一致している必要がある。
+                        string? nAxis = ConnectionCatalog.GetRotationAxis(n);
+                        if (nAxis != coreAxis)
+                        {
+                            issues.Add(new ValidationIssue
+                            {
+                                Category = IssueCategory.RotationAxisMismatch,
+                                AutoFixable = true,
+                                TargetPos = npos,
+                                SuggestedAxis = coreAxis,
+                                HumanMessage =
+                                    $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}がaxis={nAxis}だが、" +
+                                    $"({b.X},{b.Y},{b.Z})の{b.Id}の軸端で繋ぐにはコアと同じaxis={coreAxis}が必要。" +
+                                    $"axis={coreAxis}にすること。",
+                                GeneralAdvice =
+                                    "pressはfacingの向きとその反対の2側面(facing軸の両端)からのみ動力を受ける。" +
+                                    "そこに繋ぐshaft/cogはpressと同じ軸にすること。"
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // 軸端以外(facingに垂直な側面・上下)に部材が接している → 動力を受けられない。
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.PowerInputFaceInvalid,
+                            AutoFixable = false,
+                            TargetPos = npos,
+                            HumanMessage =
+                                $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}が{b.Id}の動力を受けない面に接している。" +
+                                (string.IsNullOrEmpty(spec.PowerInputHint)
+                                    ? "pressはfacingの向きとその反対の2側面(facing軸の両端)からのみ動力を受ける。"
+                                    : spec.PowerInputHint),
+                            GeneralAdvice =
+                                "pressの動力入力はfacing軸の両端2面のみ。上下やfacingに垂直な側面に軸を挿しても繋がらない。"
+                        });
+                    }
+                }
+            }
+
+            // --- (A) 入力面の制約を持つ機械(millstone/mixer 等) ---
             if (spec.PowerInputFaces != null)
             {
                 foreach (Dir d in Enum.GetValues(typeof(Dir)))
@@ -111,17 +168,97 @@ public static class ConnectionValidator
                     }
                     else
                     {
-                        issues.Add(new ValidationIssue
+                        // mixer は「側面cog一択」なので機械的に補正する:
+                        //  不正な部材(上下面のshaft等)を削除し、空いている側面に
+                        //  cogwheel(axis=y)を1個追加して動力入力口を作る。
+                        if (b.Id == "create:mechanical_mixer")
                         {
-                            Category = IssueCategory.PowerInputFaceInvalid,
-                            AutoFixable = false,
-                            TargetPos = npos,
-                            HumanMessage =
-                                $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}が{b.Id}の動力を受けられない面に接している。" +
-                                $"{b.Id}の正しい動力入力面に置き直すこと。",
-                            GeneralAdvice =
-                                "機械ごとに動力入力できる面が決まっている。上面が動力入力でない機械(millstone/press)に上から軸を挿さない。"
-                        });
+                            // 空いている側面(north/south/east/west)を探す。
+                            Dir? freeSide = null;
+                            foreach (Dir sd in new[] { Dir.North, Dir.South, Dir.East, Dir.West })
+                            {
+                                var (sx, sy, sz) = ConnectionCatalog.DirToVec(sd);
+                                if (!idx.ContainsKey((b.X + sx, b.Y + sy, b.Z + sz)))
+                                {
+                                    freeSide = sd;
+                                    break;
+                                }
+                            }
+
+                            if (freeSide != null)
+                            {
+                                var (sx, sy, sz) = ConnectionCatalog.DirToVec(freeSide.Value);
+                                var cogPos = (b.X + sx, b.Y + sy, b.Z + sz);
+
+                                // 不正部材を削除する issue。
+                                issues.Add(new ValidationIssue
+                                {
+                                    Category = IssueCategory.PowerInputFaceInvalid,
+                                    AutoFixable = true,
+                                    RemoveTarget = true,
+                                    TargetPos = npos,
+                                    HumanMessage =
+                                        $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}がmixerの動力を受けない面" +
+                                        $"(上面/下面)に接しているため削除した。",
+                                    GeneralAdvice =
+                                        "mixerの動力は側面cogのみ。上面・下面に軸を挿しても繋がらない。"
+                                });
+
+                                // 空き側面に cogwheel(axis=y) を追加する issue(TargetPosなし)。
+                                issues.Add(new ValidationIssue
+                                {
+                                    Category = IssueCategory.PowerInputFaceInvalid,
+                                    AutoFixable = true,
+                                    AddBlocks = new List<PB>
+                                    {
+                                        new PB
+                                        {
+                                            Id = "create:cogwheel",
+                                            X = cogPos.Item1,
+                                            Y = cogPos.Item2,
+                                            Z = cogPos.Item3,
+                                            Properties = new Dictionary<string, string> { ["axis"] = "y" }
+                                        }
+                                    },
+                                    HumanMessage =
+                                        $"mixerの側面({cogPos.Item1},{cogPos.Item2},{cogPos.Item3})に" +
+                                        $"create:cogwheel(axis=y)を追加して動力入力口にした。",
+                                    GeneralAdvice =
+                                        "mixerの動力入力は側面にcogwheel(axis=y)を噛み合わせる。"
+                                });
+                            }
+                            else
+                            {
+                                // 側面に空きが無い → 補正不可。再生成へ。
+                                issues.Add(new ValidationIssue
+                                {
+                                    Category = IssueCategory.PowerInputFaceInvalid,
+                                    AutoFixable = false,
+                                    TargetPos = npos,
+                                    HumanMessage =
+                                        $"mixerの動力入力に使える側面が空いていない。" +
+                                        $"mixerの側面のいずれかを空けて、そこにcreate:cogwheel(axis=y)を置くこと。" +
+                                        $"上面・下面には動力を繋げない。",
+                                    GeneralAdvice = spec.PowerInputHint
+                                });
+                            }
+                        }
+                        else
+                        {
+                            issues.Add(new ValidationIssue
+                            {
+                                Category = IssueCategory.PowerInputFaceInvalid,
+                                AutoFixable = false,
+                                TargetPos = npos,
+                                HumanMessage =
+                                    $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}が{b.Id}の動力を受けられない面に接している。" +
+                                    (string.IsNullOrEmpty(spec.PowerInputHint)
+                                        ? $"{b.Id}の正しい動力入力面に置き直すこと。"
+                                        : spec.PowerInputHint),
+                                GeneralAdvice =
+                                    "機械ごとに動力入力できる面が決まっている。上面が動力入力でない機械(millstone/mixer)に上から軸を挿さない。"
+                            });
+                        }
                     }
                 }
             }
@@ -215,10 +352,264 @@ public static class ConnectionValidator
             }
         }
 
-        // --- (C) 出力経路検証: RequiresFunnelOutput の機械は
-        //         「隣接funnel」かつ「そのfunnelに隣接するstorage」が必要。向きは不問。
+        // --- (C) 出力経路検証 ---
         foreach (var b in placed)
         {
+            // (C-2) mixer の basin 出力経路: 機械(y) → 空気(y-1) → basin(y-2)。
+            //  basin の出力は funnel 不要。basin 横の空気の真下にある depot へ spout で自動排出される。
+            //  ここでは (1)basin本体 (2)basin横空気＋斜め下depot (3)余計なfunnel撤去 を保証する。
+            if (b.Id == "create:mechanical_mixer")
+            {
+                var below1 = (b.X, b.Y - 1, b.Z);   // 空気であるべき
+                var below2 = (b.X, b.Y - 2, b.Z);   // basinであるべき
+
+                bool below2IsBasin = idx.TryGetValue(below2, out var bb)
+                                     && bb.Id == "create:basin";
+
+                if (!below2IsBasin)
+                {
+                    // 真下2マスが生成空間に収まらない高さ(mixerが低すぎる)なら補正不可で再生成へ。
+                    if (below2.Item2 < 0)
+                    {
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = false,
+                            TargetPos = (b.X, b.Y, b.Z),
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:mechanical_mixerが低すぎてbasinを置く空間がない。" +
+                                $"mixerはy>=2に置き、真下に1マス空け、その下にcreate:basinを置くこと。",
+                            GeneralAdvice =
+                                "mixerの出力はbasin経由。mixer→空気1マス→basinの縦並びが入る高さ(mixerはy>=2)に置くこと。"
+                        });
+                    }
+                    else
+                    {
+                        // (y-1)に余計なブロックがあれば除去して空気にする。
+                        bool gapBlocked = idx.TryGetValue(below1, out var mid)
+                                          && mid.Id != "minecraft:air";
+
+                        // basin を真下2マスに追加。
+                        var adds = new List<PB>
+                        {
+                            new PB
+                            {
+                                Id = "create:basin",
+                                X = below2.Item1, Y = below2.Item2, Z = below2.Item3,
+                                Properties = new Dictionary<string, string> { ["facing"] = "down" }
+                            }
+                        };
+
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = true,
+                            TargetPos = gapBlocked ? below1 : ((int, int, int)?)null,
+                            RemoveTarget = gapBlocked,
+                            AddBlocks = adds,
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:mechanical_mixerの出力経路が不正。" +
+                                $"真下に1マス空け({b.X},{b.Y - 1},{b.Z}=空気)、" +
+                                $"その下({b.X},{b.Y - 2},{b.Z})にcreate:basinを置くこと。" +
+                                $"basinの出力はfunnel不要で、basin横の空気の真下にあるbelt/depotへ自動排出される。",
+                            GeneralAdvice =
+                                "mixer(と圧縮press)の出力はbasin経由。機械→空気1マス→basinの縦並びが必須。" +
+                                "basinはfunnel出力ではなく、隣接空気の真下のbelt/depotへspoutで排出する。"
+                        });
+                    }
+                }
+                else
+                {
+                    // (C-3) basin の排出先: basin横1マス=空気 かつ その斜め下にdepot。
+                    //  basin が確定している場合のみ。4水平方向のどこか1方向に
+                    //  「横=空気・斜め下=depot」が既にあればOK。無ければ1方向に自動配置する。
+                    var basin = bb!;
+                    bool outOk = false;
+                    foreach (Dir sd in new[] { Dir.North, Dir.South, Dir.East, Dir.West })
+                    {
+                        var (sx, sy, sz) = ConnectionCatalog.DirToVec(sd);
+                        var side = (basin.X + sx, basin.Y, basin.Z + sz);          // 横(空気であるべき)
+                        var sideBelow = (basin.X + sx, basin.Y - 1, basin.Z + sz); // 斜め下(depotであるべき)
+
+                        bool sideAir = !idx.ContainsKey(side);
+                        bool depotThere = idx.TryGetValue(sideBelow, out var dp)
+                                          && dp.Id == "create:depot";
+                        if (sideAir && depotThere) { outOk = true; break; }
+                    }
+
+                    if (!outOk)
+                    {
+                        // 横が空いている方向を1つ選び、その斜め下にdepotを置く。
+                        Dir? useSide = null;
+                        foreach (Dir sd in new[] { Dir.North, Dir.South, Dir.East, Dir.West })
+                        {
+                            var (sx, sy, sz) = ConnectionCatalog.DirToVec(sd);
+                            var side = (basin.X + sx, basin.Y, basin.Z + sz);
+                            var sideBelow = (basin.X + sx, basin.Y - 1, basin.Z + sz);
+                            // 横が空気で、斜め下が空き(または既存depot以外で埋まっていない)方向。
+                            if (!idx.ContainsKey(side) && !idx.ContainsKey(sideBelow)
+                                && sideBelow.Item2 >= 0)
+                            {
+                                useSide = sd;
+                                break;
+                            }
+                        }
+
+                        if (useSide != null)
+                        {
+                            var (sx, sy, sz) = ConnectionCatalog.DirToVec(useSide.Value);
+                            var depotPos = (basin.X + sx, basin.Y - 1, basin.Z + sz);
+                            issues.Add(new ValidationIssue
+                            {
+                                Category = IssueCategory.OutputChainInvalid,
+                                AutoFixable = true,
+                                AddBlocks = new List<PB>
+                                {
+                                    new PB
+                                    {
+                                        Id = "create:depot",
+                                        X = depotPos.Item1, Y = depotPos.Item2, Z = depotPos.Item3
+                                    }
+                                },
+                                HumanMessage =
+                                    $"({basin.X},{basin.Y},{basin.Z})のcreate:basinの排出先が無い。" +
+                                    $"basin横({basin.X + sx},{basin.Y},{basin.Z + sz})を空気にして、" +
+                                    $"その斜め下({depotPos.Item1},{depotPos.Item2},{depotPos.Item3})にcreate:depotを置いた。",
+                                GeneralAdvice =
+                                    "basinは横の空気ブロックの真下にあるdepot/beltへspoutで排出する。" +
+                                    "basinの真横や真下のstorageには渡らない。"
+                            });
+                        }
+                        else
+                        {
+                            issues.Add(new ValidationIssue
+                            {
+                                Category = IssueCategory.OutputChainInvalid,
+                                AutoFixable = false,
+                                TargetPos = (basin.X, basin.Y, basin.Z),
+                                HumanMessage =
+                                    $"({basin.X},{basin.Y},{basin.Z})のcreate:basinの排出先を置く空間が無い。" +
+                                    $"basinの横1マスを空気にし、その斜め下にcreate:depotを置くこと。",
+                                GeneralAdvice =
+                                    "basinの排出には「横=空気・斜め下=depot」の空間が要る。隣を空けること。"
+                            });
+                        }
+                    }
+
+                    // basin 構成では funnel は不要。mixer/basin に隣接する andesite/brass funnel を撤去。
+                    foreach (Dir fd in Enum.GetValues(typeof(Dir)))
+                    {
+                        var (fx, fy, fz) = ConnectionCatalog.DirToVec(fd);
+                        foreach (var anchor in new[] { (b.X, b.Y, b.Z), (basin.X, basin.Y, basin.Z) })
+                        {
+                            var fpos = (anchor.Item1 + fx, anchor.Item2 + fy, anchor.Item3 + fz);
+                            if (idx.TryGetValue(fpos, out var fb) && ConnectionCatalog.IsFunnel(fb.Id))
+                            {
+                                issues.Add(new ValidationIssue
+                                {
+                                    Category = IssueCategory.OutputChainInvalid,
+                                    AutoFixable = true,
+                                    RemoveTarget = true,
+                                    TargetPos = fpos,
+                                    HumanMessage =
+                                        $"({fpos.Item1},{fpos.Item2},{fpos.Item3})の{fb.Id}は" +
+                                        $"basin構成では不要なため撤去した。basinはfunnelを使わずspoutで排出する。",
+                                    GeneralAdvice =
+                                        "mixer/press+basin構成ではfunnelを使わない。basinは横空気の斜め下のdepotへ直接排出する。"
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // (C-4) press の出力経路: press(y) → 空気(y-1) → depot/belt(y-2)。
+            //  press は真下に1マス作業空間を空け、その下の depot/belt 上のアイテムを叩く。
+            //  間が詰まっていると作動しない。depot/belt どちらでも受かる(beltは一時停止して叩かれる)。
+            //  あわせて press 隣接の funnel は不要なので撤去する。
+            if (b.Id == "create:mechanical_press")
+            {
+                var gap = (b.X, b.Y - 1, b.Z);   // 空気であるべき(作業空間)
+                var recv = (b.X, b.Y - 2, b.Z);  // depot/belt であるべき
+
+                bool recvOk = idx.TryGetValue(recv, out var rb)
+                              && (rb.Id == "create:depot" || rb.Id == "create:belt");
+
+                if (!recvOk)
+                {
+                    if (recv.Item2 < 0)
+                    {
+                        // 真下2マスが生成空間外(pressが低すぎる)。受け皿を置けないので再生成へ。
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = false,
+                            TargetPos = (b.X, b.Y, b.Z),
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:mechanical_pressが低すぎて受け皿を置く空間がない。" +
+                                $"pressはy>=2に置き、真下に1マス空け({b.X},{b.Y - 1},{b.Z}=空気)、" +
+                                $"その下({b.X},{b.Y - 2},{b.Z})にcreate:depotを置くこと。",
+                            GeneralAdvice =
+                                "pressは真下に1マス作業空間を空け、その下のdepot/belt上のアイテムを叩く。" +
+                                "press→空気1マス→depotの縦並びが入る高さ(pressはy>=2)に置くこと。"
+                        });
+                    }
+                    else
+                    {
+                        // (y-1)に余計なブロックがあれば除去して空気にする(同パスで depot 追加と併走可)。
+                        bool gapBlocked = idx.TryGetValue(gap, out var gm)
+                                          && gm.Id != "minecraft:air";
+
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = true,
+                            TargetPos = gapBlocked ? gap : ((int, int, int)?)null,
+                            RemoveTarget = gapBlocked,
+                            AddBlocks = new List<PB>
+                            {
+                                new PB
+                                {
+                                    Id = "create:depot",
+                                    X = recv.Item1, Y = recv.Item2, Z = recv.Item3
+                                }
+                            },
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:mechanical_pressの出力経路が不正。" +
+                                $"真下に1マス空け({b.X},{b.Y - 1},{b.Z}=空気)、" +
+                                $"その下({b.X},{b.Y - 2},{b.Z})にcreate:depotを置くこと。",
+                            GeneralAdvice =
+                                "pressは真下に1マス作業空間を空け、その下のdepot/belt上のアイテムを叩く。" +
+                                "press直下にdepotを密着させると隙間が無く作動しない。"
+                        });
+                    }
+                }
+
+                // press 隣接の funnel は不要なので撤去する。
+                foreach (Dir fd in Enum.GetValues(typeof(Dir)))
+                {
+                    var (fx, fy, fz) = ConnectionCatalog.DirToVec(fd);
+                    var fpos = (b.X + fx, b.Y + fy, b.Z + fz);
+                    if (idx.TryGetValue(fpos, out var fb) && ConnectionCatalog.IsFunnel(fb.Id))
+                    {
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = true,
+                            RemoveTarget = true,
+                            TargetPos = fpos,
+                            HumanMessage =
+                                $"({fpos.Item1},{fpos.Item2},{fpos.Item3})の{fb.Id}は" +
+                                $"press構成では不要なため撤去した。pressは真下のdepotへ直接叩き落とす。",
+                            GeneralAdvice =
+                                "press構成ではfunnelを使わない。pressは真下に1マス空けたdepot上のアイテムを叩く。"
+                        });
+                    }
+                }
+            }
+
+            // (C-1) RequiresFunnelOutput の機械(millstone/crushing_wheels)は
+            //        「隣接funnel(extracting=true)」かつ「funnel真下のstorage」が必要。
             if (!ConnectionCatalog.RequiresFunnelOutput.Contains(b.Id)) continue;
 
             bool ok = false;
@@ -307,9 +698,25 @@ public static class ConnectionValidator
 
         foreach (var iss in issues)
         {
-            if (!iss.AutoFixable || iss.TargetPos == null) continue;
-            if (!idx.TryGetValue(iss.TargetPos.Value, out var target)) continue;
+            if (!iss.AutoFixable) continue;
 
+            // 新規ブロックの追加(TargetPos を持たない補正もある)。
+            if (iss.AddBlocks != null)
+            {
+                foreach (var nb in iss.AddBlocks)
+                {
+                    var k = (nb.X, nb.Y, nb.Z);
+                    if (idx.ContainsKey(k)) continue; // 既存があればスキップ
+                    placed.Add(nb);
+                    idx[k] = nb;
+                    fixedCount++;
+                }
+                // AddBlocks専用issue(TargetPosなし)はここで完了。
+                if (iss.TargetPos == null) continue;
+            }
+
+            if (iss.TargetPos == null) continue;
+            if (!idx.TryGetValue(iss.TargetPos.Value, out var target)) continue;
             // 削除指示: placed から該当ブロックを除く。
             if (iss.RemoveTarget)
             {
@@ -330,6 +737,13 @@ public static class ConnectionValidator
                 target.Properties["axis"] = iss.SuggestedAxis!;
             }
 
+            // 任意プロパティの上書き(funnel の facing/extracting 等)。
+            if (iss.SuggestedProps != null)
+            {
+                target.Properties ??= new Dictionary<string, string>();
+                foreach (var kv in iss.SuggestedProps)
+                    target.Properties[kv.Key] = kv.Value;
+            }
 
             // 不要プロパティの削除(無印funnelに紛れた shape 等)。
             if (iss.RemoveProps != null && target.Properties != null)
