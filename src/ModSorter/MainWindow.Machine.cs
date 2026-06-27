@@ -17,6 +17,61 @@ public partial class MainWindow
     // 直近に生成した機械のNBT出力先（フォルダを開くボタンで使う）。
     private string? _lastMachineNbtPath;
 
+    // 機械NBTの出力先パスを決める。
+    // .minecraft/schematics/<名前>.nbt を基本とし、同名があれば上書き確認モーダルを出す。
+    // 上書き拒否なら空文字を返す（呼び出し側で保存中止）。
+    // instancePath 未設定や schematics 作成失敗時は diagnostics にフォールバックする。
+    private string ResolveMachineOutPath()
+    {
+        // 名前のサニタイズ。空なら既定名。ファイル名に使えない文字は除去。
+        string name = (MachineNameBox?.Text ?? "").Trim();
+        if (name.Length == 0) name = "module_machine";
+        foreach (char c in Path.GetInvalidFileNameChars())
+            name = name.Replace(c.ToString(), "");
+        if (name.Length == 0) name = "module_machine";
+        if (name.EndsWith(".nbt", StringComparison.OrdinalIgnoreCase))
+            name = name.Substring(0, name.Length - 4);
+
+        // schematics フォルダを組み立てる。instancePath 未設定なら diagnostics へ。
+        string? dir = null;
+        if (!string.IsNullOrEmpty(_instancePath))
+        {
+            try
+            {
+                string sch = Path.Combine(_instancePath, "schematics");
+                Directory.CreateDirectory(sch);
+                dir = sch;
+            }
+            catch (Exception ex)
+            {
+                Log($"schematics フォルダを準備できませんでした。diagnostics に出力します: {ex.Message}");
+            }
+        }
+        else
+        {
+            Log(".minecraft フォルダが未設定です。diagnostics に出力します（設定タブで指定可）。");
+        }
+
+        if (dir == null)
+            return DiagPath(name + ".nbt");
+
+        string path = Path.Combine(dir, name + ".nbt");
+
+        // 同名があれば上書き確認。
+        if (File.Exists(path))
+        {
+            var result = MessageBox.Show(
+                $"同名のスキマティックが既に存在します。\n{path}\n上書きしますか?",
+                "ModSorter - 上書き確認",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes)
+                return "";
+        }
+        return path;
+    }
+
+
+    // Ponder 隣接ルールのキャッシュ。重い解析(178件)を初回だけ行う。
 
     // Ponder 隣接ルールのキャッシュ。重い解析(178件)を初回だけ行う。
     private string? _ponderRulesCache;          // 抽出済みルール文(全許可ブロック分の素)
@@ -350,7 +405,17 @@ public partial class MainWindow
                     Properties = b.Properties
                 }).ToList();
 
-            string outPath = DiagPath("module_machine.nbt");
+            // 出力先を決定。.minecraft/schematics に <名前>.nbt で保存する。
+            // instancePath 未設定や保存不可時は diagnostics へフォールバックする。
+            string outPath = ResolveMachineOutPath();
+            if (outPath.Length == 0)
+            {
+                // ユーザーが上書きを拒否した場合は保存を中止し、生成結果だけ表示する。
+                MachineResultBox.Text = string.Join("\n", lines);
+                MachineStatus.Text = $"生成完了（保存はキャンセルされました）。{placed.Count} ブロック。";
+                Log("構造NBTの保存をキャンセルしました（同名上書き拒否）。");
+                return;
+            }
             ModSorter.Architect.Generation.StructureNbtWriter.Save(nbtBlocks, outPath);
             _lastMachineNbtPath = outPath;
             lines.Add($"\n構造NBTを出力: {outPath}");
