@@ -91,173 +91,121 @@
   ファイル: Architect/Generation/ConnectionValidator.cs / ConnectionSpec.cs / ValidationIssue.cs
 
 - 完了【実機で確定した Create 機械の正しい構成】（全て実機 or 公式Wikiで確認済み）:
-  ・millstone … 隣接 andesite_funnel(extracting=true, 外向き facing) →
+  - millstone … 隣接 andesite_funnel(extracting=true, 外向き facing) →
                 funnel の真下(y-1) に depot/chest。funnel の横はダメ。
-  ・無印funnel … facing(取り付け面) と extracting で向きが決まる。shape は持たない
+  - 無印funnel … facing(取り付け面) と extracting で向きが決まる。shape は持たない
                 （shape は belt funnel 専用。無印に付けたら削除する）。
-  ・mechanical_press … 動力は facing軸の両端2面のみ（south→north/south, west→east/west）。
-                出力は press 真下(y-1) の depot（板材デフォルト）。
-  ・mechanical_mixer … プロパティ無し・軸はY固定。動力は側面4面に cogwheel(axis=y)。
-                上下面は動力不可。出力は mixer(y)→空気(y-1)→basin(y-2) の縦並び。
-  ・basin … 出力に funnel 不要。basin 横の空気ブロックの真下にある belt/depot へ
-                spout で自動排出（公式Wiki: Basin）。
-
-- 完了【AutoFix の機能】:
-  ・RemoveTarget … 不正ブロック削除
-  ・SuggestedBlockId / SuggestedAxis … 種別変換・軸補正
-  ・SuggestedProps … 任意プロパティ上書き（funnel の facing/extracting 等）
-  ・RemoveProps … 不要プロパティ削除（無印funnel の shape 等）
-  ・AddBlocks … 新規ブロック追加（mixer 側面 cogwheel、mixer 下 basin）
-  ・mixer 専用: 上下面の不正 shaft を削除し、空き側面に cogwheel(axis=y) を追加
-  ・MainWindow.Machine.cs: AutoFix 収束ループ（issue が出続ける限り再 AutoFix）
-
-- 課題: cogwheel の直列は「ここから繋がる」表現として許容（仕様内）。
-  出力マーカー(lime_wool)の置き場所の精緻化は後回しで可。
-- 課題: press の basin 構成（圧縮レシピ）は未実装。生成段階でレシピ判別不可のため
-  press はデフォルト「真下 depot」固定。basin 化は mixer の C-2 と同形で後付け可能。
-- 課題: mixer 横に LLM が millstone のクセで置く funnel+depot は basin 構成では不要だが、
-  害がない（動力・出力に干渉しない）ため強制削除しない方針（補正回数の節約）。
-
-    ・mechanical_press … 動力は facing軸の両端2面のみ（south/north→相手axis=z,
+  - mechanical_press … 動力は facing軸の両端2面のみ（south/north→相手axis=z,
                 east/west→相手axis=x）。出力は press(y)→空気(y-1)→depot/belt(y-2)。
                 press は真下に1マス作業空間を空け、その下のアイテムを叩く（直下密着は不作動）。
                 press 隣接の funnel は不要なので撤去する。
-  ・完了【検証＆AutoFix 対応機種】: millstone / mechanical_mixer / mechanical_press の
-                3機種すべて、動力入力面と出力経路を実機準拠で検証・自動補正・収束まで確認済み。
+  - mechanical_mixer … プロパティ無し・軸はY固定。動力は側面4面に cogwheel(axis=y)。
+                上下面は動力不可。出力は mixer(y)→空気(y-1)→basin(y-2) の縦並び。
+  - basin … 出力に funnel 不要。basin 横の空気ブロックの真下にある belt/depot へ
+                spout で自動排出（公式Wiki: Basin）。
+
+- 完了【AutoFix の機能】:
+  - RemoveTarget … 不正ブロック削除
+  - SuggestedBlockId / SuggestedAxis … 種別変換・軸補正
+  - SuggestedProps … 任意プロパティ上書き（funnel の facing/extracting 等）
+  - RemoveProps … 不要プロパティ削除（無印funnel の shape 等）
+  - AddBlocks … 新規ブロック追加（mixer 側面 cogwheel、mixer 下 basin、basin 斜め下 depot、
+                press 下 depot）
+  - mixer 専用: 上下面の不正 shaft を削除し、空き側面に cogwheel(axis=y) を追加
+  - MainWindow.Machine.cs: AutoFix 収束ループ（issue が出続ける限り再 AutoFix）
+
+- 完了【検証＆AutoFix 対応機種】: millstone / mechanical_mixer / mechanical_press の
+  3機種すべて、動力入力面と出力経路を実機準拠で検証・自動補正・収束まで確認済み。
+
+- 完了【フェーズE 設置導線】: Tab5 に出力ファイル名入力欄(MachineNameBox)を追加。
+  生成NBTを .minecraft/schematics/<名前>.nbt へ直接出力する ResolveMachineOutPath を実装。
+  同名ファイルがあれば上書き確認モーダル（MessageBox YesNo）を出し、拒否時は保存中止。
+  instancePath 未設定時は diagnostics へフォールバック。名前サニタイズ（不正文字除去・
+  空欄時 module_machine）も実装。実機で指定ファイルへの出力を確認、コミット・プッシュ済み。
+  → これで「自然言語入力→生成→検証&AutoFix→schematics出力→ゲーム内設置」のMVP一巡が成立。
+
+- 課題: cogwheel の直列は「ここから繋がる」表現として許容（仕様内）。
+- 課題: 出力マーカー(lime_wool)を depot の隣へ寄せる精緻化が未実装（後回し可）。
+  ※「出力」の意味上 depot 近傍にあるべき。RemoveTarget＋AddBlocks で移動表現可能。
+- 課題: press の basin 構成（圧縮レシピ）は未実装。生成段階でレシピ判別不可のため
+  press はデフォルト「press→空気→depot/belt」固定。basin 化は mixer の C-2 と同形で後付け可能。
+- 課題: mixer 横に LLM が millstone のクセで置く funnel+depot は basin 構成では不要だが、
+  害がない（動力・出力に干渉しない）ため強制削除しない方針（補正回数の節約）。
 
 
 ## 次回やるべきこと（TODO）
 
-明日で「自然言語から機械が組み上がる」を完成させる。実装はすべて C#（.NET / fNbt / WPF）。
-Python は使わない。フェーズ順に上から着手する。
+明日以降は「建築モードの整理」と「建築モードの設置導線」を中心に進める。
+実装はすべて C#（.NET / fNbt / WPF）。Python は使わない。
 
-### フェーズA: 入力仕様の確定（マスト）
+### 最優先: 建築モード（Tab4）のテストコード整理（フェーズG相当）
 
-A-1. お題（userRequest）入力の確定
-   - 自然言語のお題を必須入力として受け取る。空欄は弾く。
-A-2. 指定空間サイズ入力の確定（マスト）
-   - 幅(X)・高さ(Y)・奥行(Z)を入力として受け取る。
-   - 現状の座標0-8固定をやめ、指定サイズを上限としてプロンプト・検証の両方に反映。
-   - 範囲外座標のブロックは生成後に弾く（バリデーション追加）。
-A-3. GenerateAsync のシグネチャ変更
-   - userRequest に加え、空間サイズ(sizeX, sizeY, sizeZ)を引数として渡せるようにする。
-   - プロンプト内の座標制約文を固定値から動的生成に差し替え。
+- 建築モードに最小実験用のテストUI・テストコードが多数残っており、機能が混線している。
+- 不具合: 「テクスチャ取得テスト」ボタン(ArchTestTextureBtn / ArchTestTexture_Click)を押すと、
+  本来のテクスチャ取得ではなく機能モジュールのテストが走ってしまう。
+  → まず Clickハンドラの中身を現物確認し、誤って呼んでいる処理を特定して切り離す。
+- Tab4 左パネルの「最小実験: 指示+ブロックリスト → 座標+ID JSON が返るか確認」等、
+  テスト目的の文言・ボタン類を棚卸しし、除去対象か残置かを一つずつ判定する。
+- 他にもボタンと実処理の結線ズレが潜在している前提で、Tab4 の各 Clickハンドラを順に確認する。
 
-### フェーズB: ルール辞書の整備
+### 次点: 建築モードの設置導線（schematics 出力）
 
-B-1. PonderRuleExtractor に Properties 抽出を追加
-   - assets/create/ponder/*.nbt から create: ブロックの
-     ID → プロパティ名（axis / facing / waterlogged 等）→ 取りうる値 を抽出。
-   - Block Entity の nbt タグは無選別で入れない。ダンプして機能に使える値だけ採用。
-B-2. 全ブロックの BlockStates 抽出ユーティリティ
-   - assets/create/blockstates/*.json を解析し ID → プロパティ → 取りうる値 を辞書化。
-   - 出力先: diagnostics/block_palette.json（現状2014ブロック）。
-B-3. ponder_rules_raw.json の安定性確認
-   - 178件一括処理が毎回同じ結果になるか検証。出力がブレないことを確認。
-B-4. ponder_rules_raw.json を人間語ルールへ変換 【着手済み】
-   - 隣接統計を英語ルール文化(ToRuleText)し、生成プロンプトへ合流。
-   - 接続位置の精度を上げる（駆動元の軸延長線上に置く等）チューニングが残る。
-B-5. 第2層ルールの起草（加工系・動力源の選び方）
-   - millstone / mechanical_press など加工系の入力面ルールを明文化。
-   - 動力源の選定基準（必要su・rpmから逆算）を追加。
+- 建築データ（建物・プリミティブ・生成AIのボクセル結果）を
+  ゲーム内 schematics フォルダへ名前指定で出力できるようにする。
+- Create機械側で確立した ResolveMachineOutPath と同じ仕組みを建築モードにも適用。
+  共通化できる部分は共通の出力ヘルパーに寄せ、二重実装を避ける。
 
-### フェーズC: UI改修（マスト）
+### Create機械側の残課題
 
-C-1. お題入力欄の追加 【完了】
-C-2. 空間サイズ入力欄の追加 【完了】
-C-3. 生成実行ボタンの整理 【完了 / Tab5独立パネル】
-C-4. 生成結果の表示 【完了 / 結果＋NBTパス＋エラー表示】
+- crushing_wheels（RequiresFunnelOutput 登録済み・未検証）の実機確認。
+- saw / deployer 等の構成確定。
+- lime_wool 出力マーカーを depot 隣へ寄せる件。
+- mixer 隣接 funnel の強制削除可否の判断。
 
-### フェーズD: 結合と検証
+### フェーズG 仕上げ（コード掃除）
 
-D-1. エンドツーエンド結線 【完了】
-   - UI入力（お題＋サイズ）→ GenerateAsync → ルール添付 → 生成 → NBT出力 を一本に。
-D-2. 生成品質の検証
-   - 複数のお題・複数サイズで生成し、向き・構成・サイズ制約の遵守を確認。
-   - shaft/cogwheel/動力源が axis/facing 付きで繋がっているかを確認。
-D-3. 不具合修正と微調整
-   - 検証で出た破綻（向き不整合・範囲外・未接続）をルール文 or 検証ロジックで潰す。
+- 撤回済み Ponder デッドコード（GetPonderAdjacencyRules 等）の除去。
+- MainWindow.Machine.cs に残る [プロパティ] 一時確認ログ（仕様確定後に削除と明記済み）の除去。
+- Nullable 警告・未使用 using・未使用変数の一掃。
+- diagnostics/*（一時出力）と schematics/*（本番出力）のパス分離を明確化。
 
-### フェーズE: ゲーム内への設置（マスト）
 
-E-1. 出力NBTのスキマティック対応形式を確定
-   - Create のスキマティック（.nbt）として読める構造で書き出す。
-   - 既存の構造NBT出力（module_*.nbt）がそのまま設置に使えるか検証。
-E-2. 設置導線の確立
-   - 生成NBTをインスタンスの schematics フォルダへ出力 or コピーする処理を追加。
-   - 出力先パスは instancePath 基準で動的に解決。
-E-3. 実機設置の確認
-   - schematic cannon または構造ブロックで読み込み、向き・接続が保たれて
-     設置されることを確認。回る／動力が通ることを確認。
+## 追加するルール／方針
 
-### フェーズF: 汎用化とアプリ仕上げ（実用化）
+- 設置導線は Create機械と建築モードで共通の出力ヘルパーに寄せ、二重実装を避ける。
+- テスト用コード・最小実験UIは「本機能と混線するもの」を最優先で切り離し、
+  判断がつかないものは一覧化してから一括判定する。
+- ボタンと実処理の結線ズレ（テクスチャ取得テスト→機能モジュールテストのような誤呼び出し）が
+  他にも潜在している前提で、Tab4 の各ボタンの Clickハンドラを順に現物確認する。
 
-F-1. MODスキャンの汎用化
-   - create 専用前提を外し、読み込んだ全MOD jar の blockstates から
-     ブロック辞書を生成（minecraft / create / cobblemon 等を横断）。
-   - 現状の MOD別件数集計・パレットキャッシュ生成を本導線に統合。
-F-2. ルール層のMOD非依存化
-   - create_power_rules.txt は Create 用ルールとして層分離し、
-     対象MODが無い場合は添付しない／別MODルールに差し替え可能な構造にする。
-F-3. インスタンス/jar パス設定UI
-   - instancePath・versions パスをUIから指定・保存できるようにする。
-   - jar が見つからない場合のエラー表示と再スキャン導線。
-F-4. アプリとしての最低限の仕上げ
-   - 設定の永続化、生成履歴 or 直近結果の保持、例外時の落ちない処理。
-   - 発表用に最小限の操作説明（README）を整備。
-F-5. リリース確認
-   - クリーン環境でビルド・起動・スキャン・生成・設置まで通すスモークテスト。
-
-### フェーズG: コード掃除・整理（発表前マスト）
-
-G-1. テスト/診断コードの棚卸し
-   - ArchTestTexture_Click などの診断・お試し系コードを列挙。
-   - 本番導線に必要なもの／検証用に消すものを仕分け。
-   - CORE-01 ブロックは Tab5 へ機能移行済みのため、診断からの撤去を検討。
-G-2. 不要コードの除去
-   - 使われていない診断ボタン・テストメソッド・デッドコードを削除。
-   - 残す診断機能は「開発用」と分かる形に隔離（別領域 or フラグ管理）。
-G-3. ファイル/責務の整理
-   - Clients / Architect 配下の責務重複を整理。命名を統一。
-   - 一時出力（diagnostics/*）と本番出力（schematics/*）のパスを明確に分離。
-G-4. ビルド警告の解消
-   - Nullable 警告・未使用 using・未使用変数を一掃。
-G-5. 最終確認
-   - 掃除後にフェーズEまでの主要パスが壊れていないか再度通す。
-
-### フェーズH: 性能・キャッシュ
-
-7. Ponder隣接ルールのキャッシュ化 【完了】
-   - Ponder解析(178件)は重いため、初回のみ実行してメモリにキャッシュ。
-   - 2回目以降の生成はキャッシュを使い、待ち時間を出さない。
-   - Tab5 に「Ponder再スキャン」ボタンを置き、MOD追加時は手動で再構築。
-   - キャッシュのフィンガープリントは Create本体jarのパス＋更新日時で判定。
 
 ## 進め方（段階ゴール）
 
 各段階で「動く状態」を確保しながら進める。
 
-第1段階(機械接続の正確化・進行中):
-  millstone / press / mixer の「動力入力・出力経路」を実機準拠で検証＆自動補正する。
-  ・millstone … 完了（funnel→真下depot）
-  ・press … 動力入力（facing軸両端）完了。出力は真下depot。
-  ・mixer … 動力入力（側面cog自動追加）完了。出力 basin（C-2）実装し実機確認待ち。
-  次の対象機械が出たら、同じく実機で構成を確定してから検証ルールを足す。
+第1段階(機械接続の正確化・完了):
+  millstone / press / mixer の「動力入力・出力経路」を実機準拠で検証＆自動補正。3機種完了。
+  次の対象機械（crushing_wheels / saw / deployer 等）が出たら、
+  同じく実機で構成を確定してから検証ルールを足す。
 
-第2段階(MVPの通し):
-  UIでお題＋空間サイズ入力 → ルール添付で生成 → 検証＆AutoFix → NBT出力 →
-  ゲーム内設置まで一本で通す（フェーズA→C→D→E）。
+第2段階(MVPの通し・完了):
+  UIでお題＋空間サイズ入力 → ルール添付で生成 → 検証＆AutoFix → schematics出力 →
+  ゲーム内設置まで一本で通る（Create機械で達成）。
 
-第3段階(実用化):
-  MODスキャンの汎用化とルール層のMOD非依存化（フェーズB残り＋F-1/F-2）。
+第3段階(建築モードの整理と設置導線・次の主作業):
+  建築モードのテスト/診断コードを整理し、機能の混線を解消。
+  建築データを schematics へ名前指定で出力できるようにする（Create機械の導線を再利用）。
 
-第4段階(発表準備):
-  コード掃除・テスト除去（フェーズG）→ パス設定UI・仕上げ・リリース確認（F-3〜F-5）。
-  掃除は主要パスが動く状態を確認した後に行い、掃除後に再度通して壊れていないことを確認する。
+第4段階(実用化・発表準備):
+  MODスキャンの汎用化とルール層のMOD非依存化。パス設定UI・仕上げ・リリース確認。
+  コード掃除は主要パスが動く状態を確認した後に行い、掃除後に再度通して壊れていないことを確認する。
+
 
 ## ゴール
 
 UI上で自然言語のお題と空間サイズ(X/Y/Z)を入力し「生成」を押すと、
 指定サイズ内に、動力が正しく繋がり加工物が正しく出力される機械（shaft/cogwheel/動力源/
-funnel/basin が axis/facing 付きで接続）が生成され、NBT出力し、ゲーム内へ設置できる
-ところまでを通しで完成させる。
+funnel/basin が axis/facing 付きで接続）が生成され、schematics へ NBT出力し、
+ゲーム内へ設置できるところまでを通しで完成させる。
+建築モードについても同様に、整理されたコードで建築データを schematics へ出力し、
+ゲーム内設置まで通せる状態を目指す。
