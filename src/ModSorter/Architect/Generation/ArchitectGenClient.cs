@@ -71,7 +71,9 @@ FIELD MEANING:
 - *_block = which allowed block to use for that part.
 - roof_type: ""flat"" (a flat roof), ""gable"" (a triangular pitched roof made of full
   blocks), ""gable_stairs"" (a triangular pitched roof made of STAIR blocks for a
-  smoother sloped look), or ""dome"" (a rounded domed roof for temples/observatories).
+  smoother sloped look), ""dome"" (a rounded domed roof for temples/observatories), or
+  ""pyramid"" (a four-sided pyramidal roof tapering to a point, for pyramids, towers,
+  or oriental-style roofs).
 - When you use ""gable_stairs"", roof_block MUST be a stair block (an id ending in
   ""_stairs"", e.g. minecraft:oak_stairs or minecraft:stone_brick_stairs) if one is in
   the allowed list. Otherwise fall back to ""gable"".
@@ -113,9 +115,13 @@ HOW TO HANDLE STORIES (IMPORTANT):
 - If the instruction explicitly gives dimensions like ""WxDxH"", use that H as height,
   and still add the appropriate floor_levels for the requested number of stories.
 - openings: each is on one wall face (""north"",""south"",""east"",""west"").
-  - kind: ""door"" (an empty opening) or ""window"" (a glass cell).
+  - kind: ""door"" (an empty opening), ""window"" (a glass cell), or ""arch""
+    (a tall rounded archway opening from the floor up, with a curved top; good for
+    temples, cathedrals, and grand entrances).
   - offset: position along that face (0 = one corner, up to width-1 or depth-1).
+    For an arch, keep offset at least 1 away from corners so it has room to curve.
   - level: which middle layer, counting from the floor (1 = just above the floor).
+    Ignored for ""arch"" (arches always start at the floor).
 
 RULES:
 - Interpret the instruction's size (e.g. ""5x5x4"" means width=5, depth=5, height=4).

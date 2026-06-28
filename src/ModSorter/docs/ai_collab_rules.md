@@ -142,7 +142,9 @@ ArchTestTexture_Click 冒頭に混入していた Create軸PoC（create:shaft/co
 左パネルの最小実験文言も実機能の説明文に差し替え。Tab4 の本番ボタンに混線・結線ズレは無いことを確認。
 ArchTestTexture_Click から連鎖して未使用化した可能性のあるクラス側メソッド
 （EnumerateBlocks / ExtractBlockPalette / BlockPaletteCache.* / StructureNbtReader.* /
-PonderRuleExtractor.Analyze 等）は Tab5本番や他経路の参照可能性があるため未着手。フェーズGで判定する。
+PonderRuleExtractor.Analyze 等）は当時 Tab5本番や他経路の参照可能性があるため未着手とした。
+→ フェーズGで grep により参照確認のうえ、StructureNbtReader / PonderRuleExtractor は
+  孤児と判明したためファイルごと削除済み（下記フェーズG参照）。
 
 #### 種別選択の整理（プリミティブ廃止）※完了
 ArchKindCombo の選択肢を3択から2択に整理。
@@ -157,10 +159,43 @@ ArchKindCombo の選択肢を3択から2択に整理。
 - ArchGenerate_Click: 生成AI分岐を ==2 → ==1 に修正。isPrimitive 分岐
   （GeneratePrimitiveMultipleAsync 呼び出し）を削除し、常に GenerateMultipleAsync
   （簡易建築=SPEC展開）へ寄せた。
-未削除（フェーズGで判定）: GeneratePrimitiveMultipleAsync / GeneratePrimitiveAsync /
-PrimitiveExpander / PrimitiveSpec は呼び出し元が消えたが本体は残置。完全削除はフェーズGで
-参照確認のうえ判定。曲面表現は SPEC 側ドーム屋根に統合済みのため失われない。
+未削除→削除済み（フェーズG）: GeneratePrimitiveMultipleAsync / GeneratePrimitiveAsync /
+PrimitiveExpander / PrimitiveSpec は当時本体を残置していたが、フェーズGで参照確認のうえ
+削除済み。曲面表現は SPEC 側ドーム屋根に統合済みのため失われていない。
 コミット: chore(arch): 種別選択からプリミティブを廃止し簡易建築/生成AIの2択に整理
+
+### フェーズG: 不要コード・孤児クラスの掃除 ※完了
+第2〜4段階・種別整理で参照元が消えたデッドコードと孤児クラスをまとめて削除。
+削除のたびにビルド確認 → コミット。全工程ビルド通過済み。
+
+削除内容:
+- ArchitectGenClient.cs: プリミティブ生成経路（GeneratePrimitiveAsync /
+  GeneratePrimitiveMultipleAsync）と、未使用だった TryParse（GeneratedBlock版）/
+  TryParsePrimitive を削除。種別からプリミティブを廃止し呼び出し元が消えていた。
+- MainWindow.Machine.cs: 未使用の Ponder 解析デッドコードを削除。
+  フィールド _ponderRulesCache / _ponderStatsCache / _ponderCacheKey、
+  メソッド ComputePonderKey / GetPonderAdjacencyRules / MachineRescanPonder_Click。
+  MachineGenerate_Click 内の「[一時確認] プロパティlog」ブロック（仕様確定後削除と明記済）も除去。
+- MainWindow.xaml: Ponder再スキャンボタン（MachineRescanPonderBtn）を削除。
+- ファイルごと削除（全リポジトリ grep で外部参照ゼロを確認のうえ実施）:
+  - Architect/Generation/PrimitiveSpec.cs
+  - Architect/Generation/PrimitiveExpander.cs
+  - Architect/Generation/StructureNbtReader.cs（ReadFile 含め呼び出し元なしを確認）
+  - Architect/Generation/PonderRuleExtractor.cs
+
+確認事項:
+- StructureExpander は PrimitiveExpander を参照していない（ドーム屋根は自前の
+  BuildDomeRoof + Outside で完結）。曲面表現は失われていない。
+- StructureNbtReader / PonderRuleExtractor は grep で自ファイル内参照のみ＝孤児だった。
+- using ModSorter.Architect（Machine.cs）は ArchitectModeHost で現役のため残置。
+- 未使用 using 警告が出た場合のみ該当行を個別除去（現状は未対応で問題なし）。
+
+コミット:
+- chore(arch): 未使用のプリミティブ生成経路と一時確認ログを削除
+- chore(machine): 未使用のPonder解析デッドコードと再スキャンボタンを削除
+- chore(arch): 未使用のプリミティブSpec/Expanderを削除
+- chore(arch): 未使用のPonder解析クラス(StructureNbtReader/PonderRuleExtractor)を削除
+
 
 
 ### 第4段階: 建築モードの設置導線 ※完了（実機確認済み）

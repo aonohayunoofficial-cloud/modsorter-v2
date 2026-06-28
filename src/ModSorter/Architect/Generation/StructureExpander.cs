@@ -48,6 +48,8 @@ public static class StructureExpander
             BuildGableStairsRoof(cells, spec, w, d, h, roof, wall);
         else if (roofType == "dome")
             BuildDomeRoof(cells, spec, w, d, h, roof);
+        else if (roofType == "pyramid")
+            BuildPyramidRoof(cells, w, d, h, roof);
         else
             BuildFlatRoof(cells, w, d, h, roof);
 
@@ -122,6 +124,34 @@ public static class StructureExpander
         for (int x = 0; x < w; x++)
             for (int z = 0; z < d; z++)
                 cells[(x, h - 1, z)] = roof;
+    }
+
+    // ピラミッド屋根（四角錐）: 底面(w×d)を y=h-1 に全面で敷き、そこから上へ
+    // 1段ごとに全周を1マスずつ内側へ絞りながら積む。頂点で1〜2マスに収束する。
+    // pyramids（建物全体を四角錐にしたいとき）や塔・東洋風の屋根に使える。
+    private static void BuildPyramidRoof(
+        Dictionary<(int x, int y, int z), string> cells, int w, int d, int h, string roof)
+    {
+        // 底面（壁の最上層の上）を天井として全面塞ぐ。錐の足元の穴を防ぐ。
+        int baseY = h - 1;
+        for (int x = 0; x < w; x++)
+            for (int z = 0; z < d; z++)
+                cells[(x, baseY, z)] = roof;
+
+        // 段ごとに内側へ絞る。step マスだけ各辺から内側に入った矩形リング（中身も塗る）。
+        // 頂点まで積めるよう、絞り切るまで層を重ねる。
+        int maxStep = (Math.Min(w, d) + 1) / 2; // これ以上絞ると矩形が消える
+        for (int step = 1; step <= maxStep; step++)
+        {
+            int x0 = step, x1 = w - 1 - step;
+            int z0 = step, z1 = d - 1 - step;
+            if (x1 < x0 || z1 < z0) break; // 絞り切った（頂点に到達）
+
+            int y = baseY + step;
+            for (int x = x0; x <= x1; x++)
+                for (int z = z0; z <= z1; z++)
+                    cells[(x, y, z)] = roof;
+        }
     }
 
     // 切妻屋根: 棟の向き(ridge_axis)に沿って段々に三角を作る。
@@ -479,33 +509,72 @@ public static class StructureExpander
         Opening op, int w, int d, int h, IReadOnlyList<string> allowedBlocks)
     {
         string face = (op.Face ?? "").Trim().ToLowerInvariant();
-        bool isWindow = (op.Kind ?? "").Trim().ToLowerInvariant() != "door";
+        string kind = (op.Kind ?? "").Trim().ToLowerInvariant();
+        bool isDoor = kind == "door";
+        bool isArch = kind == "arch";
+        bool isWindow = !isDoor && !isArch;
 
         int y = Clamp(op.Level, 1, Math.Max(1, h - 2)); // 中間層に収める
                                                         // 窓が床ぎわ(level=1)に張り付くのを防ぎ、壁の中ほどへ引き上げる。
-                                                        // ドアは床から立てるので対象外。
+                                                        // ドア・アーチは床から立てるので対象外。
         if (isWindow)
         {
             int mid = Math.Max(1, (h - 1) / 2); // 壁のおよそ中段
             if (y < mid) y = mid;
         }
+        // アーチは床から立てる（door と同じ起点）。level 指定は無視して y=1 から。
+        if (isArch) y = 1;
 
-        // 面ごとに、面に沿った座標(offset)から壁上の1セルを特定する
-        (int x, int z)? target = face switch
+        // 面ごとに、面に沿った座標(offset)から壁上の1セルを特定する。
+        // また、面に沿った「横方向」を表す軸（アーチを左右に広げる方向）も決める。
+        // alongX=true なら offset は x 方向、false なら z 方向に沿う。
+        (int x, int z)? target;
+        bool alongX;
+        switch (face)
         {
-            "north" => (Clamp(op.Offset, 0, w - 1), 0),       // z=0 の面
-            "south" => (Clamp(op.Offset, 0, w - 1), d - 1),   // z=d-1 の面
-            "west" => (0, Clamp(op.Offset, 0, d - 1)),       // x=0 の面
-            "east" => (w - 1, Clamp(op.Offset, 0, d - 1)),   // x=w-1 の面
-            _ => null
-        };
-        if (target == null) return;
+            case "north": target = (Clamp(op.Offset, 0, w - 1), 0); alongX = true; break;
+            case "south": target = (Clamp(op.Offset, 0, w - 1), d - 1); alongX = true; break;
+            case "west": target = (0, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
+            case "east": target = (w - 1, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
+            default: return;
+        }
 
         var key = (target.Value.x, y, target.Value.z);
+
+        if (isArch)
+        {
+            // アーチ: 中央列を高く抜き、左右1マスずつは1段低く抜いて上端を丸める。
+            //   中央列: y=1 .. archTop を開口
+            //   左右列: y=1 .. archTop-1 を開口（上端を内側へ詰めて曲線風に）
+            // archTop は壁の高さに収める（最上段=屋根の手前 h-2 まで）。
+            int wallTop = Math.Max(1, h - 2);
+            int archTop = Math.Min(wallTop, 3); // 標準的なアーチ高（3段）。低い壁では自動で縮む。
+            int cx = target.Value.x, cz = target.Value.z;
+
+            // 中央列を抜く。
+            for (int yy = 1; yy <= archTop; yy++)
+                cells.Remove((cx, yy, cz));
+
+            // 左右の列（offset±1）を1段低く抜く。壁セルのときのみ。
+            for (int side = -1; side <= 1; side += 2)
+            {
+                int sx = alongX ? cx + side : cx;
+                int sz = alongX ? cz : cz + side;
+                // 開口が壁の外周面からはみ出さないよう、その面上の有効範囲かを確認する。
+                bool inRange = alongX ? (sx >= 0 && sx < w) : (sz >= 0 && sz < d);
+                if (!inRange) continue;
+                for (int yy = 1; yy <= Math.Max(1, archTop - 1); yy++)
+                {
+                    var sk = (sx, yy, sz);
+                    if (cells.ContainsKey(sk)) cells.Remove(sk);
+                }
+            }
+            return;
+        }
+
         // 壁セルでなければ無視（角や非外周を壊さない）
         if (!cells.ContainsKey(key)) return;
 
-        bool isDoor = (op.Kind ?? "").Trim().ToLowerInvariant() == "door";
         if (isDoor)
         {
             cells.Remove(key); // ドア下段
