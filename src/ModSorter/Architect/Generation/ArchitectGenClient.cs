@@ -24,7 +24,7 @@ public sealed class ArchitectGenClient
     string model, string instruction, IReadOnlyList<string> allowedBlocks,
     double temperature = 0.2, string? variantHint = null, string? stylePrompt = null,
     int? fixedWidth = null, int? fixedDepth = null, int? fixedHeight = null,
-    string? facadeFace = null)
+    string? facadeFace = null, DesignPlan? plan = null)
     {
 
         var result = new GenerationResult();
@@ -137,7 +137,7 @@ RULES:
   For normal houses keep ""walled"". When colonnade or temple, openings are ignored.
 - Output ONLY the JSON spec. No explanation, no coordinates.
 
-{(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
+{(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}{(plan == null || string.IsNullOrWhiteSpace(plan.DesignNotes) ? "" : "DESIGN PLAN (follow this plan; turn it into the JSON spec above):\n" + BuildPlanText(plan) + "\n\n")}BUILD INSTRUCTION:
 {instruction}
 {(string.IsNullOrEmpty(variantHint) ? "" : "\nVARIATION FOR THIS DESIGN: " + variantHint)}
 
@@ -236,6 +236,11 @@ JSON:";
     {
 
         var results = new List<GenerationResult>();
+
+        // 2パス生成の1パス目: 指示から設計方針を1回だけ作り、3案で共有する。
+        // 失敗時は plan=null となり、各案は従来どおり方針なし（1パス相当）で生成される。
+        DesignPlan? plan = await PlanAsync(model, instruction, stylePrompt);
+
         // 案ごとの temperature と方向性ヒント。temperatureだけでは差が出ないため
         // 方向性を明示的に変えて、確実に違う案を作る。
         var variants = new (double temp, string hint)[]
@@ -248,7 +253,7 @@ JSON:";
         {
             var v = variants[i % variants.Length];
             var r = await GenerateAsync(model, instruction, allowedBlocks, v.temp, v.hint, stylePrompt,
-                                        fixedWidth, fixedDepth, fixedHeight, facadeFace);
+                                        fixedWidth, fixedDepth, fixedHeight, facadeFace, plan);
             results.Add(r);
         }
         return results;
@@ -388,6 +393,110 @@ JSON:";
         }
         return results;
     }
+
+    // 2パス生成の1パス目。指示から設計方針（DesignPlan）を作る。
+    // 失敗（接続不可・パース不可など）時は null を返し、呼び出し側は方針なしで2パス目に進む。
+    // ここでは座標も SPEC も作らない。方針だけを短く出させる。
+    public async Task<DesignPlan?> PlanAsync(
+        string model, string instruction, string? stylePrompt = null,
+        double temperature = 0.4)
+    {
+        string prompt =
+$@"You are an architect planning a small Minecraft building BEFORE any spec is written.
+Output ONLY strict JSON, no prose, no coordinates.
+
+Read the instruction and decide the design DIRECTION: how many stories, the overall
+style, the roof approach, decoration (columns/base/material contrast), and how openings
+(doors/windows) should be arranged. Keep it high-level; do NOT pick exact coordinates
+or block ids. A later step turns this plan into a detailed spec and then into blocks.
+
+OUTPUT SHAPE (this exact JSON shape):
+{{
+  ""design_notes"": ""one short paragraph describing the building's character and how the parts fit together"",
+  ""stories"": 1,
+  ""style"": ""walled"",
+  ""roof"": ""gable"",
+  ""decoration"": ""plain walls, stone base course"",
+  ""openings"": ""a door on the front, a couple of windows on the sides""
+}}
+
+RULES:
+- design_notes is the main field: a concise plan in plain language.
+- stories: integer number of floors implied by the instruction (default 1).
+- style: the intended look (e.g. walled / colonnade / temple / cottage / industrial).
+- roof: flat, gable, gable_stairs, or dome — whichever suits.
+- Output ONLY the JSON. No explanation.
+
+{(string.IsNullOrEmpty(stylePrompt) ? "" : "STYLE / GENRE:\n" + stylePrompt + "\n\n")}BUILD INSTRUCTION:
+{instruction}
+
+JSON:";
+
+        var payload = new
+        {
+            model,
+            prompt,
+            stream = false,
+            format = "json",
+            options = new { temperature }
+        };
+
+        try
+        {
+            string json = JsonSerializer.Serialize(payload);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var resp = await _http.PostAsync(Endpoint, content);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            string respText = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(respText);
+            if (!doc.RootElement.TryGetProperty("response", out var respProp)) return null;
+
+            string raw = respProp.GetString() ?? "";
+            return TryParsePlan(raw);
+        }
+        catch
+        {
+            // 計画フェーズの失敗は致命ではない。null を返し、2パス目は方針なしで進む。
+            return null;
+        }
+    }
+
+    // 生出力から DesignPlan を取り出してパース。前後のゴミに備え '{'〜'}' を抜く。
+    private static DesignPlan? TryParsePlan(string raw)
+    {
+        string candidate = raw.Trim();
+        int start = candidate.IndexOf('{');
+        int end = candidate.LastIndexOf('}');
+        if (start >= 0 && end > start)
+            candidate = candidate.Substring(start, end - start + 1);
+
+        try
+        {
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var plan = JsonSerializer.Deserialize<DesignPlan>(candidate, opts);
+            if (plan == null || string.IsNullOrWhiteSpace(plan.DesignNotes)) return null;
+            return plan;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    // DesignPlan を 2パス目プロンプトに添える短いテキストに整形する。
+    private static string BuildPlanText(DesignPlan plan)
+    {
+        var sb = new StringBuilder();
+        sb.Append(plan.DesignNotes.Trim());
+        if (plan.Stories.HasValue) sb.Append($"\n- stories: {plan.Stories.Value}");
+        if (!string.IsNullOrWhiteSpace(plan.Style)) sb.Append($"\n- style: {plan.Style!.Trim()}");
+        if (!string.IsNullOrWhiteSpace(plan.Roof)) sb.Append($"\n- roof: {plan.Roof!.Trim()}");
+        if (!string.IsNullOrWhiteSpace(plan.Decoration)) sb.Append($"\n- decoration: {plan.Decoration!.Trim()}");
+        if (!string.IsNullOrWhiteSpace(plan.Openings)) sb.Append($"\n- openings: {plan.Openings!.Trim()}");
+        return sb.ToString();
+    }
+
     // Ollamaにインストール済みのモデルタグ一覧を取得。失敗時は空リスト。
     public async Task<List<string>> ListModelsAsync()
     {
