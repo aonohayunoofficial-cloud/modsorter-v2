@@ -748,6 +748,23 @@
                                             Click="ArchCase_Click" Tag="2"/>
                                 </StackPanel>
 
+                                <TextBlock Text="出力ファイル名（schematics に保存）"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource GrassGreen}"/>
+                                <TextBox x:Name="ArchNameBox"
+                                         Background="{StaticResource BgPanel}"
+                                         Foreground="{StaticResource TextMain}"
+                                         FontFamily="{StaticResource PixelFont}"
+                                         BorderThickness="0" Padding="6" Margin="0,4,0,8"
+                                         VerticalContentAlignment="Center"
+                                         Text="building"/>
+
+                                <Button x:Name="ArchExportBtn"
+                                        Content="表示中の案を schematics に出力"
+                                        Style="{StaticResource McButton}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,8"
+                                        IsEnabled="False"
+                                        Click="ArchExport_Click"/>
 
                                 <Button x:Name="ArchOpenPreviewBtn"
                             Content="3Dプレビューを開く"

@@ -23,6 +23,8 @@ public partial class MainWindow
     // 読み込んだジャンル一覧と、現在選択中のジャンル
     private List<Genre>? _genres;
     private Genre? _currentGenre;
+    // 現在プレビュー/結果に表示している案のインデックス（-1 = 未表示）。出力対象に使う。
+    private int _archShownCaseIndex = -1;
 
     private async void NavArchitect_Click(object sender, RoutedEventArgs e)
     {
@@ -318,6 +320,9 @@ public partial class MainWindow
         {
             sb.AppendLine($"この案は失敗: {result.Error}");
             ArchResultBox.Text = sb.ToString();
+            // 失敗案を表示中は出力できない。
+            _archShownCaseIndex = -1;
+            if (ArchExportBtn != null) ArchExportBtn.IsEnabled = false;
             return;
         }
 
@@ -327,7 +332,64 @@ public partial class MainWindow
         sb.AppendLine(result.RawResponse ?? "(なし)");
         ArchResultBox.Text = sb.ToString();
 
+        // 表示中の案を記録し、schematics 出力ボタンを有効化する。
+        _archShownCaseIndex = index;
+        if (ArchExportBtn != null) ArchExportBtn.IsEnabled = true;
+
         await RenderArchPreviewAsync(result.Blocks);
+    }
+
+    // 表示中の案を schematics に NBT 出力する。
+    // 出力先決定は機械側と共通の ResolveSchematicOutPath に委譲する（二重実装回避）。
+    // 建築の GeneratedBlock は座標+IDのみで向き状態を持たないため、Properties は空で書き出す。
+    private void ArchExport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_archCases == null || _archShownCaseIndex < 0 ||
+            _archShownCaseIndex >= _archCases.Count)
+        {
+            ArchStatus.Text = "出力できる案がありません。先に生成して案を表示してください。";
+            return;
+        }
+
+        var blocks = _archCases[_archShownCaseIndex].Blocks;
+        if (blocks == null || blocks.Count == 0)
+        {
+            ArchStatus.Text = "表示中の案にブロックがありません。";
+            return;
+        }
+
+        // 出力先を決定。.minecraft/schematics に <名前>.nbt で保存する。
+        // instancePath 未設定や保存不可時は diagnostics へフォールバックする。
+        string outPath = ResolveSchematicOutPath(ArchNameBox?.Text ?? "", "building");
+        if (outPath.Length == 0)
+        {
+            // ユーザーが上書きを拒否した場合は保存を中止する。
+            ArchStatus.Text = "出力をキャンセルしました（同名上書き拒否）。";
+            Log("建築データの保存をキャンセルしました（同名上書き拒否）。");
+            return;
+        }
+
+        // GeneratedBlock → StructureNbtWriter.Block へ詰め替え（向き状態なし）。
+        var nbtBlocks = blocks.Select(b =>
+            new ModSorter.Architect.Generation.StructureNbtWriter.Block
+            {
+                Name = b.Id,
+                X = b.X,
+                Y = b.Y,
+                Z = b.Z
+            }).ToList();
+
+        try
+        {
+            ModSorter.Architect.Generation.StructureNbtWriter.Save(nbtBlocks, outPath);
+            ArchStatus.Text = $"案{_archShownCaseIndex + 1} を出力しました（{nbtBlocks.Count} ブロック）: {outPath}";
+            Log($"建築データ出力: 案{_archShownCaseIndex + 1} / {nbtBlocks.Count} ブロック / {outPath}");
+        }
+        catch (Exception ex)
+        {
+            ArchStatus.Text = $"出力に失敗しました: {ex.Message}";
+            Log($"建築データ出力失敗: {ex.Message}");
+        }
     }
 
     // 画像ギャラリーを開き、選ばれた画像をそのまま 3D化する。

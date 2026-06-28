@@ -17,18 +17,19 @@ public partial class MainWindow
     // 直近に生成した機械のNBT出力先（フォルダを開くボタンで使う）。
     private string? _lastMachineNbtPath;
 
-    // 機械NBTの出力先パスを決める。
+    // スキマティックNBTの出力先パスを決める共通処理（機械・建築で共用）。
     // .minecraft/schematics/<名前>.nbt を基本とし、同名があれば上書き確認モーダルを出す。
     // 上書き拒否なら空文字を返す（呼び出し側で保存中止）。
     // instancePath 未設定や schematics 作成失敗時は diagnostics にフォールバックする。
-    private string ResolveMachineOutPath()
+    // rawName: UI 欄の生入力。defaultName: 空/不正時に使う既定名。
+    private string ResolveSchematicOutPath(string rawName, string defaultName)
     {
         // 名前のサニタイズ。空なら既定名。ファイル名に使えない文字は除去。
-        string name = (MachineNameBox?.Text ?? "").Trim();
-        if (name.Length == 0) name = "module_machine";
+        string name = (rawName ?? "").Trim();
+        if (name.Length == 0) name = defaultName;
         foreach (char c in Path.GetInvalidFileNameChars())
             name = name.Replace(c.ToString(), "");
-        if (name.Length == 0) name = "module_machine";
+        if (name.Length == 0) name = defaultName;
         if (name.EndsWith(".nbt", StringComparison.OrdinalIgnoreCase))
             name = name.Substring(0, name.Length - 4);
 
@@ -69,6 +70,10 @@ public partial class MainWindow
         }
         return path;
     }
+
+    // 機械NBTの出力先パス。共通処理 ResolveSchematicOutPath に委譲する。
+    private string ResolveMachineOutPath()
+        => ResolveSchematicOutPath(MachineNameBox?.Text ?? "", "module_machine");
 
 
     // Ponder 隣接ルールのキャッシュ。重い解析(178件)を初回だけ行う。
