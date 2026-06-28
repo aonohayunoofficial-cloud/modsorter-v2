@@ -75,102 +75,6 @@ public partial class MainWindow
     private string ResolveMachineOutPath()
         => ResolveSchematicOutPath(MachineNameBox?.Text ?? "", "module_machine");
 
-
-    // Ponder 隣接ルールのキャッシュ。重い解析(178件)を初回だけ行う。
-
-    // Ponder 隣接ルールのキャッシュ。重い解析(178件)を初回だけ行う。
-    private string? _ponderRulesCache;          // 抽出済みルール文(全許可ブロック分の素)
-    private Dictionary<string, ModSorter.Architect.Generation.PonderRuleExtractor.BlockStat>?
-        _ponderStatsCache;                       // 解析済み統計(許可リストが変わっても使い回せる)
-    private string _ponderCacheKey = "";         // 構成フィンガープリント(jarパス+更新日時)
-
-    // Create本体jarのフィンガープリント(パス + 最終更新日時)。
-    private static string ComputePonderKey(string? createJar)
-    {
-        if (string.IsNullOrEmpty(createJar) || !System.IO.File.Exists(createJar))
-            return "";
-        try
-        {
-            var fi = new System.IO.FileInfo(createJar);
-            return $"{fi.FullName}|{fi.LastWriteTimeUtc.Ticks}";
-        }
-        catch { return createJar; }
-    }
-
-    // 許可ブロックの隣接ルールを返す。初回のみ Ponder を解析し、以降はキャッシュを使う。
-    // 構成(Create本体jar)が変わっていればキャッシュを破棄して再解析する。
-    private string GetPonderAdjacencyRules(
-        List<string> modJars, IEnumerable<string> allowedIds)
-    {
-        try
-        {
-            string? createJar = modJars.FirstOrDefault(j =>
-            {
-                string fn = System.IO.Path.GetFileName(j).ToLowerInvariant();
-                return fn.StartsWith("create-") && !fn.Contains("aeronautics");
-            });
-
-            string key = ComputePonderKey(createJar);
-            if (string.IsNullOrEmpty(key)) return "";
-
-            // 構成が変わっていたら統計キャッシュを破棄。
-            if (key != _ponderCacheKey)
-            {
-                _ponderStatsCache = null;
-                _ponderCacheKey = key;
-            }
-
-            // 統計が未キャッシュなら解析する(ここが重い処理。初回 or 再スキャン時のみ)。
-            if (_ponderStatsCache == null)
-            {
-                Log("Ponder を解析中...(初回のみ・数秒)");
-                var entries = ModSorter.Architect.Generation.StructureNbtReader
-                    .ListPonderNbtEntries(createJar!, "create");
-
-                var structures =
-                    new List<(string, ModSorter.Architect.Generation.StructureNbtReader.Structure)>();
-                foreach (var ep in entries)
-                {
-                    try
-                    {
-                        string scene = ep.Replace("assets/create/ponder/", "")
-                                         .Replace(".nbt", "");
-                        var st = ModSorter.Architect.Generation.StructureNbtReader
-                            .ReadFromJar(createJar!, ep);
-                        structures.Add((scene, st));
-                    }
-                    catch { /* 個別失敗は無視 */ }
-                }
-
-                _ponderStatsCache = ModSorter.Architect.Generation.PonderRuleExtractor
-                    .Analyze(structures);
-                Log($"Ponder解析完了: {structures.Count} シーン / {_ponderStatsCache.Count} ブロック種。");
-            }
-
-            // ルール文は許可リストに依存するので毎回作る(軽い処理)。
-            string rules = ModSorter.Architect.Generation.PonderRuleExtractor.ToRuleText(
-                _ponderStatsCache, allowedIds,
-                perBlockDirs: 6, topPerDir: 2, minCount: 1);
-            _ponderRulesCache = rules;
-            return rules;
-        }
-        catch (Exception ex)
-        {
-            Log($"Ponder隣接ルール抽出をスキップ: {ex.Message}");
-            return "";
-        }
-    }
-
-    // 「Ponder再スキャン」ボタン。キャッシュを破棄して次回生成時に再解析させる。
-    private void MachineRescanPonder_Click(object sender, RoutedEventArgs e)
-    {
-        _ponderStatsCache = null;
-        _ponderCacheKey = "";
-        _ponderRulesCache = null;
-        MachineStatus.Text = "Ponderキャッシュを破棄しました。次回生成時に再スキャンします。";
-        Log("Ponderキャッシュを破棄(手動再スキャン)。");
-    }
-
     // トップメニューの「Create機械」ボタン → Tab 5 へ遷移。
     private async void NavMachine_Click(object sender, RoutedEventArgs e)
     {
@@ -259,28 +163,6 @@ public partial class MainWindow
             {
                 var fullPalette = tp.ExtractBlockPalette();
                 allowed = ModSorter.Clients.ModuleGenerator.BuildPowerPalette(fullPalette);
-
-                // [一時確認] press/mixer/basin/belt等のプロパティをログ出力。仕様確定後に削除する。
-                foreach (var checkId in new[]
-                {
-                    "create:mechanical_press", "create:mechanical_mixer", "create:basin",
-                    "create:depot", "create:belt", "create:andesite_funnel", "create:chute",
-                })
-                {
-                    // fullPalette(生)に存在するか。存在すればプロパティ、無ければ「パレット自体に無い」。
-                    if (fullPalette.TryGetValue(checkId, out var pp))
-                    {
-                        string dump = pp.Count == 0
-                            ? "(プロパティなし=向き等を持たないブロック)"
-                            : string.Join(", ",
-                                pp.Select(kv => $"{kv.Key}=[{string.Join("|", kv.Value)}]"));
-                        Log($"[プロパティ] {checkId}: fullPaletteにあり / {dump}");
-                    }
-                    else
-                    {
-                        Log($"[プロパティ] {checkId}: fullPalette自体に無い(blockstates未抽出)");
-                    }
-                }
 
                 // 入出力マーカー用の羊毛を許可リストに加える。
                 foreach (var mk in new[] { "minecraft:magenta_wool", "minecraft:lime_wool" })
