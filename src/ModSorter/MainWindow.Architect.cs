@@ -162,9 +162,9 @@ public partial class MainWindow
             return;
         }
 
-        // 種類が 彫刻(テキスト→画像→GLB) (index=2) なら、専用フローへ。
+        // 種類が 生成AI(テキスト→画像→GLB) (index=1) なら、専用フローへ。
         // LLM(Ollama)は使わないため、以降の model/prompt/blocks チェックは通さない。
-        if (ArchKindCombo.SelectedIndex == 2)
+        if (ArchKindCombo.SelectedIndex == 1)
         {
             ArchGenBtn.IsEnabled = false;
             SetCaseButtonsEnabled(false);
@@ -216,30 +216,18 @@ public partial class MainWindow
         ProgressShow("3案を生成中...（少し時間がかかります）", indeterminate: true);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        // 種類で経路を分岐。0=建築(家)、1=プリミティブ(曲面)。
-        bool isPrimitive = ArchKindCombo.SelectedIndex == 1;
-        if (isPrimitive)
-        {
-            // サイズ欄(直径)を半径に変換。半径 = 直径/2（最低1）。
-            int rx = System.Math.Max(1, w / 2);
-            int ry = System.Math.Max(1, h / 2); // 高さ→y半径
-            int rz = System.Math.Max(1, d / 2); // 奥行→z半径
-            _archCases = await _architectHost.Generation.GeneratePrimitiveMultipleAsync(
-                model, prompt, blocks, 3, rx, ry, rz);
-        }
-        else
-        {
-            string? style = _currentGenre?.StylePrompt;
-            // 正面の向き（ファサード神殿用）。選択中の ComboBoxItem の Tag を取り出す。
-            string facade = "south";
-            if (ArchFacadeCombo.SelectedItem is System.Windows.Controls.ComboBoxItem fi
-                && fi.Tag is string ftag && !string.IsNullOrWhiteSpace(ftag))
-                facade = ftag;
-            _archCases = await _architectHost.Generation.GenerateMultipleAsync(
-                model, prompt, blocks, 3, style, w, d, h, facade);
-        }
+        // 簡易建築(家)経路。プリミティブ選択肢は廃止し、常にSPEC展開で生成する。
+        string? style = _currentGenre?.StylePrompt;
+        // 正面の向き（ファサード神殿用）。選択中の ComboBoxItem の Tag を取り出す。
+        string facade = "south";
+        if (ArchFacadeCombo.SelectedItem is System.Windows.Controls.ComboBoxItem fi
+            && fi.Tag is string ftag && !string.IsNullOrWhiteSpace(ftag))
+            facade = ftag;
+        _archCases = await _architectHost.Generation.GenerateMultipleAsync(
+            model, prompt, blocks, 3, style, w, d, h, facade);
 
         ArchGenBtn.IsEnabled = true;
+
 
         // LLM生成が終わったので進捗バーを隠す。
         ProgressHide();
@@ -413,13 +401,13 @@ public partial class MainWindow
         await RunSculptureFromImagesAsync(gallery.SelectedForSculpt, resolution, blockId);
     }
 
-    // モード切り替えで、サイズ3欄(建築/プリミティブ)と解像度コンボ(生成AI)を出し分ける。
+    // モード切り替えで、サイズ3欄(簡易建築)と解像度コンボ(生成AI)を出し分ける。
     private void ArchKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // 起動直後など、まだ要素が出来ていないことがあるので null チェック。
         if (ArchSizePanel == null || ArchResolutionPanel == null) return;
 
-        bool isAi = ArchKindCombo.SelectedIndex == 2; // 2 = 生成AI（GLBから）
+        bool isAi = ArchKindCombo.SelectedIndex == 1; // 1 = 生成AI（GLBから）
         ArchSizePanel.Visibility = isAi ? Visibility.Collapsed : Visibility.Visible;
         ArchResolutionPanel.Visibility = isAi ? Visibility.Visible : Visibility.Collapsed;
     }

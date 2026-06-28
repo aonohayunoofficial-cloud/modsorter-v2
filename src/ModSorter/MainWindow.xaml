@@ -573,9 +573,9 @@
                                           SelectedIndex="0"
                                           SelectionChanged="ArchKind_SelectionChanged">
                                     <ComboBoxItem Content="簡易建築（家・建物）"/>
-                                    <ComboBoxItem Content="プリミティブ（球・ドームなど曲面）"/>
                                     <ComboBoxItem Content="生成AI（GLBから）"/>
                                 </ComboBox>
+
                                 <TextBlock Text="正面の向き（ファサード神殿のとき）"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource GrassGreen}"/>
