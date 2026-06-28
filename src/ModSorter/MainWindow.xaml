@@ -557,7 +557,7 @@
                             <TextBlock Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource TextDim}" FontSize="11"
                                        TextWrapping="Wrap" Margin="0,8,0,0"
-                                       Text="最小実験: 指示+ブロックリスト → 座標+ID JSON が返るか確認"/>
+                                       Text="自然言語の指示と使用ブロックから、建物・曲面・生成AIの3案を生成し、3Dプレビューで確認します。"/>
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="1" Background="{StaticResource BgDark}" Padding="24">
@@ -754,12 +754,6 @@
                             Style="{StaticResource McButtonGray}"
                             HorizontalAlignment="Left" Margin="0,0,0,8"
                             Click="ArchOpenPreview_Click"/>
-
-                                <Button x:Name="ArchTestTextureBtn"
-                            Content="テクスチャ取得テスト"
-                            Style="{StaticResource McButtonGray}"
-                            HorizontalAlignment="Left" Margin="0,0,0,8"
-                            Click="ArchTestTexture_Click"/>
 
                                 <!-- 長時間処理の進捗バー。確定進捗(パレット生成)と
                                      不定進捗(生成・3D化)の両方をここで使い回す。 -->
