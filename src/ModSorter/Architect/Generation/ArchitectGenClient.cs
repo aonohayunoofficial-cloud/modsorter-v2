@@ -93,20 +93,30 @@ FIELD MEANING:
   entrance. Omit to default to ""south"".
 - structure_type: the overall kind of structure. ""building"" (the default: an ordinary
   building made of a floor, walls, a roof, and openings — use this for houses, towers,
-  temples, etc.) or ""ramp"" (a solid sloped walkway / incline that rises from the ground
-  to full height, with no walls or roof — use this for ramps, inclines, and slopes).
+  temples, etc.), ""ramp"" (a solid sloped walkway / incline that rises from the ground
+  to full height, with no walls or roof — use this for ramps, inclines, and slopes), or
+  ""bridge"" (a flat horizontal deck carried high in the air on a few support piers, with
+  low railings along both edges — use this for bridges and viaducts).
   For ""ramp"", ridge_axis chooses the direction it climbs: ""x"" rises along X (default),
-  ""z"" rises along Z. wall_block is used for the ramp body and base_block for its bottom
-  course. roof_type, openings, floors and columns are IGNORED for non-""building"" types.
-- DECIDE structure_type FIRST, before anything else. If the instruction describes a
-  ramp, slope, incline, or sloped walkway (English ""ramp""/""slope""/""incline"" or
-  Japanese ""スロープ""/""坂""/""坂道""/""傾斜""), you MUST set structure_type to ""ramp"".
-  Only use ""building"" when the instruction clearly describes a house, tower, temple,
-  wall, or other walled/roofed structure. When in doubt between a ramp and a building,
-  prefer ""ramp"" if the word ramp/slope/incline/スロープ/坂 appears anywhere.
-  For a ""ramp"", width = its length, depth = its width, height = how high it climbs;
-  pick wall_block as the requested material (e.g. stone bricks) and leave roof_type,
-  building_style, and openings at their defaults (they are ignored).
+  ""z"" rises along Z. For ""bridge"", ridge_axis chooses the direction it spans: ""x"" spans
+  along X (default), ""z"" spans along Z. wall_block is used for the ramp body / bridge
+  deck, and base_block for the ramp's bottom course / the bridge's piers and railings.
+  roof_type, openings, floors and columns are IGNORED for non-""building"" types.
+- DECIDE structure_type FIRST, before anything else.
+  - If the instruction describes a ramp, slope, incline, or sloped walkway (English
+    ""ramp""/""slope""/""incline"" or Japanese ""スロープ""/""坂""/""坂道""/""傾斜""), you MUST set
+    structure_type to ""ramp"".
+  - If the instruction describes a bridge or viaduct (English ""bridge""/""viaduct"" or
+    Japanese ""橋""/""ブリッジ""/""高架""), you MUST set structure_type to ""bridge"".
+  - Otherwise use ""building"" when the instruction describes a house, tower, temple,
+    wall, or other walled/roofed structure.
+  When in doubt, match the keyword: ramp/slope/スロープ/坂 -> ""ramp"";
+  bridge/橋/ブリッジ -> ""bridge""; everything else -> ""building"".
+  For a ""ramp"", width = its length, depth = its width, height = how high it climbs.
+  For a ""bridge"", width = its span (length across), depth = its width, height = how high
+  the deck sits above the ground. Pick wall_block as the requested deck/body material
+  (e.g. stone bricks) and leave roof_type, building_style, and openings at their
+  defaults (they are ignored for ramp and bridge).
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the

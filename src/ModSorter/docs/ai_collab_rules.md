@@ -2,7 +2,12 @@
 
 ### コード提示の形式
 1. 差し替え: 「差し替え対象の全文」→「差し替え後の全文」をセットで出す。
-2. 追加: 「追加する直前の5行」→「追加後の全文（または追加コード）」で示す。
+   既存コードの周辺に手が入る場合（既存行の修正、メソッド末尾への継ぎ足し、
+   重複や構造崩れが起こりうる挿入など）は、たとえ「足すだけ」に見えても差し替え扱い。
+   目印として数行だけ示すのではなく、差し替え対象の全文と差し替え後の全文を必ずペアで出す。
+2. 追加: 既存コードを一切消さず純粋に足すだけのときに限り許可。
+   その場合も「追加する直前の5行」は挿入位置の目印にすぎず、その5行の直後に丸ごと貼る
+   ものと誤認されやすい。誤認の恐れがあるとき・周辺行に影響が及ぶときは 1（差し替え）を使う。
 3. 新規ファイル: ディレクトリ・ファイル名・新規である旨を明記し、全文を出力する。
    → どこに何を入れる／消すかを毎回明確にするため。
    形式が守れていない場合は「固定ルール忘れてる」と指摘してよい。
@@ -233,10 +238,30 @@ GenerateMultipleAsync は PlanAsync を1回だけ呼び、3案で同一 plan を
 - 対象ファイル: StructureExpander.cs / ArchitectGenClient.cs。
 コミット: feat(arch): SPEC語彙にピラミッド屋根とアーチ開口を追加
 
-#### 段階6-2: 全体形状モード structure_type（未着手・次の作業）
-StructureSpec に structure_type（"building"既定 | "bridge" | "ramp" | "pool" 等）を新設し、
-StructureExpander.Expand 冒頭で「箱を建てる」か「特殊形状を建てる」かを分岐。
-bridge / ramp / pool / stadium を1形状ずつ実装・コミット（実用頻度なら bridge か ramp を先に）。
+#### 段階6-2: 全体形状モード structure_type（進行中）
+StructureSpec に structure_type（"building"既定 | "ramp" | "bridge" | 今後 "pool"/"stadium"）を
+新設済み。StructureExpander.Expand 冒頭で structure_type を判定し、"building" 以外は
+床/壁/屋根/開口部のロジックを一切通さず専用ビルダーへ早期リターンする方式。
+素材・向きは既存フィールドを再利用し、新規フィールドは structure_type のみ。
+
+- ramp（スロープ）※完了（実機確認済み）:
+  StructureExpander.BuildRamp。ridge_axis で傾斜方向（"x"既定=X方向に登る / "z"=Z方向）。
+  進行方向の各位置で床(y=0)から目標高さまで中実に詰める中実スロープ。
+  素材は wall_block=本体 / base_block=最下段。屋根・壁・開口部は出ない。
+  当初 LLM が structure_type に "building" を返しがちだったため、プロンプト冒頭付近に
+  「DECIDE structure_type FIRST」誘導を追加（ramp/slope/incline/スロープ/坂 を検出して
+  "ramp" を強制）。これで「スロープ」指示が正しく ramp になることを実機確認。
+- bridge（橋）※実装・差分提示済み（実機確認待ち）:
+  StructureExpander.BuildBridge。ridge_axis で渡る向き（"x"既定 / "z"）。
+  構成は路面(deck=wall_block、deckY=h-1 に水平面)＋橋脚(pier=base_block、進行方向に
+  概ね4マスごと＋両端、地面y=0から路面下まで)＋欄干(両縁に高さ1、deckY+1)。
+  幅(crossLen)が2未満なら欄干は省く。欄干があるぶん総高は指定Hより1段高くなる。
+  プロンプトの structure_type 説明とトリガー文を building/ramp/bridge の3択に拡張
+  （bridge/viaduct/橋/ブリッジ/高架 を検出して "bridge" を強制）。
+- 残り: pool / stadium を1形状ずつ実装・コミット予定。
+
+コミット: feat(arch): structure_typeを追加しramp(スロープ)形状を実装 ／
+         feat(arch): structure_typeにbridge(橋)を追加（桁橋＋橋脚＋欄干）
 
 #### 段階6-3: 曲面装飾（未着手）
 rainbow（同心の半円アーチ・多色）、wave（正弦の帯）。曲面ロジックが要るため最後。

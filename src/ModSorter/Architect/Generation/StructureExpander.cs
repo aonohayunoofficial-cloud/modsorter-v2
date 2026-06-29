@@ -27,6 +27,12 @@ public static class StructureExpander
             string rampBase = Pick(spec.BaseBlock ?? spec.FloorBlock ?? spec.WallBlock, allowedBlocks, rampBody);
             return BuildRamp(w, d, h, rampBody, rampBase, spec.RidgeAxis);
         }
+        if (structureType == "bridge")
+        {
+            string deckBlock = Pick(spec.WallBlock ?? spec.FloorBlock, allowedBlocks, fallback);
+            string pierBlock = Pick(spec.BaseBlock ?? spec.WallBlock ?? spec.FloorBlock, allowedBlocks, deckBlock);
+            return BuildBridge(w, d, h, deckBlock, pierBlock, spec.RidgeAxis);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
@@ -646,6 +652,74 @@ public static class StructureExpander
                 // 床から levelY までを中実に満たす。最下段(y=0)は base、上は body。
                 for (int y = 0; y <= levelY; y++)
                     cells[(x, y, z)] = (y == 0) ? baseBlock : body;
+            }
+        }
+
+        return cells
+            .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)
+            .Select(kv => new GeneratedBlock
+            {
+                X = kv.Key.x,
+                Y = kv.Key.y,
+                Z = kv.Key.z,
+                Id = kv.Value
+            })
+            .ToList();
+    }
+
+    // 橋（桁橋＋橋脚＋欄干）: ridge_axis で渡す向きを選ぶ。
+    //   ridge_axis="x"（既定）→ 橋は x 方向に渡る（z 方向に幅）。
+    //   ridge_axis="z"        → 橋は z 方向に渡る（x 方向に幅）。
+    // 構成:
+    //   ・路面(deck): 高さ deckY に進行方向いっぱいの水平面を敷く。歩いて渡れる。
+    //   ・橋脚(pier): 進行方向に等間隔の数か所で、路面の下を地面(y=0)まで柱で支える。
+    //   ・欄干(rail): 路面の両縁(幅方向の端)に高さ1の手すりを立てる。橋らしさを出す。
+    // deckY は h-1 とし、橋脚が地面から路面まで届く。幅が2未満なら欄干は省く。
+    private static List<GeneratedBlock> BuildBridge(
+        int w, int d, int h, string deck, string pier, string? ridgeAxis)
+    {
+        var cells = new Dictionary<(int x, int y, int z), string>();
+
+        // 渡る向き。"z" 指定時のみ z 方向、それ以外は x 方向。
+        bool runAlongX = (ridgeAxis ?? "x").Trim().ToLowerInvariant() != "z";
+
+        int runLen = runAlongX ? w : d;   // 渡る方向の長さ（スパン）
+        int crossLen = runAlongX ? d : w; // 幅方向の長さ
+        int deckY = h - 1;                // 路面の高さ（最上段）
+
+        // 進行方向 i・幅方向 c を実座標(x,z)へ変換するローカル関数。
+        (int x, int z) ToXz(int i, int c) => runAlongX ? (i, c) : (c, i);
+
+        // 路面: deckY に幅いっぱいの水平面。
+        for (int i = 0; i < runLen; i++)
+            for (int c = 0; c < crossLen; c++)
+            {
+                var (x, z) = ToXz(i, c);
+                cells[(x, deckY, z)] = deck;
+            }
+
+        // 橋脚: 進行方向に等間隔の数か所で、路面の下(y=0..deckY-1)を柱で支える。
+        // 本数は概ね4マスごと。両端は必ず脚を置いて橋台にする。
+        int pierStep = Math.Max(4, runLen / 4);
+        var pierPositions = AxisPositions(0, runLen - 1, pierStep);
+        foreach (int i in pierPositions)
+            for (int c = 0; c < crossLen; c++)
+            {
+                var (x, z) = ToXz(i, c);
+                for (int y = 0; y < deckY; y++)
+                    cells[(x, y, z)] = pier;
+            }
+
+        // 欄干: 路面の両縁(幅方向の端 c=0 と c=crossLen-1)に高さ1の手すり。
+        // 幅が2未満なら省略（路面と重なってしまうため）。
+        if (crossLen >= 2)
+        {
+            for (int i = 0; i < runLen; i++)
+            {
+                var (xa, za) = ToXz(i, 0);
+                var (xb, zb) = ToXz(i, crossLen - 1);
+                cells[(xa, deckY + 1, za)] = pier;
+                cells[(xb, deckY + 1, zb)] = pier;
             }
         }
 
