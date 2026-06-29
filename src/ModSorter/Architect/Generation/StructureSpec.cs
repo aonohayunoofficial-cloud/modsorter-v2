@@ -52,6 +52,11 @@ public sealed class StructureSpec
     // "north" | "south" | "east" | "west"。未指定なら "south"。
     [JsonPropertyName("facade_face")] public string? FacadeFace { get; set; }
 
+    // 全体の構造タイプ。"building"（既定・通常の建物。床/壁/屋根/開口部のロジックを通す）
+    // または特殊形状。特殊形状は床/壁/屋根/開口部を一切作らず、専用ビルダーが座標を作る。
+    // "building"（既定） | "ramp"（スロープ・坂道）。今後 bridge / pool 等を追加予定。
+    [JsonPropertyName("structure_type")] public string? StructureType { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 }

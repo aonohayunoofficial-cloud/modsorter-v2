@@ -54,6 +54,7 @@ OUTPUT SHAPE (this exact JSON shape):
   ""base_block"": ""minecraft:cobblestone"",
   ""building_style"": ""walled"",
   ""facade_face"": ""south"",
+  ""structure_type"": ""building"",
   ""roof_type"": ""gable"",
   ""ridge_axis"": ""x"",
   ""dome_height"": 5,
@@ -90,6 +91,22 @@ FIELD MEANING:
 - facade_face: only for building_style ""temple"". Which side the columned porch faces:
   ""north"", ""south"", ""east"", or ""west"". Choose the side that should be the front
   entrance. Omit to default to ""south"".
+- structure_type: the overall kind of structure. ""building"" (the default: an ordinary
+  building made of a floor, walls, a roof, and openings — use this for houses, towers,
+  temples, etc.) or ""ramp"" (a solid sloped walkway / incline that rises from the ground
+  to full height, with no walls or roof — use this for ramps, inclines, and slopes).
+  For ""ramp"", ridge_axis chooses the direction it climbs: ""x"" rises along X (default),
+  ""z"" rises along Z. wall_block is used for the ramp body and base_block for its bottom
+  course. roof_type, openings, floors and columns are IGNORED for non-""building"" types.
+- DECIDE structure_type FIRST, before anything else. If the instruction describes a
+  ramp, slope, incline, or sloped walkway (English ""ramp""/""slope""/""incline"" or
+  Japanese ""スロープ""/""坂""/""坂道""/""傾斜""), you MUST set structure_type to ""ramp"".
+  Only use ""building"" when the instruction clearly describes a house, tower, temple,
+  wall, or other walled/roofed structure. When in doubt between a ramp and a building,
+  prefer ""ramp"" if the word ramp/slope/incline/スロープ/坂 appears anywhere.
+  For a ""ramp"", width = its length, depth = its width, height = how high it climbs;
+  pick wall_block as the requested material (e.g. stone bricks) and leave roof_type,
+  building_style, and openings at their defaults (they are ignored).
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the

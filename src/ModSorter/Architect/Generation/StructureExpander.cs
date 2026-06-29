@@ -17,6 +17,16 @@ public static class StructureExpander
 
         // 素材決定（許可リスト外なら先頭ブロックにフォールバック）
         string fallback = allowedBlocks.Count > 0 ? allowedBlocks[0] : "minecraft:oak_planks";
+
+        // 全体形状モード。"building"（既定）以外は床/壁/屋根/開口部を一切通さず、
+        // 専用ビルダーが座標を確定する。早期リターンで通常ロジックを完全にバイパスする。
+        string structureType = (spec.StructureType ?? "building").Trim().ToLowerInvariant();
+        if (structureType == "ramp")
+        {
+            string rampBody = Pick(spec.WallBlock ?? spec.FloorBlock, allowedBlocks, fallback);
+            string rampBase = Pick(spec.BaseBlock ?? spec.FloorBlock ?? spec.WallBlock, allowedBlocks, rampBody);
+            return BuildRamp(w, d, h, rampBody, rampBase, spec.RidgeAxis);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
@@ -600,5 +610,54 @@ public static class StructureExpander
             if (match != null) return match;
         }
         return fallback;
+    }
+
+    // スロープ（坂道）: ridge_axis で傾斜方向を選ぶ。
+    //   ridge_axis="x"（既定）→ x方向に進むほど高くなる（z方向に幅）。
+    //   ridge_axis="z"        → z方向に進むほど高くなる（x方向に幅）。
+    // 進行方向の各位置で、床から「その位置の目標高さ」までを body で満たす中実スロープ。
+    // 下を base、踏面（各段の最上面）も含めて中身を詰めるので、宙に浮かず歩いて登れる。
+    // 高さは進行方向の長さに合わせて h-1 段まで一定割合で上げる。
+    private static List<GeneratedBlock> BuildRamp(
+        int w, int d, int h, string body, string baseBlock, string? ridgeAxis)
+    {
+        var cells = new Dictionary<(int x, int y, int z), string>();
+
+        // 進行方向（傾斜が上がる向き）。"z" 指定時のみ z 方向、それ以外は x 方向。
+        bool runAlongX = (ridgeAxis ?? "x").Trim().ToLowerInvariant() != "z";
+
+        int runLen = runAlongX ? w : d; // 傾斜方向の長さ
+        int crossLen = runAlongX ? d : w; // 幅方向の長さ
+        int topY = h - 1; // 最大の高さ（最上段の y）
+
+        for (int i = 0; i < runLen; i++)
+        {
+            // 進行位置 i に対する目標高さ。i=0 で 0 段、i=runLen-1 で topY 段。
+            // 1マス進むごとに段が上がる比率を、長さと高さから線形に決める。
+            int levelY = (runLen <= 1)
+                ? topY
+                : (int)System.Math.Round((double)topY * i / (runLen - 1));
+
+            for (int c = 0; c < crossLen; c++)
+            {
+                int x = runAlongX ? i : c;
+                int z = runAlongX ? c : i;
+
+                // 床から levelY までを中実に満たす。最下段(y=0)は base、上は body。
+                for (int y = 0; y <= levelY; y++)
+                    cells[(x, y, z)] = (y == 0) ? baseBlock : body;
+            }
+        }
+
+        return cells
+            .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)
+            .Select(kv => new GeneratedBlock
+            {
+                X = kv.Key.x,
+                Y = kv.Key.y,
+                Z = kv.Key.z,
+                Id = kv.Value
+            })
+            .ToList();
     }
 }
