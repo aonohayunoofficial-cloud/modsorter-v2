@@ -145,6 +145,18 @@ public static class ConnectionCatalog
                     "噛み合わせる。上面・下面には動力を繋げない(上は本体、下はbasin方向)。" +
                     "mixerは向きプロパティを持たないので置くだけでよい。"
             },
+            // crushing_wheel: axis が回転軸。動力は axis 端(同軸方向の隣)に shaft/cog を同軸で挿す。
+            //  2個1組で「軸に垂直な水平方向」へ1マス離して並べる(専用検証 (C-0) で間隔/受けを確認)。
+            //  RotationSpec が無いと (C-0) の GetRotationAxis が null になり軸計算が崩れるため必須。
+            ["create:crushing_wheel"] = new()
+            {
+                BlockId = "create:crushing_wheel",
+                AxisSource = AxisSource.AxisProperty,
+                PowerInputHint =
+                    "crushing_wheelの動力は、axisが示す回転軸の端(同軸方向の隣)にcreate:shaftを" +
+                    "同じaxisで挿すか、cogwheelを同軸で噛み合わせる。axisに垂直な側面にshaftを置いても繋がらない。" +
+                    "2個を軸に垂直な水平方向へ1マス離して並べ、両方を逆回転で駆動する。"
+            },
             // 必要に応じて拡充。
         };
 
@@ -152,9 +164,9 @@ public static class ConnectionCatalog
         => Rotation.TryGetValue(blockId, out var s) ? s : null;
 
     // 加工物の取り出しに「隣接funnel→そのfunnelに隣接するstorage」が必要な機械。
-    // crushing_wheels は排出位置が「2輪の隙間の真下」であって機械本体の隣接面ではない。
+    // crushing_wheel(単数IDが正)は排出位置が「2輪の隙間の真下」であって本体の隣接面ではない。
     // millstone型のfunnel検証(隣接funnel+真下storage)を当てると偽合格を生むため含めない。
-    // crushing_wheels は専用検証(ペア存在・1マス間隔)で扱う。
+    // crushing_wheel は専用検証(ペア存在・1マス間隔・軸端動力・隙間真下の保管庫)で扱う。
     public static readonly HashSet<string> RequiresFunnelOutput =
         new(StringComparer.Ordinal)
         {

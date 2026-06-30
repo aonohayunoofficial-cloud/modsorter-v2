@@ -731,28 +731,81 @@ public static class ConnectionValidator
                         if (isPrimary)
                         {
                             var recvPos = (gapPos.Value.x, gapPos.Value.y - 1, gapPos.Value.z);
-                            bool recvOk = idx.TryGetValue(recvPos, out var rb)
-                                          && ConnectionCatalog.IsBulkStorage(rb.Id);
-                            bool recvIsDepot = idx.TryGetValue(recvPos, out var rd)
-                                               && rd.Id == "create:depot";
+                            bool hasRecv = idx.TryGetValue(recvPos, out var rb);
+                            bool recvIsBulk = hasRecv && ConnectionCatalog.IsBulkStorage(rb!.Id);
+                            bool recvIsDepot = hasRecv && rb!.Id == "create:depot";
 
-                            if (!recvOk)
+                            if (recvIsDepot)
                             {
+                                // depot は1個しか貯められず詰まる。chest へ自動置換(種別変換)。
                                 issues.Add(new ValidationIssue
                                 {
                                     Category = IssueCategory.OutputChainInvalid,
-                                    AutoFixable = false,
-                                    TargetPos = (b.X, b.Y, b.Z),
-                                    HumanMessage = recvIsDepot
-                                        ? $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下に" +
-                                          $"create:depotが置かれているが、depotは1個しか貯められず連続排出で詰まる。" +
-                                          $"chest/barrel/item_vault 等の保管庫に置き換えること。"
-                                        : $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下に受けが無い。" +
-                                          $"({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})にchest/barrel/item_vault等の保管庫を置くこと。",
+                                    AutoFixable = true,
+                                    TargetPos = recvPos,
+                                    SuggestedBlockId = "minecraft:chest",
+                                    HumanMessage =
+                                        $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下の" +
+                                        $"create:depotを保管庫(minecraft:chest)に置き換えた。" +
+                                        $"depotは1個しか貯められず連続排出で詰まるため。",
                                     GeneralAdvice =
-                                        "crushing_wheelの加工物は2輪の隙間の真下へ落ちる。" +
-                                        "そこにchest/barrel/item_vault等の貯められる保管庫を置く。depotは1個しか持てないので不可。"
+                                        "crushing_wheelの受けは貯められる保管庫(chest/barrel/item_vault)。depotは不可。"
                                 });
+                            }
+                            else if (!recvIsBulk)
+                            {
+                                if (recvPos.Item2 < 0)
+                                {
+                                    // 隙間が低すぎて真下に受けを置けない → 再生成へ。
+                                    issues.Add(new ValidationIssue
+                                    {
+                                        Category = IssueCategory.OutputChainInvalid,
+                                        AutoFixable = false,
+                                        TargetPos = (b.X, b.Y, b.Z),
+                                        HumanMessage =
+                                            $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})が低すぎて" +
+                                            $"真下に受けを置く空間がない。隙間の真下に保管庫を置ける高さに配置すること。",
+                                        GeneralAdvice =
+                                            "crushing_wheelの加工物は隙間の真下へ落ちる。真下に保管庫を置ける高さに2輪を上げること。"
+                                    });
+                                }
+                                else if (hasRecv)
+                                {
+                                    // 受け位置に保管庫でも depot でもない別ブロックがある → 補正不可で再生成。
+                                    issues.Add(new ValidationIssue
+                                    {
+                                        Category = IssueCategory.OutputChainInvalid,
+                                        AutoFixable = false,
+                                        TargetPos = (b.X, b.Y, b.Z),
+                                        HumanMessage =
+                                            $"crushing_wheelの隙間の真下({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})に" +
+                                            $"{rb!.Id}があり受けにならない。そこをchest/barrel/item_vault等の保管庫にすること。",
+                                        GeneralAdvice =
+                                            "crushing_wheelの隙間の真下は保管庫(chest/barrel/item_vault)にする。"
+                                    });
+                                }
+                                else
+                                {
+                                    // 受けが空 → chest を自動追加。
+                                    issues.Add(new ValidationIssue
+                                    {
+                                        Category = IssueCategory.OutputChainInvalid,
+                                        AutoFixable = true,
+                                        AddBlocks = new List<PB>
+                                        {
+                                            new PB
+                                            {
+                                                Id = "minecraft:chest",
+                                                X = recvPos.Item1, Y = recvPos.Item2, Z = recvPos.Item3
+                                            }
+                                        },
+                                        HumanMessage =
+                                            $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下が空だったため" +
+                                            $"({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})にminecraft:chestを追加した。",
+                                        GeneralAdvice =
+                                            "crushing_wheelの加工物は隙間の真下へ落ちる。そこに保管庫(chest等)を置く。"
+                                    });
+                                }
                             }
                         }
                     }
