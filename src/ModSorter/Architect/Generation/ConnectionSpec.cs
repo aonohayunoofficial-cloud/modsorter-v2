@@ -152,11 +152,13 @@ public static class ConnectionCatalog
         => Rotation.TryGetValue(blockId, out var s) ? s : null;
 
     // 加工物の取り出しに「隣接funnel→そのfunnelに隣接するstorage」が必要な機械。
+    // crushing_wheels は排出位置が「2輪の隙間の真下」であって機械本体の隣接面ではない。
+    // millstone型のfunnel検証(隣接funnel+真下storage)を当てると偽合格を生むため含めない。
+    // crushing_wheels は専用検証(ペア存在・1マス間隔)で扱う。
     public static readonly HashSet<string> RequiresFunnelOutput =
         new(StringComparer.Ordinal)
         {
             "create:millstone",
-            "create:crushing_wheels",
         };
 
     public static bool IsFunnel(string id)

@@ -608,7 +608,67 @@ public static class ConnectionValidator
                 }
             }
 
-            // (C-1) RequiresFunnelOutput の機械(millstone/crushing_wheels)は
+            // (C-0) crushing_wheels 専用検証(AutoFix不可・再生成誘導)。
+            //  公式仕様: 2個1組・互いに1ブロック離して並べる(隣接させない)・
+            //  両方を逆回転で駆動・素材は2輪の隙間の上から投入・加工物は隙間の真下に排出。
+            //  ここでは「相方の存在」と「1マス間隔(縦または横)」のみを機械的に検証する。
+            //  軸整合・逆回転・受け皿の自動補正は行わない(リスクが高いため将来の第2段)。
+            if (b.Id == "create:crushing_wheels")
+            {
+                // 自分から見て「1ブロック離れた位置(+2方向)」に相方がいるか。
+                //  Create では2輪の間に1マスの隙間を空けて配置する。
+                //  6方向それぞれ2マス先(縦: y±2 / 横: x±2, z±2)を確認する。
+                bool hasPartnerWithGap = false;
+                foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                {
+                    var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                    var partnerPos = (b.X + dx * 2, b.Y + dy * 2, b.Z + dz * 2);
+                    if (idx.TryGetValue(partnerPos, out var p)
+                        && p.Id == "create:crushing_wheels")
+                    {
+                        hasPartnerWithGap = true;
+                        break;
+                    }
+                }
+
+                // 「隣接(間隔ゼロ)で置かれた相方」を誤配置として検出する。
+                bool hasAdjacentPartner = false;
+                foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                {
+                    var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                    var adjPos = (b.X + dx, b.Y + dy, b.Z + dz);
+                    if (idx.TryGetValue(adjPos, out var p)
+                        && p.Id == "create:crushing_wheels")
+                    {
+                        hasAdjacentPartner = true;
+                        break;
+                    }
+                }
+
+                if (!hasPartnerWithGap)
+                {
+                    issues.Add(new ValidationIssue
+                    {
+                        Category = IssueCategory.OutputChainInvalid,
+                        AutoFixable = false,
+                        TargetPos = (b.X, b.Y, b.Z),
+                        HumanMessage = hasAdjacentPartner
+                            ? $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheelsが相方と隙間なく密着している。" +
+                              $"crushing_wheelsは2個を1ブロック離して(間に1マス空けて)並べること。"
+                            : $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheelsが単体で置かれている。" +
+                              $"crushing_wheelsは必ず2個1組で、互いに1ブロック離して(縦または横に)並べること。",
+                        GeneralAdvice =
+                            "crushing_wheelsは2個1組。互いに1ブロック離して並べ(間に1マスの隙間)、" +
+                            "両方を逆回転で駆動する(片方だけでは動かない)。" +
+                            "素材は2輪の隙間の真上から投入し、加工物は隙間の真下のdepot/beltで受ける。"
+                    });
+                }
+
+                // crushing_wheels はこの専用検証で完結(millstone型funnel検証には回さない)。
+                continue;
+            }
+
+            // (C-1) RequiresFunnelOutput の機械(millstone)は
             //        「隣接funnel(extracting=true)」かつ「funnel真下のstorage」が必要。
             if (!ConnectionCatalog.RequiresFunnelOutput.Contains(b.Id)) continue;
 
