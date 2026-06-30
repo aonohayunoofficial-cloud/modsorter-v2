@@ -675,33 +675,54 @@ public static class ConnectionValidator
                 }
                 else
                 {
-                    // ペア間隔は正しい。各wheelに「軸端の動力(shaft/cog)」が付いているか確認する。
+                    // ペア間隔は正しい。動力は「両wheelの同じ側の軸端」に shaft を揃えて出す。
+                    //  (向きを揃えると単一動力ラインで繋ぎやすい。逆回転の作り込みはユーザー側に委ねる。)
+                    //  endA(=軸の-側) / endB(=軸の+側) のどちらかに、自分と相方の両方が shaft/cog を
+                    //  持っていれば「揃っている」とみなす。両側バラバラ・片方のみは再生成 Issue。
                     var (endA, endB) = ConnectionCatalog.AxisToDirs(wheelAxis);
-                    bool hasAxisEndPower = false;
-                    foreach (Dir d in new[] { endA, endB })
+
+                    // 自分の軸端2方向それぞれに動力部材があるか。
+                    bool selfEndA = HasPart(idx, b, endA);
+                    bool selfEndB = HasPart(idx, b, endB);
+
+                    // 相方を取得(軸に垂直方向の2マス先)。
+                    PB? partner = null;
+                    foreach (Dir d in Enum.GetValues(typeof(Dir)))
                     {
+                        if (AxisOfDir(d) == wheelAxis) continue;
                         var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
-                        if (idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
-                            && (n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel"))
+                        if (idx.TryGetValue((b.X + dx * 2, b.Y + dy * 2, b.Z + dz * 2), out var p)
+                            && p.Id == "create:crushing_wheel")
                         {
-                            hasAxisEndPower = true;
+                            partner = p;
                             break;
                         }
                     }
+                    bool partnerEndA = partner != null && HasPart(idx, partner, endA);
+                    bool partnerEndB = partner != null && HasPart(idx, partner, endB);
 
-                    if (!hasAxisEndPower)
+                    // 「同じ側」に両輪とも shaft があるか。
+                    bool alignedA = selfEndA && partnerEndA;
+                    bool alignedB = selfEndB && partnerEndB;
+                    bool anyPower = selfEndA || selfEndB || partnerEndA || partnerEndB;
+
+                    if (!alignedA && !alignedB)
                     {
                         issues.Add(new ValidationIssue
                         {
                             Category = IssueCategory.OutputChainInvalid,
                             AutoFixable = false,
                             TargetPos = (b.X, b.Y, b.Z),
-                            HumanMessage =
-                                $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheel(axis={wheelAxis})に動力が繋がっていない。" +
-                                $"axisの端(軸方向の隣、{ConnectionCatalog.DirToFacing(endA)}か{ConnectionCatalog.DirToFacing(endB)}側)に" +
-                                $"create:shaft(axis={wheelAxis})を同軸で挿すこと。axisに垂直な側面に挿しても繋がらない。",
+                            HumanMessage = anyPower
+                                ? $"crushing_wheelの2輪のshaftが揃っていない。" +
+                                  $"両輪とも「同じ側の軸端({ConnectionCatalog.DirToFacing(endA)}側か{ConnectionCatalog.DirToFacing(endB)}側のどちらか一方)」に" +
+                                  $"create:shaft(axis={wheelAxis})を出すこと。逆側にバラバラだと1本の動力ラインで繋ぎにくい。"
+                                : $"crushing_wheelの2輪に動力が繋がっていない。" +
+                                  $"両輪とも同じ側の軸端({ConnectionCatalog.DirToFacing(endA)}側か{ConnectionCatalog.DirToFacing(endB)}側)に" +
+                                  $"create:shaft(axis={wheelAxis})を出すこと。",
                             GeneralAdvice =
-                                "crushing_wheelの動力は回転軸(axis)の端から入れる。2個とも駆動し逆回転にすること。"
+                                "crushing_wheelは2輪とも駆動する。動力は両輪の同じ側の軸端にshaft(同axis)を揃えて出す。" +
+                                "axisに垂直な側面に挿しても繋がらない。逆回転の作り込み(gearshift等)はユーザーが行う。"
                         });
                     }
 
@@ -730,81 +751,138 @@ public static class ConnectionValidator
 
                         if (isPrimary)
                         {
-                            var recvPos = (gapPos.Value.x, gapPos.Value.y - 1, gapPos.Value.z);
-                            bool hasRecv = idx.TryGetValue(recvPos, out var rb);
-                            bool recvIsBulk = hasRecv && ConnectionCatalog.IsBulkStorage(rb!.Id);
-                            bool recvIsDepot = hasRecv && rb!.Id == "create:depot";
+                            // 確定出力経路: gap(投入空間) → funnel(facing=down) → storage(保管庫)。
+                            //  funnelPos = 隙間の真下(gap.y-1)、storagePos = その下(gap.y-2)。
+                            var funnelPos = (gapPos.Value.x, gapPos.Value.y - 1, gapPos.Value.z);
+                            var storagePos = (gapPos.Value.x, gapPos.Value.y - 2, gapPos.Value.z);
 
-                            if (recvIsDepot)
+                            // 縦に funnel+storage の2マスが入る高さが無ければ再生成へ。
+                            if (storagePos.Item2 < 0)
                             {
-                                // depot は1個しか貯められず詰まる。chest へ自動置換(種別変換)。
                                 issues.Add(new ValidationIssue
                                 {
                                     Category = IssueCategory.OutputChainInvalid,
-                                    AutoFixable = true,
-                                    TargetPos = recvPos,
-                                    SuggestedBlockId = "minecraft:chest",
+                                    AutoFixable = false,
+                                    TargetPos = (b.X, b.Y, b.Z),
                                     HumanMessage =
-                                        $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下の" +
-                                        $"create:depotを保管庫(minecraft:chest)に置き換えた。" +
-                                        $"depotは1個しか貯められず連続排出で詰まるため。",
+                                        $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})が低すぎて" +
+                                        $"真下にfunnel+保管庫の2マスを置く空間がない。" +
+                                        $"隙間の真下にcreate:andesite_funnel(facing=down)、その下にchest等を置ける高さに2輪を上げること。",
                                     GeneralAdvice =
-                                        "crushing_wheelの受けは貯められる保管庫(chest/barrel/item_vault)。depotは不可。"
+                                        "crushing_wheelの出力は「隙間→funnel(facing=down)→保管庫」の縦3段。" +
+                                        "この2マス分の余裕がある高さに2輪を置く。"
                                 });
                             }
-                            else if (!recvIsBulk)
+                            else
                             {
-                                if (recvPos.Item2 < 0)
+                                bool hasFunnel = idx.TryGetValue(funnelPos, out var fb0);
+                                bool funnelOk = hasFunnel && ConnectionCatalog.IsFunnel(fb0!.Id);
+                                bool hasStorage = idx.TryGetValue(storagePos, out var sb0);
+                                bool storageIsBulk = hasStorage && ConnectionCatalog.IsBulkStorage(sb0!.Id);
+                                bool storageIsDepot = hasStorage && sb0!.Id == "create:depot";
+
+                                var adds = new List<PB>();
+
+                                // (1) funnel の位置に保管庫/depot が密着している(funnel枠が無い)場合。
+                                //  → 縦余裕が足りない密着配置。自動移動はせず再生成へ。
+                                bool funnelSlotBlockedByStorage =
+                                    hasFunnel && (ConnectionCatalog.IsBulkStorage(fb0!.Id)
+                                                  || fb0!.Id == "create:depot");
+
+                                if (funnelSlotBlockedByStorage)
                                 {
-                                    // 隙間が低すぎて真下に受けを置けない → 再生成へ。
                                     issues.Add(new ValidationIssue
                                     {
                                         Category = IssueCategory.OutputChainInvalid,
                                         AutoFixable = false,
                                         TargetPos = (b.X, b.Y, b.Z),
                                         HumanMessage =
-                                            $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})が低すぎて" +
-                                            $"真下に受けを置く空間がない。隙間の真下に保管庫を置ける高さに配置すること。",
+                                            $"crushing_wheelの隙間の真下({funnelPos.Item1},{funnelPos.Item2},{funnelPos.Item3})に" +
+                                            $"{fb0!.Id}が密着している。アイテムを保管庫に入れるにはfunnelが要る。" +
+                                            $"隙間の真下をcreate:andesite_funnel(facing=down)にし、その下に保管庫を置くこと。",
                                         GeneralAdvice =
-                                            "crushing_wheelの加工物は隙間の真下へ落ちる。真下に保管庫を置ける高さに2輪を上げること。"
-                                    });
-                                }
-                                else if (hasRecv)
-                                {
-                                    // 受け位置に保管庫でも depot でもない別ブロックがある → 補正不可で再生成。
-                                    issues.Add(new ValidationIssue
-                                    {
-                                        Category = IssueCategory.OutputChainInvalid,
-                                        AutoFixable = false,
-                                        TargetPos = (b.X, b.Y, b.Z),
-                                        HumanMessage =
-                                            $"crushing_wheelの隙間の真下({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})に" +
-                                            $"{rb!.Id}があり受けにならない。そこをchest/barrel/item_vault等の保管庫にすること。",
-                                        GeneralAdvice =
-                                            "crushing_wheelの隙間の真下は保管庫(chest/barrel/item_vault)にする。"
+                                            "crushing_wheelの加工物を保管庫に格納するには、隙間の真下にfunnel(facing=down)を" +
+                                            "挟み、そのさらに下に保管庫(chest/barrel/item_vault)を置く。"
                                     });
                                 }
                                 else
                                 {
-                                    // 受けが空 → chest を自動追加。
-                                    issues.Add(new ValidationIssue
+                                    // (2) funnel が無ければ追加(facing=down, extracting=false で上から受けて下へ通す)。
+                                    if (!funnelOk && !hasFunnel)
                                     {
-                                        Category = IssueCategory.OutputChainInvalid,
-                                        AutoFixable = true,
-                                        AddBlocks = new List<PB>
+                                        adds.Add(new PB
                                         {
-                                            new PB
+                                            Id = "create:andesite_funnel",
+                                            X = funnelPos.Item1,
+                                            Y = funnelPos.Item2,
+                                            Z = funnelPos.Item3,
+                                            Properties = new Dictionary<string, string>
                                             {
-                                                Id = "minecraft:chest",
-                                                X = recvPos.Item1, Y = recvPos.Item2, Z = recvPos.Item3
+                                                ["facing"] = "down",
+                                                ["extracting"] = "false"
                                             }
-                                        },
-                                        HumanMessage =
-                                            $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下が空だったため" +
-                                            $"({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})にminecraft:chestを追加した。",
-                                        GeneralAdvice =
-                                            "crushing_wheelの加工物は隙間の真下へ落ちる。そこに保管庫(chest等)を置く。"
-                                    });
+                                        });
+                                    }
+
+                                    // (3) storage が depot なら chest へ置換。
+                                    if (storageIsDepot)
+                                    {
+                                        issues.Add(new ValidationIssue
+                                        {
+                                            Category = IssueCategory.OutputChainInvalid,
+                                            AutoFixable = true,
+                                            TargetPos = storagePos,
+                                            SuggestedBlockId = "minecraft:chest",
+                                            HumanMessage =
+                                                $"crushing_wheelの出力先({storagePos.Item1},{storagePos.Item2},{storagePos.Item3})の" +
+                                                $"create:depotを保管庫(minecraft:chest)に置き換えた(depotは1個で詰まる)。",
+                                            GeneralAdvice =
+                                                "crushing_wheelの受けは貯められる保管庫(chest/barrel/item_vault)。depotは不可。"
+                                        });
+                                    }
+                                    // (4) storage が空なら chest を追加。
+                                    else if (!hasStorage)
+                                    {
+                                        adds.Add(new PB
+                                        {
+                                            Id = "minecraft:chest",
+                                            X = storagePos.Item1,
+                                            Y = storagePos.Item2,
+                                            Z = storagePos.Item3
+                                        });
+                                    }
+                                    // (5) storage が保管庫でも depot でもない別ブロック → 再生成。
+                                    else if (!storageIsBulk)
+                                    {
+                                        issues.Add(new ValidationIssue
+                                        {
+                                            Category = IssueCategory.OutputChainInvalid,
+                                            AutoFixable = false,
+                                            TargetPos = (b.X, b.Y, b.Z),
+                                            HumanMessage =
+                                                $"crushing_wheelの出力先({storagePos.Item1},{storagePos.Item2},{storagePos.Item3})に" +
+                                                $"{sb0!.Id}があり受けにならない。そこをchest/barrel/item_vault等の保管庫にすること。",
+                                            GeneralAdvice =
+                                                "crushing_wheelの出力先は保管庫(chest/barrel/item_vault)にする。"
+                                        });
+                                    }
+
+                                    // funnel/chest の追加があればまとめて1 Issue で出す。
+                                    if (adds.Count > 0)
+                                    {
+                                        issues.Add(new ValidationIssue
+                                        {
+                                            Category = IssueCategory.OutputChainInvalid,
+                                            AutoFixable = true,
+                                            AddBlocks = adds,
+                                            HumanMessage =
+                                                $"crushing_wheelの出力経路を補完した: 隙間の真下にfunnel(facing=down)" +
+                                                (adds.Exists(a => a.Id == "minecraft:chest") ? "とその下に保管庫(chest)" : "") +
+                                                $"を追加。加工物は隙間→funnel→保管庫へ格納される。",
+                                            GeneralAdvice =
+                                                "crushing_wheelの出力は「隙間→funnel(facing=down)→保管庫」。funnelが無いと保管庫に入らない。"
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -969,4 +1047,12 @@ public static class ConnectionValidator
         Dir.Up or Dir.Down => "y",
         _ => "z"
     };
+
+    // 指定ブロックの指定方向の隣に、回転を運ぶ部材(shaft/cogwheel)があるか。
+    private static bool HasPart(Dictionary<(int, int, int), PB> idx, PB b, Dir d)
+    {
+        var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+        return idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
+               && (n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel");
+    }
 }

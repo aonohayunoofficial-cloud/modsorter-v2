@@ -229,12 +229,13 @@ Rules:
 - create:crushing_wheel (singular id) MUST be placed as a PAIR. Both wheels use the SAME
   axis. Place the two wheels one block apart along the axis PERPENDICULAR to their
   rotation axis (leave exactly one empty cell between them, horizontally). NEVER place
-  them directly adjacent, and NEVER place a single one. Drive BOTH wheels in opposite
-  rotation by inserting create:shaft (same axis) at the AXIS END of each wheel (the
-  neighbour along the axis direction); do NOT attach shafts to the perpendicular sides.
-  Items go into the gap from above; the output drops into a STORAGE block (chest/barrel/
-  item_vault) directly below the gap. Do NOT use a depot there (it holds only one item)
-  and do NOT attach a funnel to the wheel body.
+  them directly adjacent, and NEVER place a single one. Drive BOTH wheels with
+  create:shaft (same axis) at the AXIS END, and put BOTH shafts on the SAME side
+  (both on the negative-axis end OR both on the positive-axis end) so one drive line can
+  reach them; do NOT attach shafts to the perpendicular sides. Items go into the gap from
+  above. Output path below the gap is THREE cells stacked: gap -> create:andesite_funnel
+  (facing=down) -> a STORAGE block (chest/barrel/item_vault). The funnel is REQUIRED to
+  feed the storage. Do NOT use a depot as the storage (it holds only one item).
 - Output the single JSON object only.
 
 Allowed blocks:
