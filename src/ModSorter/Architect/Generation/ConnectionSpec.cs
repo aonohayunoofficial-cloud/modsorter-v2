@@ -166,7 +166,13 @@ public static class ConnectionCatalog
               or "create:andesite_belt_funnel" or "create:brass_belt_funnel";
 
     public static bool IsItemStorage(string id)
-        => id is "create:depot" or "create:item_vault" || id.Contains("chest");
+        => id is "create:depot" or "create:item_vault" or "minecraft:barrel"
+           || id.Contains("chest");
+
+    // crushing_wheel の受けに使える「貯められる保管庫」。
+    //  depot は1個しか持てず連続排出で詰まるため除外する(depotは加工台・belt終点用)。
+    public static bool IsBulkStorage(string id)
+        => id is "create:item_vault" or "minecraft:barrel" || id.Contains("chest");
 
     // 方向 → facing のブロックステート文字列。
     public static string DirToFacing(Dir d) => d switch

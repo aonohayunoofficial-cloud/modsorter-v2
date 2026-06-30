@@ -226,11 +226,15 @@ Rules:
 - Coordinates are integers. The build volume is {sizeX} x {sizeY} x {sizeZ}.
   x MUST be 0..{maxX}, y MUST be 0..{maxY}, z MUST be 0..{maxZ}. Do NOT exceed these.
 - Put EVERY block as a separate element inside the ""blocks"" array.
-- create:crushing_wheels MUST be placed as a PAIR, one block apart (leave exactly one
-  empty cell between the two wheels, vertically or horizontally). NEVER place them
-  directly adjacent, and NEVER place a single one. Drive BOTH wheels in opposite
-  rotation. Items go into the gap from above; output drops into a depot/belt directly
-  below the gap. Do not attach a funnel to the wheel body.
+- create:crushing_wheel (singular id) MUST be placed as a PAIR. Both wheels use the SAME
+  axis. Place the two wheels one block apart along the axis PERPENDICULAR to their
+  rotation axis (leave exactly one empty cell between them, horizontally). NEVER place
+  them directly adjacent, and NEVER place a single one. Drive BOTH wheels in opposite
+  rotation by inserting create:shaft (same axis) at the AXIS END of each wheel (the
+  neighbour along the axis direction); do NOT attach shafts to the perpendicular sides.
+  Items go into the gap from above; the output drops into a STORAGE block (chest/barrel/
+  item_vault) directly below the gap. Do NOT use a depot there (it holds only one item)
+  and do NOT attach a funnel to the wheel body.
 - Output the single JSON object only.
 
 Allowed blocks:

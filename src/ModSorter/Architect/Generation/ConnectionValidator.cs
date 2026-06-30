@@ -608,25 +608,34 @@ public static class ConnectionValidator
                 }
             }
 
-            // (C-0) crushing_wheels 専用検証(AutoFix不可・再生成誘導)。
-            //  公式仕様: 2個1組・互いに1ブロック離して並べる(隣接させない)・
-            //  両方を逆回転で駆動・素材は2輪の隙間の上から投入・加工物は隙間の真下に排出。
-            //  ここでは「相方の存在」と「1マス間隔(縦または横)」のみを機械的に検証する。
-            //  軸整合・逆回転・受け皿の自動補正は行わない(リスクが高いため将来の第2段)。
-            if (b.Id == "create:crushing_wheels")
+            // (C-0) crushing_wheel 専用検証(AutoFix不可・再生成誘導)。
+            //  確定形(横並び・真上投入・真下排出): 2個1組・互いに「軸に垂直な水平方向」へ
+            //  1ブロック離して並べる(隣接させない)・両方を逆回転で駆動・
+            //  素材は2輪の隙間の真上から投入・加工物は隙間の真下の保管庫(storage)で受ける。
+            //  実機ID は create:crushing_wheel(単数)。axis が回転軸。
+            //  受けは depot 不可(1個しか持てず連続排出で詰まる)。chest/barrel/item_vault 等の
+            //  「貯められる保管庫(IsBulkStorage)」を隙間の真下に置く。
+            //  ここでは (1)相方の存在 (2)1マス間隔 (3)両輪に軸端動力 (4)隙間の真下に保管庫
+            //  を機械的に検証する。逆回転/受けの自動配置は行わない(将来の第2段)。
+            if (b.Id == "create:crushing_wheel")
             {
-                // 自分から見て「1ブロック離れた位置(+2方向)」に相方がいるか。
-                //  Create では2輪の間に1マスの隙間を空けて配置する。
-                //  6方向それぞれ2マス先(縦: y±2 / 横: x±2, z±2)を確認する。
+                string wheelAxis = ConnectionCatalog.GetRotationAxis(b) ?? "y";
+
+                // 相方は「軸に垂直な方向」へ2マス先(間に1マス隙間)にいるのが正しい。
+                //  6方向のうち、軸方向(=軸端)を除いた4方向の2マス先を確認する。
+                //  見つかった方向を覚えておき、隙間(中間マス)の座標を出力受け検証に使う。
                 bool hasPartnerWithGap = false;
+                (int x, int y, int z)? gapPos = null; // 2輪の中間=隙間
                 foreach (Dir d in Enum.GetValues(typeof(Dir)))
                 {
+                    if (AxisOfDir(d) == wheelAxis) continue; // 軸方向は並べる向きではない
                     var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
                     var partnerPos = (b.X + dx * 2, b.Y + dy * 2, b.Z + dz * 2);
                     if (idx.TryGetValue(partnerPos, out var p)
-                        && p.Id == "create:crushing_wheels")
+                        && p.Id == "create:crushing_wheel")
                     {
                         hasPartnerWithGap = true;
+                        gapPos = (b.X + dx, b.Y + dy, b.Z + dz);
                         break;
                     }
                 }
@@ -638,7 +647,7 @@ public static class ConnectionValidator
                     var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
                     var adjPos = (b.X + dx, b.Y + dy, b.Z + dz);
                     if (idx.TryGetValue(adjPos, out var p)
-                        && p.Id == "create:crushing_wheels")
+                        && p.Id == "create:crushing_wheel")
                     {
                         hasAdjacentPartner = true;
                         break;
@@ -653,18 +662,103 @@ public static class ConnectionValidator
                         AutoFixable = false,
                         TargetPos = (b.X, b.Y, b.Z),
                         HumanMessage = hasAdjacentPartner
-                            ? $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheelsが相方と隙間なく密着している。" +
-                              $"crushing_wheelsは2個を1ブロック離して(間に1マス空けて)並べること。"
-                            : $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheelsが単体で置かれている。" +
-                              $"crushing_wheelsは必ず2個1組で、互いに1ブロック離して(縦または横に)並べること。",
+                            ? $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheel(axis={wheelAxis})が相方と隙間なく密着している。" +
+                              $"crushing_wheelは2個を「軸(axis={wheelAxis})に垂直な水平方向」へ1ブロック離して(間に1マス空けて)並べること。"
+                            : $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheel(axis={wheelAxis})が単体で置かれている。" +
+                              $"crushing_wheelは必ず2個1組で、軸に垂直な水平方向へ互いに1ブロック離して並べること。",
                         GeneralAdvice =
-                            "crushing_wheelsは2個1組。互いに1ブロック離して並べ(間に1マスの隙間)、" +
+                            "crushing_wheelは2個1組。axisが回転軸で、2輪は軸に垂直な水平方向へ1マス離して並べる。" +
                             "両方を逆回転で駆動する(片方だけでは動かない)。" +
-                            "素材は2輪の隙間の真上から投入し、加工物は隙間の真下のdepot/beltで受ける。"
+                            "動力は各wheelのaxis端(軸方向の隣)にshaft/cogを同軸で挿す。" +
+                            "素材は2輪の隙間の真上から投入し、加工物は隙間の真下の保管庫(chest/barrel/item_vault)で受ける。"
                     });
                 }
+                else
+                {
+                    // ペア間隔は正しい。各wheelに「軸端の動力(shaft/cog)」が付いているか確認する。
+                    var (endA, endB) = ConnectionCatalog.AxisToDirs(wheelAxis);
+                    bool hasAxisEndPower = false;
+                    foreach (Dir d in new[] { endA, endB })
+                    {
+                        var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                        if (idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
+                            && (n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel"))
+                        {
+                            hasAxisEndPower = true;
+                            break;
+                        }
+                    }
 
-                // crushing_wheels はこの専用検証で完結(millstone型funnel検証には回さない)。
+                    if (!hasAxisEndPower)
+                    {
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.OutputChainInvalid,
+                            AutoFixable = false,
+                            TargetPos = (b.X, b.Y, b.Z),
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:crushing_wheel(axis={wheelAxis})に動力が繋がっていない。" +
+                                $"axisの端(軸方向の隣、{ConnectionCatalog.DirToFacing(endA)}か{ConnectionCatalog.DirToFacing(endB)}側)に" +
+                                $"create:shaft(axis={wheelAxis})を同軸で挿すこと。axisに垂直な側面に挿しても繋がらない。",
+                            GeneralAdvice =
+                                "crushing_wheelの動力は回転軸(axis)の端から入れる。2個とも駆動し逆回転にすること。"
+                        });
+                    }
+
+                    // 隙間の真下(gap.y-1)に「貯められる保管庫」があるか検証する。
+                    //  片方のwheelからのみ走査すれば足りる(gapPosは2輪の中間で一意)。
+                    //  二重Issueを避けるため、座標が小さい側のwheelのときだけ受けを検証する。
+                    if (gapPos != null)
+                    {
+                        // ペアの相方を特定して、自分が「小さい側」かを判定する。
+                        //  gapPos から相方方向へさらに1マス進んだ先が相方。
+                        bool isPrimary = true; // 既定はこのwheelが代表
+                        foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                        {
+                            if (AxisOfDir(d) == wheelAxis) continue;
+                            var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                            var partnerPos = (b.X + dx * 2, b.Y + dy * 2, b.Z + dz * 2);
+                            if (idx.TryGetValue(partnerPos, out var p)
+                                && p.Id == "create:crushing_wheel")
+                            {
+                                // 相方の座標が自分より小さければ、代表は相方に譲る。
+                                if ((p.X, p.Y, p.Z).CompareTo((b.X, b.Y, b.Z)) < 0)
+                                    isPrimary = false;
+                                break;
+                            }
+                        }
+
+                        if (isPrimary)
+                        {
+                            var recvPos = (gapPos.Value.x, gapPos.Value.y - 1, gapPos.Value.z);
+                            bool recvOk = idx.TryGetValue(recvPos, out var rb)
+                                          && ConnectionCatalog.IsBulkStorage(rb.Id);
+                            bool recvIsDepot = idx.TryGetValue(recvPos, out var rd)
+                                               && rd.Id == "create:depot";
+
+                            if (!recvOk)
+                            {
+                                issues.Add(new ValidationIssue
+                                {
+                                    Category = IssueCategory.OutputChainInvalid,
+                                    AutoFixable = false,
+                                    TargetPos = (b.X, b.Y, b.Z),
+                                    HumanMessage = recvIsDepot
+                                        ? $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下に" +
+                                          $"create:depotが置かれているが、depotは1個しか貯められず連続排出で詰まる。" +
+                                          $"chest/barrel/item_vault 等の保管庫に置き換えること。"
+                                        : $"crushing_wheelの隙間({gapPos.Value.x},{gapPos.Value.y},{gapPos.Value.z})の真下に受けが無い。" +
+                                          $"({recvPos.Item1},{recvPos.Item2},{recvPos.Item3})にchest/barrel/item_vault等の保管庫を置くこと。",
+                                    GeneralAdvice =
+                                        "crushing_wheelの加工物は2輪の隙間の真下へ落ちる。" +
+                                        "そこにchest/barrel/item_vault等の貯められる保管庫を置く。depotは1個しか持てないので不可。"
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // crushing_wheel はこの専用検証で完結(millstone型funnel検証には回さない)。
                 continue;
             }
 
