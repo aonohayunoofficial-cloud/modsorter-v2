@@ -155,8 +155,72 @@ public static class ConnectionValidator
                                     : "") +
                                 (string.IsNullOrEmpty(spec.PowerInputHint) ? "" : spec.PowerInputHint),
                             GeneralAdvice =
-                                "saw/deployerの動力入力は背面(facingの反対側)1面のみ。" +
+                                "deployerの動力入力は背面(facingの反対側)1面のみ。" +
                                 "前面(作用面)・上下・facingに垂直な側面に軸を挿しても繋がらない。"
+                        });
+                    }
+                }
+            }
+
+            // --- (A''') mechanical_saw 専用: facingで動力入力面が二分される。 ---
+            //  縦置き(facing=up/down)=加工: ブレード軸に直交する両側面のいずれか1面にshaft(同軸)。
+            //   動力軸は axis_along_first(true=x, false=z)。片側にでも動力があれば合格。
+            //   両側面のどちらにも動力が無ければ再生成 Issue(AutoFix不可)。
+            //  横向き(facing=north/south/east/west)=伐採: 加工ジャンルでは使わない。
+            //   縦置きへ直すよう再生成 Issue(AutoFix不可)。動力入力面の可否判定はしない。
+            //  flipped は動力に無関係なので参照しない。
+            if (spec.IsSaw)
+            {
+                string facing = b.Properties != null
+                    && b.Properties.TryGetValue("facing", out var sfv) ? sfv : "up";
+                bool isVertical = facing is "up" or "down";
+
+                if (!isVertical)
+                {
+                    // 横向き=伐採モード。加工ジャンルでは不可。
+                    issues.Add(new ValidationIssue
+                    {
+                        Category = IssueCategory.PowerInputFaceInvalid,
+                        AutoFixable = false,
+                        TargetPos = (b.X, b.Y, b.Z),
+                        HumanMessage =
+                            $"({b.X},{b.Y},{b.Z})のcreate:mechanical_sawがfacing={facing}(横向き)で置かれている。" +
+                            $"横向きは前方を伐採するモードで加工用途ではない。" +
+                            $"加工ではfacing=upの縦置きにし、ブレード軸に直交する両側面のどちらか一方に" +
+                            $"create:shaftを同軸で挿すこと。",
+                        GeneralAdvice =
+                            "mechanical_sawは加工用途では縦置き(facing=up)。横向き(north/south/east/west)は" +
+                            "伐採(からくり)用途なので加工ジャンルでは使わない。"
+                    });
+                }
+                else
+                {
+                    // 縦置き=加工モード。動力軸は axis_along_first で決まる(true=x, false=z)。
+                    bool axisAlongFirst = b.Properties != null
+                        && b.Properties.TryGetValue("axis_along_first", out var av)
+                        ? av == "true" : true; // 既定 true(x軸)
+                    string powerAxis = axisAlongFirst ? "x" : "z";
+                    var (sideA, sideB) = ConnectionCatalog.AxisToDirs(powerAxis);
+
+                    // 両側面のいずれか1面に、動力軸と同軸の shaft/cog があれば合格(片側でOK)。
+                    bool poweredA = HasCoaxialPart(idx, b, sideA, powerAxis);
+                    bool poweredB = HasCoaxialPart(idx, b, sideB, powerAxis);
+
+                    if (!poweredA && !poweredB)
+                    {
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.PowerInputFaceInvalid,
+                            AutoFixable = false,
+                            TargetPos = (b.X, b.Y, b.Z),
+                            HumanMessage =
+                                $"({b.X},{b.Y},{b.Z})のcreate:mechanical_saw(facing=up, " +
+                                $"axis_along_first={(axisAlongFirst ? "true" : "false")})の両側面" +
+                                $"({ConnectionCatalog.DirToFacing(sideA)}側/{ConnectionCatalog.DirToFacing(sideB)}側)に" +
+                                $"動力が繋がっていない。どちらか一方の側面にcreate:shaft(axis={powerAxis})を同軸で挿すこと。",
+                            GeneralAdvice =
+                                "縦置きmechanical_sawの動力はブレード軸に直交する両側面のいずれか1面から。" +
+                                "動力軸はaxis_along_firstで決まる(true=x/東西, false=z/南北)。片側だけ繋げば回る。"
                         });
                     }
                 }
@@ -1125,10 +1189,15 @@ public static class ConnectionValidator
     };
 
     // 指定ブロックの指定方向の隣に、回転を運ぶ部材(shaft/cogwheel)があるか。
-    private static bool HasPart(Dictionary<(int, int, int), PB> idx, PB b, Dir d)
+
+    // 指定方向の隣に「回転部材(shaft/cog)」があり、かつその軸が wantAxis と一致するか。
+    // saw の縦置き動力(両側面のいずれか1面に同軸shaft)の判定に使う。
+    private static bool HasCoaxialPart(Dictionary<(int, int, int), PB> idx, PB b, Dir d, string wantAxis)
     {
         var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
-        return idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
-               && (n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel");
+        if (!idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)) return false;
+        if (n.Id is not ("create:shaft" or "create:cogwheel" or "create:large_cogwheel"))
+            return false;
+        return ConnectionCatalog.GetRotationAxis(n) == wantAxis;
     }
 }

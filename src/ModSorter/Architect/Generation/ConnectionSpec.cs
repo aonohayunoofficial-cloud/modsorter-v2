@@ -41,11 +41,21 @@ public sealed class RotationSpec
     // 軸は GetRotationAxis(=facingから算出) を使う。
     public bool PowerOnAxisEnds = false;
 
-    // saw/deployer のように「facingの反対側(背面)1面だけがshaft動力入力で、残り5面は不可」
+    // deployer のように「facingの反対側(背面)1面だけがshaft動力入力で、残り5面は不可」
     // という動的な制約を表す。true のとき PowerInputFaces / PowerOnAxisEnds より優先して判定する。
     // 背面に付くshaftはfacing軸と同軸であること。前面(作用面)・上下・垂直側面は全て不可。
     // 軸は GetRotationAxis(=facingから算出) を使う。
     public bool PowerOnBackOnly = false;
+
+    // mechanical_saw 専用。sawは実機で動力入力面がfacingで二分される:
+    //  ・縦置き(facing=up/down)=加工モード → ブレード軸に直交する「両側面のいずれか1面」から
+    //    shaftで入力(片側でOK)。動力軸は properties["axis_along_first"] で決まる
+    //    (true=x/東西, false=z/南北)。flipped は動力に無関係。
+    //  ・横向き(facing=north/south/east/west)=伐採モード → 背面1面(PowerOnBackOnly相当)。
+    //    ただし加工ジャンルでは縦置きが正で、横向きは伐採(からくり)用途のため許可しない。
+    // この分岐は PowerOnBackOnly では表現できないため専用フラグにする。
+    // true のとき他の動力入力フラグより優先し、Validator の (A''') で判定する。
+    public bool IsSaw = false;
 
     // 動力入力の正しいやり方をLLMへ伝える具体文(再生成プロンプト用)。
     // 「どこにどの部材をどの向きで置けば動くか」を明記する。
@@ -163,18 +173,24 @@ public static class ConnectionCatalog
                     "同じaxisで挿すか、cogwheelを同軸で噛み合わせる。axisに垂直な側面にshaftを置いても繋がらない。" +
                     "2個を軸に垂直な水平方向へ1マス離して並べ、両方を逆回転で駆動する。"
             },
-            // mechanical_saw: facing は刃(のこぎり)の向き。動力入力は facing の反対側(背面)1面のみ。
-            //  背面に facing 軸と同軸の shaft を挿す。前面(刃/作用面)・上下・垂直側面は全て不可。
+            // mechanical_saw: facing は刃(のこぎり)の向き。動力入力面は実機で二分される。
+            //  【加工モード=縦置き(facing=up/down)】動力はブレード軸に直交する「両側面のいずれか1面」
+            //   にshaftを同軸で挿す(片側でOK)。動力軸は axis_along_first で決まる(true=x, false=z)。
+            //   flipped は動力に無関係。加工ジャンルではこの縦置きが正。
+            //  【伐採モード=横向き(facing=north/south/east/west)】動力は背面1面。ただし伐採(からくり)
+            //   用途であり加工ジャンルでは使わない。
+            //  この分岐は PowerOnBackOnly では表せないため IsSaw 専用判定((A''')で処理)を使う。
             //  出力(加工品は刃の端から飛ぶ)の受けは強制しない(用途で向きが変わるためプロンプト誘導のみ)。
             ["create:mechanical_saw"] = new()
             {
                 BlockId = "create:mechanical_saw",
                 AxisSource = AxisSource.FacingAxis,
-                PowerOnBackOnly = true,
+                IsSaw = true,
                 PowerInputHint =
-                    "mechanical_sawの動力は、facing(刃の向き)の反対側(背面)にcreate:shaftを" +
-                    "facing軸と同じ軸で挿す。前面(刃の側)・上面・下面・facingに垂直な側面には繋がらない。" +
-                    "縦置き(facing=up)なら背面=下面にshaftを挿し上面で加工、横置きなら背面にshaftを挿しfacing方向を伐採。"
+                    "mechanical_sawは加工用途では縦置き(facing=up)にする。動力はブレード軸に直交する" +
+                    "両側面のどちらか一方にcreate:shaftを同軸で挿す(片側でOK)。動力軸はaxis_along_firstで決まり、" +
+                    "axis_along_first=trueならx軸(東西)、falseならz軸(南北)。flipped は動力に関係ない。" +
+                    "横向き(facing=north/south/east/west)は前方を伐採するモードで、加工には使わない。"
             },
             // deployer: 背面(facingの反対側)に facing 軸と同軸の shaft を挿す。作用は facing 先の2マス目。
             //  動力面は背面1面のみ。前面(作用面)・上下・垂直側面は全て不可。
