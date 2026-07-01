@@ -236,6 +236,15 @@ Rules:
   above. Output path below the gap is THREE cells stacked: gap -> create:andesite_funnel
   (facing=down) -> a STORAGE block (chest/barrel/item_vault). The funnel is REQUIRED to
   feed the storage. Do NOT use a depot as the storage (it holds only one item).
+- create:mechanical_saw: its facing is the blade direction. Power is fed on the BACK face
+  (the side opposite facing) with create:shaft whose axis MATCHES the facing axis. NEVER
+  attach a shaft to the front (blade side), top, bottom, or a side perpendicular to facing.
+  For item processing, use facing=up (back = bottom, shaft below) and drop items on top;
+  for tree cutting, use a horizontal facing and put the shaft on the opposite side.
+- create:deployer is powered by create:shaft on its BACK face (the side opposite its
+  facing), and the shaft axis MUST match the facing axis. NEVER attach a shaft to the top,
+  bottom, or to a side perpendicular to facing. The deployer acts on the cell TWO blocks
+  ahead in its facing direction (the cell one block ahead is phased through).
 - Output the single JSON object only.
 
 Allowed blocks:

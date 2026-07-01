@@ -41,6 +41,12 @@ public sealed class RotationSpec
     // 軸は GetRotationAxis(=facingから算出) を使う。
     public bool PowerOnAxisEnds = false;
 
+    // saw/deployer のように「facingの反対側(背面)1面だけがshaft動力入力で、残り5面は不可」
+    // という動的な制約を表す。true のとき PowerInputFaces / PowerOnAxisEnds より優先して判定する。
+    // 背面に付くshaftはfacing軸と同軸であること。前面(作用面)・上下・垂直側面は全て不可。
+    // 軸は GetRotationAxis(=facingから算出) を使う。
+    public bool PowerOnBackOnly = false;
+
     // 動力入力の正しいやり方をLLMへ伝える具体文(再生成プロンプト用)。
     // 「どこにどの部材をどの向きで置けば動くか」を明記する。
     public string PowerInputHint = "";
@@ -156,6 +162,32 @@ public static class ConnectionCatalog
                     "crushing_wheelの動力は、axisが示す回転軸の端(同軸方向の隣)にcreate:shaftを" +
                     "同じaxisで挿すか、cogwheelを同軸で噛み合わせる。axisに垂直な側面にshaftを置いても繋がらない。" +
                     "2個を軸に垂直な水平方向へ1マス離して並べ、両方を逆回転で駆動する。"
+            },
+            // mechanical_saw: facing は刃(のこぎり)の向き。動力入力は facing の反対側(背面)1面のみ。
+            //  背面に facing 軸と同軸の shaft を挿す。前面(刃/作用面)・上下・垂直側面は全て不可。
+            //  出力(加工品は刃の端から飛ぶ)の受けは強制しない(用途で向きが変わるためプロンプト誘導のみ)。
+            ["create:mechanical_saw"] = new()
+            {
+                BlockId = "create:mechanical_saw",
+                AxisSource = AxisSource.FacingAxis,
+                PowerOnBackOnly = true,
+                PowerInputHint =
+                    "mechanical_sawの動力は、facing(刃の向き)の反対側(背面)にcreate:shaftを" +
+                    "facing軸と同じ軸で挿す。前面(刃の側)・上面・下面・facingに垂直な側面には繋がらない。" +
+                    "縦置き(facing=up)なら背面=下面にshaftを挿し上面で加工、横置きなら背面にshaftを挿しfacing方向を伐採。"
+            },
+            // deployer: 背面(facingの反対側)に facing 軸と同軸の shaft を挿す。作用は facing 先の2マス目。
+            //  動力面は背面1面のみ。前面(作用面)・上下・垂直側面は全て不可。
+            //  作用先(depot/belt等)の受けは強制しない(用途で変わるためプロンプト誘導のみ)。
+            ["create:deployer"] = new()
+            {
+                BlockId = "create:deployer",
+                AxisSource = AxisSource.FacingAxis,
+                PowerOnBackOnly = true,
+                PowerInputHint =
+                    "deployerの動力は、背面(facingの反対側)にcreate:shaftをfacing軸と同じ軸で挿す。" +
+                    "作用は facing の向きの2マス先(1マス先は貫通する)。" +
+                    "前面(作用面)・上面・下面やfacingに垂直な側面には動力を繋げない。"
             },
             // 必要に応じて拡充。
         };

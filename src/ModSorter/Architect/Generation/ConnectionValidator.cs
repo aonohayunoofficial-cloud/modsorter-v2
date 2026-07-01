@@ -86,6 +86,82 @@ public static class ConnectionValidator
                 }
             }
 
+            // --- (A'') 背面1面型: facingの反対側(背面)だけがshaft動力入力。他5面は不可。 ---
+            //  saw/deployer 用。背面shaftはfacing軸と同軸であること。
+            if (spec.PowerOnBackOnly)
+            {
+                string coreAxis = ConnectionCatalog.GetRotationAxis(b) ?? "z";
+                // 背面 = facing の反対方向。facing は properties["facing"] から取る。
+                string facing = b.Properties != null
+                    && b.Properties.TryGetValue("facing", out var fv) ? fv : "";
+                Dir? frontDir = facing switch
+                {
+                    "up" => Dir.Up,
+                    "down" => Dir.Down,
+                    "north" => Dir.North,
+                    "south" => Dir.South,
+                    "east" => Dir.East,
+                    "west" => Dir.West,
+                    _ => (Dir?)null
+                };
+
+                foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                {
+                    var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
+                    var npos = (b.X + dx, b.Y + dy, b.Z + dz);
+                    if (!idx.TryGetValue(npos, out var n)) continue;
+
+                    bool nIsPart = n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel";
+                    if (!nIsPart) continue;
+
+                    // 背面 = frontDir の反対。frontDir 不明時は「facing軸の端2面のうち動力を許す側」が
+                    //  定まらないので、facing軸に沿う面なら暫定OK・それ以外は不可、で扱う。
+                    bool isBack = frontDir != null && d == ConnectionCatalog.OppositeDir(frontDir.Value);
+                    bool isFront = frontDir != null && d == frontDir.Value;
+
+                    if (isBack || (frontDir == null && AxisOfDir(d) == coreAxis && !isFront))
+                    {
+                        // 背面に繋ぐ shaft は facing 軸と同軸であること。
+                        string? nAxis = ConnectionCatalog.GetRotationAxis(n);
+                        if (nAxis != coreAxis)
+                        {
+                            issues.Add(new ValidationIssue
+                            {
+                                Category = IssueCategory.RotationAxisMismatch,
+                                AutoFixable = true,
+                                TargetPos = npos,
+                                SuggestedAxis = coreAxis,
+                                HumanMessage =
+                                    $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}がaxis={nAxis}だが、" +
+                                    $"({b.X},{b.Y},{b.Z})の{b.Id}の背面で繋ぐにはfacing軸と同じaxis={coreAxis}が必要。" +
+                                    $"axis={coreAxis}にすること。",
+                                GeneralAdvice =
+                                    "saw/deployerの動力は背面(facingの反対側)から、facing軸と同軸のshaftで入れる。"
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // 背面以外(前面=作用面・上下・facingに垂直な側面)に部材 → 動力を受けない。
+                        issues.Add(new ValidationIssue
+                        {
+                            Category = IssueCategory.PowerInputFaceInvalid,
+                            AutoFixable = false,
+                            TargetPos = npos,
+                            HumanMessage =
+                                $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}が{b.Id}の動力を受けない面に接している。" +
+                                (isFront
+                                    ? "そこはfacing方向(前面=作用面)なので動力を繋げない。"
+                                    : "") +
+                                (string.IsNullOrEmpty(spec.PowerInputHint) ? "" : spec.PowerInputHint),
+                            GeneralAdvice =
+                                "saw/deployerの動力入力は背面(facingの反対側)1面のみ。" +
+                                "前面(作用面)・上下・facingに垂直な側面に軸を挿しても繋がらない。"
+                        });
+                    }
+                }
+            }
+
             // --- (A) 入力面の制約を持つ機械(millstone/mixer 等) ---
             if (spec.PowerInputFaces != null)
             {
