@@ -41,11 +41,12 @@ public sealed class RotationSpec
     // 軸は GetRotationAxis(=facingから算出) を使う。
     public bool PowerOnAxisEnds = false;
 
-    // deployer のように「facingの反対側(背面)1面だけがshaft動力入力で、残り5面は不可」
-    // という動的な制約を表す。true のとき PowerInputFaces / PowerOnAxisEnds より優先して判定する。
-    // 背面に付くshaftはfacing軸と同軸であること。前面(作用面)・上下・垂直側面は全て不可。
-    // 軸は GetRotationAxis(=facingから算出) を使う。
-    public bool PowerOnBackOnly = false;
+    // deployer 専用。動力入力面は「facing に垂直な水平軸」の両端2面(縦置き=up/downのときは
+    // axis_along_first が示す軸: true=x/東西, false=z/南北)。背面(facingの反対)は不可。
+    // 実機準拠: facing=west のとき入力口は南北(z軸両端)。facing=up かつ axis_along_first=true のとき東西(x軸両端)。
+    // その2面のいずれか1面に、その軸と同軸の shaft/cog があればOK。他の面は動力入力不可。
+    // true のとき他の動力入力フラグより優先し、Validator の (A'''') で判定する。
+    public bool IsDeployer = false;
 
     // mechanical_saw 専用。sawは実機で動力入力面がfacingで二分される:
     //  ・縦置き(facing=up/down)=加工モード → ブレード軸に直交する「両側面のいずれか1面」から
@@ -192,18 +193,23 @@ public static class ConnectionCatalog
                     "axis_along_first=trueならx軸(東西)、falseならz軸(南北)。flipped は動力に関係ない。" +
                     "横向き(facing=north/south/east/west)は前方を伐採するモードで、加工には使わない。"
             },
-            // deployer: 背面(facingの反対側)に facing 軸と同軸の shaft を挿す。作用は facing 先の2マス目。
-            //  動力面は背面1面のみ。前面(作用面)・上下・垂直側面は全て不可。
+            // deployer: 動力軸は axis_along_first で決まる。その軸の両端2面のいずれか1面に同軸shaft。
+            //  axis_along_first=true → 垂直(axis=y, 上下の両端)。
+            //  axis_along_first=false → facingに垂直な水平軸(facing=east/west→z/南北, north/south→x/東西)。
+            //  片側1面に同軸shaftがあればOK。前面(作用面)・動力軸に沿わない面は不可。作用は facing 先の2マス目。
             //  作用先(depot/belt等)の受けは強制しない(用途で変わるためプロンプト誘導のみ)。
             ["create:deployer"] = new()
             {
                 BlockId = "create:deployer",
                 AxisSource = AxisSource.FacingAxis,
-                PowerOnBackOnly = true,
+                IsDeployer = true,
                 PowerInputHint =
-                    "deployerの動力は、背面(facingの反対側)にcreate:shaftをfacing軸と同じ軸で挿す。" +
-                    "作用は facing の向きの2マス先(1マス先は貫通する)。" +
-                    "前面(作用面)・上面・下面やfacingに垂直な側面には動力を繋げない。"
+                    "deployerの動力軸はaxis_along_firstで決まる。" +
+                    "axis_along_first=trueなら垂直(axis=y)で、上面か下面のどちらか一方にcreate:shaft(axis=y)を挿す。" +
+                    "axis_along_first=falseならfacingに垂直な水平軸で、facing=east/west(X向き)なら南北(axis=z)の" +
+                    "north面かsouth面、facing=north/south(Z向き)なら東西(axis=x)のeast面かwest面のどちらか一方に" +
+                    "create:shaftをその軸で挿す。shaftの軸は入力面の軸と一致させる(片側だけで回る)。" +
+                    "前面(作用面)や動力軸に沿わない面には繋がらない。作用は facing の向きの2マス先(1マス先は貫通する)。"
             },
             // 必要に応じて拡充。
         };

@@ -54,18 +54,27 @@
 - 排出: 真下または側面下に funnel を向け、その先に depot/チェストを置いて取り出す。
 
 # --- mechanical_saw(メカニカルソー) ---
-- 機能: 木材の製材・石の加工(スタック加工)、横置き時は facing 方向の丸太を伐採する。
-- 向き: facing は刃(のこぎり)の向き。動力入力は facing の反対側(背面)。
-- 動力入力(重要): 背面(facing の反対側)に create:shaft を facing 軸と同じ軸で挿す。
-  例) facing=north なら背面=south に axis=z の shaft。facing=up(縦置き)なら背面=下面に shaft。
-  前面(刃の側)・上面・下面・facing に垂直な側面には動力を繋げない。
-- 作用/出力: 縦置き(facing=up)は上面に落ちたアイテムを加工し加工品は刃の端から飛ぶ。
-  横置きは facing 方向の木を伐採。受けの位置は用途で変わるため骨格では固定しない。
+- 機能: 木材の製材・石の加工(スタック加工)。加工用途では縦置き(facing=up)にする。
+  横置き(facing=north/south/east/west)は facing 方向の丸太を伐採するモードで、加工には使わない。
+- 向き(重要): 加工では必ず縦置き(facing=up)。刃の軸(ブレード軸)は axis_along_first で決まる
+  (axis_along_first=true → x軸/東西、false → z軸/南北)。flipped は動力に関係しない。
+- 動力入力(重要): 縦置き時、ブレード軸に直交する「両側面のどちらか一方」に create:shaft を
+  その軸と同軸で挿す(片側だけで回る)。
+  例) axis_along_first=true(x軸)なら側面=東(east)か西(west)のどちらかに axis=x の shaft。
+      axis_along_first=false(z軸)なら側面=南(south)か北(north)のどちらかに axis=z の shaft。
+  上面(投入口)・下面・ブレード軸に沿う面には動力を繋げない。
+- 作用/出力: 縦置きは上面に落ちたアイテムを加工し、加工品は刃の端から飛ぶ。
+  受けの位置は用途で変わるため骨格では固定しない。
 
 # --- deployer(展開機/デプロイヤー) ---
 - 機能: 持たせたツール/アイテムで facing 先に右クリック(Use)/左クリック(Attack)動作をする。
-- 動力入力(重要): 背面(facing の反対側)に create:shaft を facing 軸と同じ軸で挿す。
-  上面・下面や facing に垂直な側面には動力を繋げない。
+- 動力入力(重要): 動力軸は axis_along_first で決まる。その軸の「両端2面のどちらか一方」に
+  create:shaft をその軸と同軸で挿す(片側だけで回る)。
+  - axis_along_first=true → 垂直軸(axis=y)。上面か下面のどちらか一方に create:shaft(axis=y)。
+  - axis_along_first=false → facing に垂直な水平軸。
+      facing=east/west(X向き) → 南北(axis=z)の north 面か south 面。
+      facing=north/south(Z向き) → 東西(axis=x)の east 面か west 面。
+  shaft の軸は入力面の軸と一致させる。前面(作用面)や動力軸に沿わない面には繋がらない。
 - 作用対象(重要): facing の向きの「2マス先」で作用する(1マス先は貫通して無視される)。
   作用先の depot/belt/対象ブロックの位置は用途で変わるため骨格では固定しない。
 
