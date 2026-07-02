@@ -111,6 +111,80 @@
                                        FontSize="11" Margin="10,0,10,8"
                                        TextWrapping="Wrap" Text=""/>
 
+                            <!-- ===== 日本語化パック生成パネル(追加) ===== -->
+                            <Border DockPanel.Dock="Top" Margin="10,4,10,8"
+                                    Background="{StaticResource BgPanel}"
+                                    Padding="8">
+                                <StackPanel>
+                                    <TextBlock Text="日本語化パック生成(DeepL)"
+                                               Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource GrassGreen}"
+                                               FontSize="12" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="LangPackSkipJaCheck"
+                                              Content="既に日本語がある MOD は翻訳しない"
+                                              IsChecked="True"
+                                              Foreground="{StaticResource TextMain}"
+                                              FontSize="11" Margin="0,0,0,6"/>
+                                    <TextBlock Text="出力先(空欄=resourcepacks)"
+                                               Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}"
+                                               FontSize="10" Margin="0,0,0,2"/>
+                                    <TextBox x:Name="LangPackOutPath"
+                                             FontSize="11" Margin="0,0,0,6"
+                                             Background="{StaticResource StoneDark}"
+                                             Foreground="{StaticResource TextMain}"
+                                             BorderThickness="0" Padding="4,2"/>
+                                    <TextBlock x:Name="LangPackUsage"
+                                               Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}"
+                                               FontSize="10" Margin="0,0,0,4"
+                                               TextWrapping="Wrap" Text=""/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Button x:Name="LangPackGenBtn"
+                                                Content="生成"
+                                                Style="{StaticResource McButton}"
+                                                Margin="0,0,6,0"
+                                                Click="LangPackGenerate_Click"/>
+                                        <Button x:Name="LangPackCancelBtn"
+                                                Content="中断"
+                                                Style="{StaticResource McButtonGray}"
+                                                IsEnabled="False"
+                                                Click="LangPackCancel_Click"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,0,4">
+                                        <Button x:Name="LangPackRecheckBtn"
+                                                Content="復元漏れ再検査"
+                                                Style="{StaticResource McButtonGray}"
+                                                HorizontalAlignment="Stretch"
+                                                Margin="0,0,0,4"
+                                                Click="LangPackRecheck_Click"/>
+                                        <Button x:Name="LangPackRepairPrintfBtn"
+                                                Content="printf修復"
+                                                Style="{StaticResource McButtonGray}"
+                                                HorizontalAlignment="Stretch"
+                                                Margin="0,0,0,4"
+                                                Click="LangPackRepairPrintf_Click"/>
+                                        <Button x:Name="LangPackRetranslateBtn"
+                                                Content="色コード再翻訳"
+                                                Style="{StaticResource McButtonGray}"
+                                                HorizontalAlignment="Stretch"
+                                                Click="LangPackRetranslate_Click" Cursor=""/>
+                                    </StackPanel>
+                                    <ProgressBar x:Name="LangPackProgress"
+                                                 Height="14" Margin="0,0,0,4"
+                                                 Minimum="0" Maximum="100" Value="0"
+                                                 Foreground="{StaticResource GrassGreen}"
+                                                 Background="{StaticResource StoneDark}"
+                                                 Visibility="Collapsed"/>
+                                    <TextBlock x:Name="LangPackStatus"
+                                               Style="{StaticResource PixelText}"
+                                               Foreground="{StaticResource TextDim}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap" Text=""/>
+                                </StackPanel>
+                            </Border>
+
+
                             <TreeView x:Name="ModTree" Background="Transparent"
                                       BorderThickness="0"
                                       Foreground="{StaticResource TextMain}"
