@@ -78,6 +78,14 @@
 - src/ModSorter/Architect/Generation/ConnectionValidator.cs / ConnectionSpec.cs / ValidationIssue.cs … 接続検証＆AutoFix
 - src/ModSorter/Architect/Rules/create_power_rules.txt … 動力ルール第1層（人間語）
 - src/ModSorter/ModSorter.csproj … create_power_rules.txt のコピー設定あり
+- src/ModSorter/Clients/DeepLClient.cs … DeepL翻訳（HTML/英訳に加え、usage取得・複数text一括翻訳・
+  XMLタグ保持翻訳 TranslateBatchXmlAsync を追加）
+- src/ModSorter/Services/TranslationCache.cs … 原文→訳文の永続キャッシュ（エンジン別・SHA1キー）
+- src/ModSorter/Services/LangPackService.cs … MOD日本語化の本体（jar走査・抽出・除外・
+  プレースホルダ/色コード退避・バッチ翻訳・ja_jpパック生成・再検査/修復/再翻訳）
+- src/ModSorter/MainWindow.LangPack.cs … Tab1(Mods) 日本語化パネルのハンドラ群
+  （生成/中断/復元漏れ再検査/printf修復/色コード再翻訳）
+
 
 ※削除済み（フェーズG）: PrimitiveSpec.cs / PrimitiveExpander.cs / StructureNbtReader.cs /
   PonderRuleExtractor.cs。曲面表現は StructureExpander 側のドーム屋根に統合済み。
@@ -100,6 +108,22 @@ Ponder 隣接統計を生成プロンプトに合流させる路線
 建築モードは既に「自然言語→LLM(2パス: 設計方針 DesignPlan→設計SPEC StructureSpec)→
 StructureExpander で確定展開」になっている。LLM に座標は書かせていない。
 設計方針の転換は不要。
+
+### MOD 自動日本語化機能の設計方針（確認済み・実機成功）
+導入 MOD のうち ja_jp を同梱しない名前空間の en_us を DeepL で翻訳し、全 MOD 分を1つの
+リソースパック(zip)にまとめて resourcepacks へ出力する機能。MOD jar は改変しない。
+【確定方針】翻訳エンジンは DeepL 単独（正規API）。Google 非公式経路は規約・不安定・
+バッチ/枠管理不可のため採用しない。将来のエンジン追加は必要になった時点で足す方針とし、
+今は interface 抽象を先行導入しない（DeepLClient は static のまま使う）。
+【確定方針】名前空間は宣言 modid ではなく jar 内の実ディレクトリ assets/<ns>/lang/ を
+走査して検出する（1jar複数名前空間・宣言との不一致に対応するため）。
+【DeepL枠が最重要制約】無料枠は月間文字数上限があり、実運用では数回しか全生成できない。
+そのため原文→訳文キャッシュを必須とし、再生成時はキャッシュヒットで枠を消費しない。
+壊れた訳の修正も、対象分だけを再翻訳する経路（下記）で枠消費を最小化する。
+【プレースホルダ/色コード保護＝XMLタグ方式】%s・%1$s・%d・{0}・§x を <x id="n"/> タグに
+退避し tag_handling=xml + ignore_tags=x + outline_detection=0 で送る（旧 X0X 方式は
+DeepL がトークンを落として復元漏れが多発したため撤回）。本文の < > & はエスケープする。
+実機教訓: 旧方式では色コード大量の長文で復元漏れが集中した。XMLタグ方式で復元漏れ0に。
 
 ---
 
@@ -326,6 +350,17 @@ diagnostics/*（一時出力）と schematics/*（本番出力）のパス分離
 - 建築モード Tab4 の棚卸し（第1段階）と掃除（第2・3段階・種別整理・フェーズG）完了。
 - 建築生成の2パス化（第5段階）完了・実機評価済み。
 - SPEC語彙拡張 段階6-1（ピラミッド屋根・アーチ開口）完了・実機確認済み。
+- MOD 自動日本語化リソースパック生成機能 ※完了（実機成功）:
+  ja_jp を持たない MOD の en_us を DeepL で翻訳し、1つの ja_jp リソースパック(zip)を
+  resourcepacks へ生成。DeepL usage 照合・文字数見積もり・残量超過警告・上書き確認を実装。
+  プレースホルダ/色コード保護は XMLタグ方式（tag_handling=xml）。原文→訳文キャッシュで
+  再生成時の枠消費ゼロ。復元漏れ対策として「復元漏れ再検査（枠0）」「printf修復（原形維持・枠0）」
+  「色コード再翻訳（対象分のみ新方式で再翻訳）」の3ボタンを常設。
+  実機結果: 252 MOD / 139 名前空間 / 19366 エントリで生成、復元漏れ 0、翻訳文字数 0（全キャッシュ）、
+  除外（日本語化済み）70 件。ゲーム内で日本語表示・色コード・printf箇所とも正常（CreateCobblemon, 1.21.1）。
+  対象バージョンの pack_format は 34（LangPackFormat 定数で保持、バージョン変更時はここだけ直す）。
+  コミット: feat(langpack): MOD自動日本語化リソースパック生成機能を追加
+
 
 ---
 
