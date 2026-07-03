@@ -37,27 +37,35 @@ public static class StructureExpander
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
 
+        // 平面形状（フットプリント）。矩形以外を許すためのマスク。
+        // w×d 確定後に一度だけ集約して作る（プリセット→add→sub の順、順序非依存）。
+        // 未指定なら全面 true＝従来の矩形と完全一致（後方互換）。
+        HashSet<(int x, int z)> foot = BuildFootprint(spec, w, d);
+        // マスクが矩形一杯（全 w*d セル）かどうか。非矩形なら屋根・様式を安全側へ寄せる。
+        bool rectangular = IsRectangular(foot, w, d);
+
         // 座標 -> ブロックID。後勝ち（開口部で上書きするため）。
         var cells = new Dictionary<(int x, int y, int z), string>();
 
-        // 床（y=0 全面）
-        for (int x = 0; x < w; x++)
-            for (int z = 0; z < d; z++)
-                cells[(x, 0, z)] = floor;
+        // 床（y=0、マスク内のみ）
+        foreach (var (x, z) in foot)
+            cells[(x, 0, z)] = floor;
 
-        // 土台段（base course）: y=0 の外周一周を土台材に差し替える。
+        // 土台段（base course）: y=0 のマスク縁一周を土台材に差し替える。
         // 未指定なら floor と同じ＝従来の見た目（差し替えても影響なし）。座標系は変えない。
         string baseBlock = Pick(spec.BaseBlock, allowedBlocks, floor);
         if (spec.HasBase)
         {
-            for (int x = 0; x < w; x++)
-                for (int z = 0; z < d; z++)
-                    if (x == 0 || x == w - 1 || z == 0 || z == d - 1)
-                        cells[(x, 0, z)] = baseBlock;
+            foreach (var (x, z) in foot)
+                if (IsEdge(foot, x, z))
+                    cells[(x, 0, z)] = baseBlock;
         }
 
-        // 屋根（roof_type で分岐）
+        // 屋根（roof_type で分岐）。非矩形フットプリントのときは gable/dome/pyramid が
+        // 矩形前提のため崩れる。安全側として flat にフォールバックし、平屋根をマスクに沿わせる。
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
+        if (!rectangular)
+            roofType = "flat";
         if (roofType == "gable")
             BuildGableRoof(cells, spec, w, d, h, roof, wall);
         else if (roofType == "gable_stairs")
@@ -67,9 +75,13 @@ public static class StructureExpander
         else if (roofType == "pyramid")
             BuildPyramidRoof(cells, w, d, h, roof);
         else
-            BuildFlatRoof(cells, w, d, h, roof);
+            BuildFlatRoof(cells, foot, h, roof);
 
+        // 建物様式。colonnade/temple は矩形前提（柱の等間隔配置・柱廊）なので、
+        // 非矩形フットプリントのときは walled（壁のリング）へフォールバックする。
         string buildingStyle = (spec.BuildingStyle ?? "walled").Trim().ToLowerInvariant();
+        if (!rectangular)
+            buildingStyle = "walled";
 
         if (buildingStyle == "colonnade")
         {
@@ -91,35 +103,66 @@ public static class StructureExpander
             if (spec.PilasterStep.HasValue && spec.PilasterStep.Value >= 2)
                 pilasterStep = Math.Max(4, spec.PilasterStep.Value);
 
-            // 壁（中間層 y=1..h-2 の外周リングのみ）
+            // 壁（中間層 y=1..h-2 の外周リングのみ）。
+            // マスクの縁(IsEdge)にだけ立てるので、L字・コの字でも内側角まで正しく回る。
             for (int y = 1; y <= h - 2; y++)
-                for (int x = 0; x < w; x++)
-                    for (int z = 0; z < d; z++)
-                        if (x == 0 || x == w - 1 || z == 0 || z == d - 1)
-                        {
-                            bool isCorner = (x == 0 || x == w - 1) && (z == 0 || z == d - 1);
-                            bool isPilaster = pilasterStep > 0 &&
-                                ((x == 0 || x == w - 1) ? (z % pilasterStep == 0)
-                                                        : (x % pilasterStep == 0));
-                            cells[(x, y, z)] = (isCorner || isPilaster) ? accent : wall;
-                        }
+                foreach (var (x, z) in foot)
+                {
+                    if (!IsEdge(foot, x, z)) continue;
+
+                    // 角判定・柱リズムは矩形のときだけ従来どおり適用する。
+                    // 非矩形では角の定義が曖昧なので、縁は一律 wall（アクセントなし）にする。
+                    bool useAccent = false;
+                    if (rectangular)
+                    {
+                        bool isCorner = (x == 0 || x == w - 1) && (z == 0 || z == d - 1);
+                        bool isPilaster = pilasterStep > 0 &&
+                            ((x == 0 || x == w - 1) ? (z % pilasterStep == 0)
+                                                    : (x % pilasterStep == 0));
+                        useAccent = isCorner || isPilaster;
+                    }
+                    cells[(x, y, z)] = useAccent ? accent : wall;
+                }
         }
 
-        // 中間床（複数階）。指定された各 y に内部も含む全面の床を敷く。
+        // 中間床（複数階）。指定された各 y にマスク内の全面の床を敷く。
         foreach (int fy in (spec.FloorLevels ?? new List<int>()).Distinct())
         {
             // 1階の床(0)・屋根の領域(h-1以上)とぶつかる指定は無視
             if (fy <= 0 || fy >= h - 1) continue;
-            for (int x = 0; x < w; x++)
-                for (int z = 0; z < d; z++)
-                    cells[(x, fy, z)] = floor;
+            foreach (var (x, z) in foot)
+                cells[(x, fy, z)] = floor;
         }
 
         // 開口部の適用（中間床より後。床に窓・ドアが指定されても壁セルのみ作用するので安全）
         // colonnade（開放型）は壁がないので開口部は適用しない。
+        // 注意: 現状の ApplyOpening は矩形外周（x=0/w-1, z=0/d-1）を前提とするため、
+        //       非矩形フットプリントでは開口が壁セルに当たらず無視されることがある。
+        //       非矩形向けの開口スナップは次フェーズで対応する。
         if (buildingStyle != "colonnade")
-            foreach (var op in spec.Openings ?? new List<Opening>())
+        {
+            var ops = spec.Openings ?? new List<Opening>();
+            foreach (var op in ops)
                 ApplyOpening(cells, op, w, d, h, allowedBlocks);
+
+            // 入口の保証: door が1つも指定されていない場合、正面(facade_face、既定 south)の
+            // 中央に自動でドアを1つ開ける。LLM がドアを出さなくても必ず入口ができる。
+            bool hasDoor = ops.Any(o =>
+                string.Equals((o.Kind ?? "").Trim(), "door", StringComparison.OrdinalIgnoreCase));
+            if (!hasDoor)
+            {
+                string doorFace = (spec.FacadeFace ?? "south").Trim().ToLowerInvariant();
+                if (doorFace != "north" && doorFace != "south" &&
+                    doorFace != "east" && doorFace != "west")
+                    doorFace = "south";
+                // 面の中央を offset にする。south/north は x 方向、east/west は z 方向。
+                int centerOffset = (doorFace == "south" || doorFace == "north")
+                    ? w / 2 : d / 2;
+                ApplyOpening(cells,
+                    new Opening { Face = doorFace, Kind = "door", Offset = centerOffset, Level = 1 },
+                    w, d, h, allowedBlocks);
+            }
+        }
 
         return cells
             .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)
@@ -133,13 +176,137 @@ public static class StructureExpander
             .ToList();
     }
 
-    // 平屋根: 最上層 y=h-1 を全面で塞ぐ
-    private static void BuildFlatRoof(
-        Dictionary<(int x, int y, int z), string> cells, int w, int d, int h, string roof)
+    // ===== フットプリント（平面形状マスク）=====
+    // spec の footprint 指定から、建てる平面(X-Z)のマスクを確定的に作る。
+    // 手順: プリセット形状 → footprint_add をすべて OR → footprint_sub をすべて減算。
+    // add をすべて足してから sub をすべて引くので、add 同士・sub 同士の順序は結果に影響しない。
+    // 未指定（shape=null かつ add/sub 空）なら全面 true＝従来の矩形と完全一致。
+    private static HashSet<(int x, int z)> BuildFootprint(StructureSpec spec, int w, int d)
     {
-        for (int x = 0; x < w; x++)
-            for (int z = 0; z < d; z++)
-                cells[(x, h - 1, z)] = roof;
+        var mask = new HashSet<(int x, int z)>();
+
+        string shape = (spec.FootprintShape ?? "rect").Trim().ToLowerInvariant();
+        int cutW = spec.FootprintParams?.CutW ?? 0;
+        int cutD = spec.FootprintParams?.CutD ?? 0;
+        // 未指定(0以下)なら幅・奥行のおよそ半分を既定の切り欠き量にする。
+        if (cutW <= 0) cutW = Math.Max(1, w / 2);
+        if (cutD <= 0) cutD = Math.Max(1, d / 2);
+        // 切り欠きが全体を食い尽くさないよう上限を掛ける。
+        cutW = Clamp(cutW, 1, Math.Max(1, w - 1));
+        cutD = Clamp(cutD, 1, Math.Max(1, d - 1));
+
+        // 1) プリセットで大枠を作る。
+        switch (shape)
+        {
+            case "l":
+                // L字: 右奥(x大・z大)の cutW×cutD の一角を削る。
+                for (int x = 0; x < w; x++)
+                    for (int z = 0; z < d; z++)
+                        if (!(x >= w - cutW && z >= d - cutD))
+                            mask.Add((x, z));
+                break;
+
+            case "u":
+                // コの字: 手前(z大側)の中央を幅 cutW・深さ cutD で削り込む。
+                {
+                    int lo = (w - cutW) / 2;
+                    int hi = lo + cutW - 1;
+                    for (int x = 0; x < w; x++)
+                        for (int z = 0; z < d; z++)
+                            if (!(x >= lo && x <= hi && z >= d - cutD))
+                                mask.Add((x, z));
+                }
+                break;
+
+            case "t":
+                // T字: z 小側に横棒（全幅・厚み cutD）、中央に縦棒（幅 cutW・全奥行）。
+                {
+                    int lo = (w - cutW) / 2;
+                    int hi = lo + cutW - 1;
+                    for (int x = 0; x < w; x++)
+                        for (int z = 0; z < d; z++)
+                        {
+                            bool bar = z < cutD;                 // 横棒
+                            bool stem = (x >= lo && x <= hi);    // 縦棒
+                            if (bar || stem) mask.Add((x, z));
+                        }
+                }
+                break;
+
+            case "plus":
+                // 十字: 中央縦帯（幅 cutW）＋中央横帯（厚み cutD）。
+                {
+                    int xlo = (w - cutW) / 2, xhi = xlo + cutW - 1;
+                    int zlo = (d - cutD) / 2, zhi = zlo + cutD - 1;
+                    for (int x = 0; x < w; x++)
+                        for (int z = 0; z < d; z++)
+                        {
+                            bool vBand = (x >= xlo && x <= xhi);
+                            bool hBand = (z >= zlo && z <= zhi);
+                            if (vBand || hBand) mask.Add((x, z));
+                        }
+                }
+                break;
+
+            default: // "rect" ほか未知の値は矩形一杯（従来互換）。
+                for (int x = 0; x < w; x++)
+                    for (int z = 0; z < d; z++)
+                        mask.Add((x, z));
+                break;
+        }
+
+        // 2) footprint_add をすべて OR で足す（順序非依存）。
+        foreach (var r in spec.FootprintAdd ?? new List<Rect>())
+            AddRect(mask, r, w, d, add: true);
+
+        // 3) footprint_sub をすべて減算する（add 完了後に一括、順序非依存）。
+        foreach (var r in spec.FootprintSub ?? new List<Rect>())
+            AddRect(mask, r, w, d, add: false);
+
+        // 空マスク（全部削られた等）になったら安全側で矩形一杯へ戻す。宙抜け生成を防ぐ。
+        if (mask.Count == 0)
+            for (int x = 0; x < w; x++)
+                for (int z = 0; z < d; z++)
+                    mask.Add((x, z));
+
+        return mask;
+    }
+
+    // 矩形 r を建物範囲(0..w-1, 0..d-1)にクランプして、マスクへ加算/減算する。
+    private static void AddRect(HashSet<(int x, int z)> mask, Rect r, int w, int d, bool add)
+    {
+        int x0 = Clamp(r.X, 0, w - 1);
+        int z0 = Clamp(r.Z, 0, d - 1);
+        int x1 = Clamp(r.X + Math.Max(0, r.W) - 1, 0, w - 1);
+        int z1 = Clamp(r.Z + Math.Max(0, r.D) - 1, 0, d - 1);
+        if (r.W <= 0 || r.D <= 0) return;
+        for (int x = x0; x <= x1; x++)
+            for (int z = z0; z <= z1; z++)
+                if (add) mask.Add((x, z));
+                else mask.Remove((x, z));
+    }
+
+    // マスクが矩形一杯（全 w*d セルが埋まっている）か。true なら従来の矩形と同一。
+    private static bool IsRectangular(HashSet<(int x, int z)> mask, int w, int d)
+        => mask.Count == w * d;
+
+    // 指定セルがマスクの「縁」か。4近傍(±x, ±z)のいずれかがマスク外なら縁とみなす。
+    // マスク外セルに対しては false。壁・土台をここで判定するので、L字の内側角も正しく回る。
+    private static bool IsEdge(HashSet<(int x, int z)> mask, int x, int z)
+    {
+        if (!mask.Contains((x, z))) return false;
+        return !mask.Contains((x + 1, z))
+            || !mask.Contains((x - 1, z))
+            || !mask.Contains((x, z + 1))
+            || !mask.Contains((x, z - 1));
+    }
+
+    // 平屋根: 最上層 y=h-1 をマスク内で塞ぐ（フットプリントに沿う）。
+    private static void BuildFlatRoof(
+        Dictionary<(int x, int y, int z), string> cells, HashSet<(int x, int z)> foot, int h, string roof)
+    {
+        foreach (var (x, z) in foot)
+            cells[(x, h - 1, z)] = roof;
     }
 
     // ピラミッド屋根（四角錐）: 底面(w×d)を y=h-1 に全面で敷き、そこから上へ
@@ -535,8 +702,11 @@ public static class StructureExpander
                                                         // ドア・アーチは床から立てるので対象外。
         if (isWindow)
         {
-            int mid = Math.Max(1, (h - 1) / 2); // 壁のおよそ中段
-            if (y < mid) y = mid;
+            // 窓は床から最低 2 段上げる（見た目の要件: y>=2。床 y=0、壁下段 y=1 の上）。
+            // ただし低い壁では上端(h-2)を超えないようクランプする。中段補正はしない
+            //（要件は「最低 2」。高い建物でも y=2 の腰高で素直に付ける）。
+            int minY = Clamp(2, 1, Math.Max(1, h - 2));
+            if (y < minY) y = minY;
         }
         // アーチは床から立てる（door と同じ起点）。level 指定は無視して y=1 から。
         if (isArch) y = 1;
@@ -544,18 +714,18 @@ public static class StructureExpander
         // 面ごとに、面に沿った座標(offset)から壁上の1セルを特定する。
         // また、面に沿った「横方向」を表す軸（アーチを左右に広げる方向）も決める。
         // alongX=true なら offset は x 方向、false なら z 方向に沿う。
-        (int x, int z)? target;
+        (int x, int z)? target2;
         bool alongX;
         switch (face)
         {
-            case "north": target = (Clamp(op.Offset, 0, w - 1), 0); alongX = true; break;
-            case "south": target = (Clamp(op.Offset, 0, w - 1), d - 1); alongX = true; break;
-            case "west": target = (0, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
-            case "east": target = (w - 1, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
+            case "north": target2 = (Clamp(op.Offset, 0, w - 1), 0); alongX = true; break;
+            case "south": target2 = (Clamp(op.Offset, 0, w - 1), d - 1); alongX = true; break;
+            case "west": target2 = (0, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
+            case "east": target2 = (w - 1, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
             default: return;
         }
 
-        var key = (target.Value.x, y, target.Value.z);
+        var key = (target2.Value.x, y, target2.Value.z);
 
         if (isArch)
         {
@@ -565,7 +735,7 @@ public static class StructureExpander
             // archTop は壁の高さに収める（最上段=屋根の手前 h-2 まで）。
             int wallTop = Math.Max(1, h - 2);
             int archTop = Math.Min(wallTop, 3); // 標準的なアーチ高（3段）。低い壁では自動で縮む。
-            int cx = target.Value.x, cz = target.Value.z;
+            int cx = target2.Value.x, cz = target2.Value.z;
 
             // 中央列を抜く。
             for (int yy = 1; yy <= archTop; yy++)
@@ -595,7 +765,7 @@ public static class StructureExpander
         {
             cells.Remove(key); // ドア下段
                                // ドアは縦2マス。1つ上の段も同じ面・同じ位置を開ける（壁セルのときのみ）。
-            var upper = (target.Value.x, y + 1, target.Value.z);
+            var upper = (target2.Value.x, y + 1, target2.Value.z);
             if (cells.ContainsKey(upper)) cells.Remove(upper);
         }
         else

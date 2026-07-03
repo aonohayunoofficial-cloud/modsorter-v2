@@ -130,6 +130,25 @@ FIELD MEANING:
 - base_block: the allowed block for that base course. Choose something solid and
   contrasting with the floor (e.g. cobblestone or stone bricks under wooden walls).
   Only matters when has_base is true.
+- footprint_shape: the FLOOR PLAN shape, seen from above. Omit (or ""rect"") for an
+  ordinary rectangular building — this is the default and correct choice for almost all
+  buildings. Only set a non-rect shape when the instruction clearly asks for one:
+    ""l""    = L-shaped plan (a rectangle with one corner bitten out),
+    ""u""    = U-shaped / courtyard plan (a notch cut into the front-center),
+    ""t""    = T-shaped plan (a cross-bar plus a central stem),
+    ""plus"" = plus/cross-shaped plan (a central vertical band crossing a horizontal band).
+  Japanese cues: ""L字"" -> ""l"", ""コの字"" -> ""u"", ""T字"" -> ""t"", ""十字"" -> ""plus"".
+  When you set a non-rect footprint_shape, the roof is forced to flat and decorative
+  styles (colonnade/temple, pilasters) are ignored, so keep roof_type ""flat"" and
+  building_style ""walled"" for those shapes.
+- footprint_params: optional sizing for footprint_shape, as {{ ""cut_w"": N, ""cut_d"": M }}
+  where cut_w is the size of the notch/band along X and cut_d along Z. Omit to let it
+  auto-size to about half the width/depth. Only meaningful with a non-rect shape.
+- footprint_add / footprint_sub: OPTIONAL lists of rectangles to fine-tune the plan.
+  Each rectangle is {{ ""x"": X, ""z"": Z, ""w"": W, ""d"": D }} in the 0..width-1 / 0..depth-1
+  grid. All footprint_add rectangles are unioned onto the plan, then all footprint_sub
+  rectangles are removed. Use these only for a specific wing or cut-out that the
+  instruction explicitly describes; otherwise leave them as empty lists [].
 
 HOW TO HANDLE STORIES (IMPORTANT):
 - If the instruction asks for N stories (e.g. ""2-story"", ""2階建て"", ""3 floors""),
@@ -154,6 +173,8 @@ RULES:
 - Interpret the instruction's size (e.g. ""5x5x4"" means width=5, depth=5, height=4).
 - Use only allowed block IDs for *_block and window block.
 - Keep openings on walls, not on corners. A small house has 1 door and a few windows.
+- ALWAYS include at least one ""door"" opening so the building has an entrance. Even a
+  tower or a windows-only design MUST have exactly one door, usually on the front face.
 - Use accent_block + pilaster_step only when the style benefits from visible columns or
   framing (industrial, fortified, or structured looks). For plain or natural styles,
   omit them so the walls stay simple.
@@ -163,6 +184,10 @@ RULES:
   halls). For ordinary houses prefer ""gable"" or ""flat"".
 - Prefer ""gable_stairs"" over ""gable"" when a stair block is available and a nicer
   sloped roof suits the house; set roof_block to that stair block.
+- Keep footprint_shape as ""rect"" (or omit it) unless the instruction explicitly asks
+  for an L-shaped, U-shaped, T-shaped, or cross/plus-shaped plan. For any such non-rect
+  plan, set roof_type ""flat"" and building_style ""walled"" (other roofs and columned
+  styles are ignored for non-rectangular plans).
 
 - Use building_style ""colonnade"" for fully open, columned structures (pavilions,
   shrines) with columns all around. Use ""temple"" when the instruction wants a
