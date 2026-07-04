@@ -23,7 +23,7 @@ public sealed class GenerationResult
 {
     public List<GeneratedBlock>? Blocks { get; set; }  // null = 失敗
     public string? RawResponse { get; set; }            // 生出力（デバッグ用）
-    public string Error { get; set; } = "";
+    public string? Error { get; set; } = "";
 
     // 色マッチのデバッグ集計(ブロックID別の個数と平均RGB)。null可。
     public string? MatchLog { get; set; }

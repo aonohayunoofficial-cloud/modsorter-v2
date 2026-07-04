@@ -30,6 +30,8 @@ public sealed class ArchitectGenClient
         var result = new GenerationResult();
 
         string blockList = string.Join(", ", allowedBlocks);
+        bool isShipInstruction = IsShipInstruction(instruction);
+        if (isShipInstruction) plan = null;
         string prompt =
 $@"You design a small Minecraft building. Output ONLY strict JSON, no prose.
 
@@ -94,29 +96,54 @@ FIELD MEANING:
 - structure_type: the overall kind of structure. ""building"" (the default: an ordinary
   building made of a floor, walls, a roof, and openings — use this for houses, towers,
   temples, etc.), ""ramp"" (a solid sloped walkway / incline that rises from the ground
-  to full height, with no walls or roof — use this for ramps, inclines, and slopes), or
+  to full height, with no walls or roof — use this for ramps, inclines, and slopes),
   ""bridge"" (a flat horizontal deck carried high in the air on a few support piers, with
-  low railings along both edges — use this for bridges and viaducts).
+  low railings along both edges — use this for bridges and viaducts), or ""ship"" (a boat
+  or ship with a tapered hull, a deck, and a superstructure — use this for any watercraft).
   For ""ramp"", ridge_axis chooses the direction it climbs: ""x"" rises along X (default),
   ""z"" rises along Z. For ""bridge"", ridge_axis chooses the direction it spans: ""x"" spans
   along X (default), ""z"" spans along Z. wall_block is used for the ramp body / bridge
   deck, and base_block for the ramp's bottom course / the bridge's piers and railings.
   roof_type, openings, floors and columns are IGNORED for non-""building"" types.
+- For ""ship"", width = the beam (how wide across), depth = the length (bow-to-stern),
+  height = how tall including the superstructure. The bow (pointed front) is at the
+  z=0 side by default; set bow_face to ""south"" to point it the other way. Choose the
+  kind of ship with ship_class (leave it out to auto-pick one from the size):
+    ""rowboat"" (tiny open boat), ""motorboat"" (small powerboat with a cockpit),
+    ""trawler"" (fishing/crab boat: tall wheelhouse near the bow, open work deck aft),
+    ""caravel"" (small sailing ship), ""galleon"" (large sailing ship with fore/stern
+    castles and masts), ""liner"" (large passenger ship with a tall multi-deck
+    superstructure and funnels), ""cargo"" (freighter/tanker: bridge tower aft, long flat
+    deck), ""destroyer"" (slim warship), ""battleship"" (heavy warship with gun turrets),
+    ""carrier"" (flat full-length flight deck with a small island on the starboard side),
+    ""submarine"" (rounded cigar hull with a conning tower).
+  hull_block = the hull material, deck_block = the deck, superstructure_block = the
+  cabins/bridge/island. All openings/doors are placed automatically per ship type;
+  roof_type, building_style, openings, and floors are IGNORED for ""ship"".
 - DECIDE structure_type FIRST, before anything else.
   - If the instruction describes a ramp, slope, incline, or sloped walkway (English
     ""ramp""/""slope""/""incline"" or Japanese ""スロープ""/""坂""/""坂道""/""傾斜""), you MUST set
     structure_type to ""ramp"".
   - If the instruction describes a bridge or viaduct (English ""bridge""/""viaduct"" or
     Japanese ""橋""/""ブリッジ""/""高架""), you MUST set structure_type to ""bridge"".
+  - If the instruction describes a boat or ship (English ""boat""/""ship""/""vessel""/""fishing
+    boat""/""galleon""/""submarine""/""carrier""/""liner""/""tanker""/""warship"" or Japanese
+    ""船""/""ボート""/""漁船""/""帆船""/""ガレオン""/""潜水艦""/""空母""/""客船""/""タンカー""/""軍艦""),
+    you MUST set structure_type to ""ship"" and pick a matching ship_class (or omit
+    ship_class to auto-pick from the size).
   - Otherwise use ""building"" when the instruction describes a house, tower, temple,
     wall, or other walled/roofed structure.
   When in doubt, match the keyword: ramp/slope/スロープ/坂 -> ""ramp"";
-  bridge/橋/ブリッジ -> ""bridge""; everything else -> ""building"".
+  bridge/橋/ブリッジ -> ""bridge""; boat/ship/船/漁船/帆船 -> ""ship"";
+  everything else -> ""building"".
   For a ""ramp"", width = its length, depth = its width, height = how high it climbs.
   For a ""bridge"", width = its span (length across), depth = its width, height = how high
   the deck sits above the ground. Pick wall_block as the requested deck/body material
   (e.g. stone bricks) and leave roof_type, building_style, and openings at their
   defaults (they are ignored for ramp and bridge).
+  For a ""ship"", width = the beam, depth = the length, height = the total height; set
+  hull_block/deck_block/superstructure_block for materials and leave roof_type,
+  building_style, and openings at their defaults (they are ignored for ship).
 - floor_levels: heights (y) where an extra floor (ceiling/floor slab) is added,
   to split the interior into multiple stories. Empty [] = single story.
 - accent_block: an allowed block used for vertical support columns (pilasters) on the
@@ -241,6 +268,10 @@ JSON:";
                 result.Error = "SPEC(JSON)としてパースできませんでした。";
                 return result;
             }
+
+            // ship_class が入っているのに structure_type が抜けている出力ムラを補正する。
+            if (!string.IsNullOrWhiteSpace(spec.ShipClass) || isShipInstruction)
+                spec.StructureType = "ship";
 
             // UIで寸法が確定されていれば、モデルの値を上書きする（寸法のブレを根絶）
             if (fixedWidth.HasValue) spec.Width = fixedWidth.Value;
@@ -454,6 +485,23 @@ JSON:";
 
     // 生出力から StructureSpec を取り出してパース。前後にゴミが付く場合に備え
     // 最初の '{' から最後の '}' までを抜き出して試す。
+    private static bool IsShipInstruction(string instruction)
+    {
+        if (string.IsNullOrEmpty(instruction)) return false;
+        string s = instruction.ToLowerInvariant();
+        string[] kws =
+        {
+            "boat", "ship", "vessel", "trawler", "galleon", "caravel", "liner",
+            "tanker", "cargo", "warship", "destroyer", "battleship", "carrier",
+            "submarine", "rowboat", "motorboat", "yacht",
+            "船", "ボート", "漁船", "帆船", "ガレオン", "カラベル", "潜水艦",
+            "空母", "客船", "タンカー", "貨物船", "軍艦", "駆逐艦", "戦艦", "ヨット"
+        };
+        foreach (var k in kws)
+            if (s.Contains(k)) return true;
+        return false;
+    }
+
     private static StructureSpec? TryParseSpec(string raw)
     {
         string candidate = raw.Trim();

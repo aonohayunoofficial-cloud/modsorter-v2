@@ -77,6 +77,12 @@ public static class StructureExpander
             string pierBlock = Pick(spec.BaseBlock ?? spec.WallBlock ?? spec.FloorBlock, allowedBlocks, deckBlock);
             return BuildBridge(w, d, h, deckBlock, pierBlock, spec.RidgeAxis);
         }
+        if (structureType == "ship")
+        {
+            // 船は ShipExpander が船体・甲板・上部構造物・出入口をすべて確定的に作る。
+            // 床/壁/屋根/開口部・入口保証は一切通さない（出入口は船種ごとに自動配置）。
+            return ShipExpander.Build(spec, w, d, h, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
