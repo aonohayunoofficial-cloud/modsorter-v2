@@ -88,6 +88,26 @@ public sealed class StructureSpec
 
     // 削る矩形（すべての add を足した後に一括で引く）。窓や中庭ではなく平面の欠けを作る用途。
     [JsonPropertyName("footprint_sub")] public List<Rect> FootprintSub { get; set; } = new();
+
+    // ===== 複数ボリューム合成（フェーズ2）=====
+    // 双胴船のように「離れた複数の塊」を1つの構造として合成するための指定。
+    // 空（既定）なら従来どおり単一の箱として展開する（後方互換）。
+    // 各 VolumePart は完全な StructureSpec を内包し、オフセット分だけ平行移動して重ねる。
+    // 重なったセルは後勝ち（リストで後ろの Part が上書き）。
+    [JsonPropertyName("volumes")] public List<VolumePart> Volumes { get; set; } = new();
+}
+
+// 複数ボリューム合成の1要素（フェーズ2）。
+// Part（完全な StructureSpec）を Offset だけ平行移動して合成する。
+// Offset は全体原点からの絶対配置。負値は Expander 側で 0 にクランプされる。
+public sealed class VolumePart
+{
+    [JsonPropertyName("offset_x")] public int OffsetX { get; set; }  // x方向のずらし
+    [JsonPropertyName("offset_y")] public int OffsetY { get; set; }  // y方向のずらし（浮上可）
+    [JsonPropertyName("offset_z")] public int OffsetZ { get; set; }  // z方向のずらし
+
+    // この要素の中身。単一の箱として展開される（内部の volumes は無視＝再帰1段まで）。
+    [JsonPropertyName("part")] public StructureSpec? Part { get; set; }
 }
 
 // フットプリントのプリセット寸法。指定がなければ Expander 側で妥当な既定を計算する。

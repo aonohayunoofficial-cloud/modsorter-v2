@@ -8,7 +8,51 @@ namespace ModSorter.Architect.Generation;
 // 壁の外周リングは必ずここで生成するため、塊化や壁抜けは原理的に起きない。
 public static class StructureExpander
 {
+    // 公開エントリ。volumes が指定されていれば各 Part を個別展開してオフセット合成する。
+    // 空なら従来どおり単一の箱として ExpandCore に委譲する（後方互換）。
     public static List<GeneratedBlock> Expand(StructureSpec spec, IReadOnlyList<string> allowedBlocks)
+    {
+        // ===== 複数ボリューム合成（フェーズ2）=====
+        if (spec.Volumes != null && spec.Volumes.Count > 0)
+        {
+            var merged = new Dictionary<(int x, int y, int z), string>();
+            foreach (var vol in spec.Volumes)
+            {
+                if (vol?.Part == null) continue;
+
+                // Part は単一の箱として展開する。Part 内にさらに volumes があっても
+                // ExpandCore は volumes を参照しないので、再帰は1段で止まる（無限再帰防止）。
+                var partBlocks = ExpandCore(vol.Part, allowedBlocks);
+
+                // オフセットは絶対配置。負値は 0 にクランプ（宙抜け・負座標を防ぐ）。
+                int ox = Math.Max(0, vol.OffsetX);
+                int oy = Math.Max(0, vol.OffsetY);
+                int oz = Math.Max(0, vol.OffsetZ);
+
+                // 重なりは後勝ち（リストで後ろの Part が上書きする）。
+                foreach (var b in partBlocks)
+                    merged[(b.X + ox, b.Y + oy, b.Z + oz)] = b.Id;
+            }
+
+            return merged
+                .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)
+                .Select(kv => new GeneratedBlock
+                {
+                    X = kv.Key.x,
+                    Y = kv.Key.y,
+                    Z = kv.Key.z,
+                    Id = kv.Value
+                })
+                .ToList();
+        }
+
+        return ExpandCore(spec, allowedBlocks);
+    }
+
+    // 単一の箱を確定的に座標へ展開する（従来の Expand 本体をそのまま移設）。
+    // このメソッドは spec.Volumes を一切参照しない。ゆえに Part 内に volumes があっても
+    // 展開されず、フェーズ2の再帰は1段で止まる。
+    private static List<GeneratedBlock> ExpandCore(StructureSpec spec, IReadOnlyList<string> allowedBlocks)
     {
         // 寸法の健全化（最低 2x2x2、極端な値は抑える）
         int w = Clamp(spec.Width, 2, 64);
@@ -714,16 +758,25 @@ public static class StructureExpander
         // 面ごとに、面に沿った座標(offset)から壁上の1セルを特定する。
         // また、面に沿った「横方向」を表す軸（アーチを左右に広げる方向）も決める。
         // alongX=true なら offset は x 方向、false なら z 方向に沿う。
+        //
+        // 開口スナップ（非矩形フットプリント対応）:
+        //   非矩形（L字・コの字・十字など）では、面の固定座標（例: south の z=d-1）に
+        //   壁セルが無いことがある。その場合、offset の列を面の外側から内側へ走査し、
+        //   最初に見つかった壁セルの位置へ寄せる。矩形なら1回目で当たるので従来と完全一致。
+        //   列全体に壁が無ければ従来どおり無視される（後段の ContainsKey で弾かれる）。
         (int x, int z)? target2;
         bool alongX;
         switch (face)
         {
-            case "north": target2 = (Clamp(op.Offset, 0, w - 1), 0); alongX = true; break;
-            case "south": target2 = (Clamp(op.Offset, 0, w - 1), d - 1); alongX = true; break;
-            case "west": target2 = (0, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
-            case "east": target2 = (w - 1, Clamp(op.Offset, 0, d - 1)); alongX = false; break;
+            case "north": target2 = SnapToWall(cells, Clamp(op.Offset, 0, w - 1), 0, false, +1, w, d); alongX = true; break;
+            case "south": target2 = SnapToWall(cells, Clamp(op.Offset, 0, w - 1), d - 1, false, -1, w, d); alongX = true; break;
+            case "west": target2 = SnapToWall(cells, 0, Clamp(op.Offset, 0, d - 1), true, +1, w, d); alongX = false; break;
+            case "east": target2 = SnapToWall(cells, w - 1, Clamp(op.Offset, 0, d - 1), true, -1, w, d); alongX = false; break;
             default: return;
         }
+
+        // 列全体に壁が無ければ寄せ先が無い＝開口しない（従来の無視挙動と同じ）。
+        if (target2 == null) return;
 
         var key = (target2.Value.x, y, target2.Value.z);
 
@@ -773,6 +826,45 @@ public static class StructureExpander
             string glass = Pick(op.Block ?? "minecraft:glass", allowedBlocks, "minecraft:glass");
             cells[key] = glass; // 窓=ガラス置換
         }
+    }
+
+    // 開口スナップ用。面上の固定座標(fixedCoord)から、指定 offset の列を面の内側へ
+    // step 方向に走査し、最初に壁セル（いずれかの y に cells が存在する x,z）を持つ
+    // 位置を返す。alongZ=true なら offset は z、走査は x 方向; false なら offset は x、
+    // 走査は z 方向。列全体に壁が無ければ null（＝開口しない）。
+    //   引数の意味:
+    //     alongZ=false（north/south）… offsetX 固定、z を fixedCoord から step 方向へ走査
+    //     alongZ=true （east/west）  … offsetZ 固定、x を fixedCoord から step 方向へ走査
+    private static (int x, int z)? SnapToWall(
+        Dictionary<(int x, int y, int z), string> cells,
+        int a, int b, bool alongZ, int step, int w, int d)
+    {
+        // north/south: a=offsetX(固定), b=面のz(=0 or d-1), 走査は z 方向
+        // east/west  : a=面のx(=0 or w-1), b=offsetZ(固定), 走査は x 方向
+        if (!alongZ)
+        {
+            int x = a;
+            for (int z = b; z >= 0 && z < d; z += step)
+                if (HasWallColumn(cells, x, z)) return (x, z);
+        }
+        else
+        {
+            int z = b;
+            for (int x = a; x >= 0 && x < w; x += step)
+                if (HasWallColumn(cells, x, z)) return (x, z);
+        }
+        return null;
+    }
+
+    // (x,z) の柱にいずれかの高さ(y>=1)で壁セルが存在するか。
+    // 床(y=0)や屋根だけの位置を壁と誤認しないよう、y>=1 のセルの有無で判定する。
+    private static bool HasWallColumn(
+        Dictionary<(int x, int y, int z), string> cells, int x, int z)
+    {
+        foreach (var k in cells.Keys)
+            if (k.x == x && k.z == z && k.y >= 1)
+                return true;
+        return false;
     }
 
     private static int Clamp(int v, int lo, int hi) => v < lo ? lo : (v > hi ? hi : v);
