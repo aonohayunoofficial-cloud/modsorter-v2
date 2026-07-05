@@ -273,6 +273,19 @@ JSON:";
             if (!string.IsNullOrWhiteSpace(spec.ShipClass) || isShipInstruction)
                 spec.StructureType = "ship";
 
+            // 船のときは、LLMが紛れ込ませた建物用フィールドを無視する（案3のような汚染対策）。
+            if (spec.StructureType == "ship")
+            {
+                spec.BuildingStyle = "walled";
+                spec.RoofType = "flat";
+                spec.HasBase = false;
+                spec.FloorLevels = new List<int>();
+                spec.Openings = new List<Opening>();
+                // ship_class が空なら指示文から推定して埋める（案2のような欠落対策）。
+                if (string.IsNullOrWhiteSpace(spec.ShipClass))
+                    spec.ShipClass = GuessShipClass(instruction);
+            }
+
             // UIで寸法が確定されていれば、モデルの値を上書きする（寸法のブレを根絶）
             if (fixedWidth.HasValue) spec.Width = fixedWidth.Value;
             if (fixedDepth.HasValue) spec.Depth = fixedDepth.Value;
@@ -483,8 +496,7 @@ JSON:";
         return models;
     }
 
-    // 生出力から StructureSpec を取り出してパース。前後にゴミが付く場合に備え
-    // 最初の '{' から最後の '}' までを抜き出して試す。
+    // 指示が船（ship）を表しているかを判定する。船なら建物用の設計方針を無視する。
     private static bool IsShipInstruction(string instruction)
     {
         if (string.IsNullOrEmpty(instruction)) return false;
@@ -493,15 +505,38 @@ JSON:";
         {
             "boat", "ship", "vessel", "trawler", "galleon", "caravel", "liner",
             "tanker", "cargo", "warship", "destroyer", "battleship", "carrier",
-            "submarine", "rowboat", "motorboat", "yacht",
+            "submarine", "motorboat", "yacht", "cruiser", "frigate",
             "船", "ボート", "漁船", "帆船", "ガレオン", "カラベル", "潜水艦",
-            "空母", "客船", "タンカー", "貨物船", "軍艦", "駆逐艦", "戦艦", "ヨット"
+            "空母", "客船", "タンカー", "貨物船", "軍艦", "駆逐艦", "戦艦", "ヨット",
+            "巡洋艦", "フリゲート"
         };
         foreach (var k in kws)
             if (s.Contains(k)) return true;
         return false;
     }
 
+    // 指示文から ship_class を推定する。該当が無ければ null（ShipExpander 側が寸法で自動選択）。
+    private static string? GuessShipClass(string instruction)
+    {
+        if (string.IsNullOrEmpty(instruction)) return null;
+        string s = instruction.ToLowerInvariant();
+        if (s.Contains("空母") || s.Contains("carrier")) return "carrier";
+        if (s.Contains("潜水艦") || s.Contains("submarine")) return "submarine";
+        if (s.Contains("戦艦") || s.Contains("battleship")) return "battleship";
+        if (s.Contains("駆逐") || s.Contains("destroyer")) return "destroyer";
+        if (s.Contains("巡洋") || s.Contains("cruiser")) return "cruiser";
+        if (s.Contains("フリゲート") || s.Contains("frigate")) return "frigate";
+        if (s.Contains("客船") || s.Contains("liner")) return "liner";
+        if (s.Contains("貨物") || s.Contains("タンカー") || s.Contains("cargo") || s.Contains("tanker")) return "cargo";
+        if (s.Contains("ガレオン") || s.Contains("galleon")) return "galleon";
+        if (s.Contains("カラベル") || s.Contains("caravel")) return "caravel";
+        if (s.Contains("漁船") || s.Contains("trawler")) return "trawler";
+        if (s.Contains("モーター") || s.Contains("motorboat")) return "motorboat";
+        return null; // 一般的な「船」など。寸法から自動選択させる。
+    }
+
+    // 生出力から StructureSpec を取り出してパース。前後にゴミが付く場合に備え
+    // 最初の '{' から最後の '}' までを抜き出して試す。
     private static StructureSpec? TryParseSpec(string raw)
     {
         string candidate = raw.Trim();
