@@ -1017,17 +1017,22 @@
                                     <Button x:Name="MachineGenBtn"
                                             Content="機械を生成" Style="{StaticResource McButton}"
                                             Click="MachineGenerate_Click"/>
+                                    <Button x:Name="MachineOpenPreviewBtn"
+                                            Content="3Dビューを開く"
+                                            Style="{StaticResource McButtonGray}"
+                                            Margin="8,0,0,0"
+                                            Click="MachineOpenPreview_Click"/>
                                     <Button x:Name="MachineOpenFolderBtn"
                                             Content="出力フォルダを開く"
                                             Style="{StaticResource McButtonGray}"
                                             Margin="8,0,0,0"
                                             Click="MachineOpenFolder_Click"/>
                                 </StackPanel>
-                                
+
                                 <TextBlock x:Name="MachineStatus"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}" FontSize="11"
-                                           TextWrapping="Wrap" Margin="0,0,0,8" Text=""/>
+                                           TextWrapping="Wrap" Margin="0,0,0,8" Text="" Cursor=""/>
 
                                 <TextBlock Text="生成結果"
                                            Style="{StaticResource PixelText}"

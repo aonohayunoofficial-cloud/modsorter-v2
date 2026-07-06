@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -16,6 +17,9 @@ public partial class MainWindow
 {
     // 直近に生成した機械のNBT出力先（フォルダを開くボタンで使う）。
     private string? _lastMachineNbtPath;
+
+    // 直近に生成した機械のブロック配置。3Dビューを開き直すときに再描画する。
+    private List<ModSorter.Clients.ModuleGenerator.PlacedBlock>? _lastMachinePlaced;
 
     // スキマティックNBTの出力先パスを決める共通処理（機械・建築で共用）。
     // .minecraft/schematics/<名前>.nbt を基本とし、同名があれば上書き確認モーダルを出す。
@@ -262,6 +266,11 @@ public partial class MainWindow
                 return;
             }
 
+            // 直近結果を保持し、3Dプレビューへ描画する。
+            _lastMachinePlaced = placed;
+            await RenderMachinePreviewAsync(placed);
+
+
             if (issues.Count > 0)
                 Log($"上限 {MAX_ATTEMPTS} 回でも結合不正が {issues.Count} 件残りました。最良案を出力します。");
             // 結果テキストを組み立て。
@@ -341,4 +350,265 @@ public partial class MainWindow
             MachineStatus.Text = $"フォルダを開けませんでした: {ex.Message}";
         }
     }
+
+
+    // 「3Dビューを開く」ボタン。
+    // ウィンドウが閉じられていても開き直し、直近に生成した機械を再描画する。
+    private async void MachineOpenPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastMachinePlaced == null || _lastMachinePlaced.Count == 0)
+        {
+            MachineStatus.Text = "表示できる機械がありません。先に生成してください。";
+            return;
+        }
+        await RenderMachinePreviewAsync(_lastMachinePlaced);
+    }
+
+    // Create機械の生成結果を3Dプレビューへ描画する。
+    // モデルJSONから見た目形状(elements)と面別テクスチャ(faces)を解決し、
+    // {x,y,z,id,elements:[{from,to,faces:{面名:{tex,uv,rot}}}], rotX,rotY} の形で渡す。
+    // faces のテクスチャ参照(例 create:block/shaft_side)は texKey として使い、
+    // その PNG を texMap[texKey] で送る。JS側は面ごとにこの texKey で貼り、uv でUVを合わせる。
+    // 形状が取れないブロックは elements 無し → JS側で 1×1×1 にフォールバック。
+    // water_wheel 等の動的描画(BlockEntityRenderer)ブロックは、モデルJSONに本体形状が
+    // 無い(枠や別モデルの断片しか取れない)ため、GetBlockShape の結果を使わず
+    // 強制的に専用の簡易形状(FallbackShapeFor)を当てて「それらしい塊」にする。
+    private async Task RenderMachinePreviewAsync(
+        List<ModSorter.Clients.ModuleGenerator.PlacedBlock> placed)
+    {
+        // プレビューウィンドウが無ければ開く(建築モードと共有する _previewWindow)。
+        if (_previewWindow == null)
+        {
+            _previewWindow = new ModSorter.Architect.Preview.PreviewWindow { Owner = this };
+            _previewWindow.Closed += (_, __) => _previewWindow = null;
+            _previewWindow.Show();
+            await _previewWindow.InitAsync();
+        }
+
+        // 準備完了まで少し待つ(最大5秒)。
+        int waited = 0;
+        while (!_previewWindow.IsReady && waited < 5000)
+        {
+            await Task.Delay(100);
+            waited += 100;
+        }
+        if (!_previewWindow.IsReady)
+        {
+            Log("プレビュー描画中止: ウィンドウが準備完了になりませんでした。");
+            return;
+        }
+
+        var vanilla = FindVanillaJar();
+        var modJars = (_mods ?? new List<ModSorter.Models.ModEntry>())
+            .Select(m => m.FilePath)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        string blocksJson;
+        // texMap: テクスチャキー(=解決済みテクスチャ参照 or baseId) → dataURI。
+        var texMap = new Dictionary<string, string>();
+
+        using (var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars))
+        {
+            // 面別テクスチャPNGをキーで集めるローカル関数。
+            // texKey は "create:block/shaft_side" のような解決済み参照。
+            void AddFaceTexture(string texKey)
+            {
+                if (string.IsNullOrEmpty(texKey)) return;
+                if (texMap.ContainsKey(texKey)) return;
+                var png = tp.GetTextureByPath(texKey);
+                if (png != null && png.Length > 0)
+                    texMap[texKey] = "data:image/png;base64," + System.Convert.ToBase64String(png);
+            }
+
+            var payload = new List<object>(placed.Count);
+            int shapeHit = 0;
+            int fallbackHit = 0;
+
+            foreach (var b in placed)
+            {
+                string baseId = b.Id.Split('[')[0];
+
+                // 動的描画ブロックは GetBlockShape が中途半端な形状を返すことがあるため、
+                // 先に判定して強制的に簡易形状を使う。
+                var forced = FallbackShapeFor(baseId);
+                if (forced != null && forced.Count > 0)
+                {
+                    fallbackHit++;
+                    payload.Add(BuildElementPayload(b, forced, 0, 0, AddFaceTexture));
+                }
+                else
+                {
+                    var shape = tp.GetBlockShape(b.Id, b.Properties);
+                    if (shape != null && shape.Elements.Count > 0)
+                    {
+                        shapeHit++;
+                        payload.Add(BuildElementPayload(b, shape.Elements, shape.RotX, shape.RotY, AddFaceTexture));
+                    }
+                    else
+                    {
+                        // 完全に不明 → elements 無し。JS側で 1×1×1、色は baseId のテクスチャ。
+                        payload.Add(new { x = b.X, y = b.Y, z = b.Z, id = b.Id });
+                    }
+                }
+
+                // フォールバック用に baseId のテクスチャも入れておく
+                // (elements 無しブロック、簡易形状、faces 欠落面の保険)。
+                if (!texMap.ContainsKey(baseId))
+                {
+                    var png = tp.GetTexture(baseId);
+                    if (png != null && png.Length > 0)
+                        texMap[baseId] = "data:image/png;base64," + System.Convert.ToBase64String(png);
+                }
+            }
+
+            blocksJson = JsonSerializer.Serialize(payload);
+            Log($"プレビュー形状: {placed.Count} ブロック中 {shapeHit} 件を elements、" +
+                $"{fallbackHit} 件を簡易形状で描画。テクスチャ {texMap.Count} 種。");
+        }
+
+        // テクスチャを先に送ってから描画する。
+        try
+        {
+            string texJson = JsonSerializer.Serialize(texMap);
+            await _previewWindow.SetTexturesAsync(texJson);
+        }
+        catch (Exception ex)
+        {
+            Log($"テクスチャ送信をスキップ: {ex.Message}");
+        }
+
+        Log($"プレビュー描画: {placed.Count} ブロックを送信します。");
+        await _previewWindow.RenderAsync(blocksJson);
+        _previewWindow.Activate();
+    }
+
+    // elements(faces解決済み) から JS へ渡す payload オブジェクトを組み立てる。
+    // 各面の texKey を addFaceTex で texMap に集めつつ、from/to/faces(tex,uv,rot)、
+    // 要素の2段回転(rotAngle/rotAxis/rotOrigin と rot2Angle/rot2Axis)を載せる。
+    private static object BuildElementPayload(
+        ModSorter.Clients.ModuleGenerator.PlacedBlock b,
+        List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement> elements,
+        int rotX, int rotY,
+        Action<string> addFaceTex)
+    {
+        var elems = new List<object>(elements.Count);
+        foreach (var el in elements)
+        {
+            // faces: 面名 → {tex, uv, rot}。uv は無ければ null(JS側で from/to から算出)。
+            var faces = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var f in el.Faces)
+            {
+                addFaceTex(f.Value.Tex);
+                faces[f.Key] = new
+                {
+                    tex = f.Value.Tex,
+                    uv = f.Value.Uv,   // double[4] または null
+                    rot = f.Value.Rotation
+                };
+            }
+            elems.Add(new
+            {
+                from = el.From,
+                to = el.To,
+                faces,
+                rotAngle = el.RotAngle,
+                rotAxis = el.RotAxis,
+                rotOrigin = el.RotOrigin,
+                rot2Angle = el.Rot2Angle,
+                rot2Axis = el.Rot2Axis
+            });
+        }
+        return new
+        {
+            x = b.X,
+            y = b.Y,
+            z = b.Z,
+            id = b.Id,
+            elements = elems,
+            rotX = rotX,
+            rotY = rotY
+        };
+    }
+
+    // 動的描画(BlockEntityRenderer)で本体形状がモデルJSONに無いブロック向けの簡易形状。
+    // 水車は本物に寄せて「中心の金属ハブ + 8角形の外周板リング + 斜めの水受けパドル8枚」で作る。
+    // 要素の2段回転を使い、1段目(X軸)で外周へ45度刻み配置、2段目(Z軸)で羽根を軸方向へ傾ける。
+    // 座標は 0..16 のピクセル単位。軸はX方向、車輪面はYZ平面に立てる。
+    private static List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>?
+        FallbackShapeFor(string baseId)
+    {
+        const string PLANK = "minecraft:block/oak_planks";
+        const string AXIS = "create:block/axis";
+
+        static Dictionary<string, ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace>
+            AllFaces(string tex)
+        {
+            var d = new Dictionary<string, ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace>(
+                StringComparer.Ordinal);
+            foreach (var fn in new[] { "north", "south", "east", "west", "up", "down" })
+                d[fn] = new ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace
+                { Tex = tex, Uv = null, Rotation = 0 };
+            return d;
+        }
+
+        // テクスチャ+2段回転つきの小箱。
+        // 1段目: angle 度を axis 軸まわり。2段目: angle2 度を axis2 軸まわり。中心[8,8,8]。
+        static ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement Box(
+            double x0, double y0, double z0, double x1, double y1, double z1,
+            string tex, double angle = 0, string axis = "x",
+            double angle2 = 0, string axis2 = "y")
+            => new()
+            {
+                From = new double[] { x0, y0, z0 },
+                To = new double[] { x1, y1, z1 },
+                Faces = AllFaces(tex),
+                RotAngle = angle,
+                RotAxis = axis,
+                RotOrigin = new double[] { 8, 8, 8 },
+                Rot2Angle = angle2,
+                Rot2Axis = axis2
+            };
+
+        switch (baseId)
+        {
+            case "create:water_wheel":
+            case "create:large_water_wheel":
+                {
+                    var list = new List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>
+                    {
+                        // 中心の金属ハブ(ケース+軸)。X方向に薄い四角。
+                        Box(6, 5, 5, 10, 11, 11, AXIS),
+                    };
+                    for (int i = 0; i < 8; i++)
+                    {
+                        double a = i * 45.0;
+                        // 8角形リングの外周板。中心から上へオフセットした薄板をX軸で45度刻み配置。
+                        list.Add(Box(6.5, 13, 4, 9.5, 15.5, 12, PLANK, a, "x"));
+                        // パドル(水受け板)。軸方向(Z)にまっすぐ長い板。傾けない。
+                        list.Add(Box(6, 12.5, 2, 10, 15.5, 14, PLANK, a, "x"));
+                    }
+                    return list;
+                }
+
+            case "create:crushing_wheel":
+                {
+                    var list = new List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>
+                    {
+                        Box(1, 1, 1, 15, 15, 15, PLANK),
+                    };
+                    return list;
+                }
+
+            case "create:belt":
+                return new()
+                {
+                    Box(0, 3, 3, 16, 13, 13, AXIS),
+                };
+
+            default:
+                return null;
+        }
+    }
+
 }

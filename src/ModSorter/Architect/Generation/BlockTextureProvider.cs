@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.Json;
 
 namespace ModSorter.Architect.Generation;
 
@@ -15,6 +16,8 @@ public sealed class BlockTextureProvider : IDisposable
     private readonly Dictionary<string, ZipArchive> _zips = new();
     // 取得済みPNGのキャッシュ(blockId → bytes or null)。
     private readonly Dictionary<string, byte[]?> _cache = new();
+    // テクスチャパス(例 "create:block/shaft_side")→ PNG bytes のキャッシュ。
+    private readonly Dictionary<string, byte[]?> _pathCache = new(StringComparer.Ordinal);
 
     // namespace(例 "minecraft","create") → そのassetsを含むjarパス
     private readonly Dictionary<string, string> _nsToJar = new();
@@ -152,6 +155,44 @@ public sealed class BlockTextureProvider : IDisposable
         }
 
         _cache[blockId] = result;
+        return result;
+    }
+
+    // テクスチャ参照パス(例 "create:block/shaft_side" や "block/oak_planks")から
+    // PNG バイト列を返す。無ければ null。面別テクスチャ解決で使う。
+    public byte[]? GetTextureByPath(string texRef)
+    {
+        if (string.IsNullOrEmpty(texRef)) return null;
+        if (_pathCache.TryGetValue(texRef, out var cached)) return cached;
+
+        byte[]? result = null;
+        try
+        {
+            // ns の解決。ns 無しは minecraft 扱い(バニラモデルの慣習)。
+            string ns, path;
+            int c = texRef.IndexOf(':');
+            if (c >= 0) { ns = texRef.Substring(0, c); path = texRef.Substring(c + 1); }
+            else { ns = "minecraft"; path = texRef; }
+
+            if (_nsToJar.TryGetValue(ns, out var jar))
+            {
+                var za = GetZip(ns, jar);
+                var entry = za.GetEntry($"assets/{ns}/textures/{path}.png");
+                if (entry != null)
+                {
+                    using var s = entry.Open();
+                    using var ms = new MemoryStream();
+                    s.CopyTo(ms);
+                    result = ms.ToArray();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+        }
+
+        _pathCache[texRef] = result;
         return result;
     }
 
@@ -302,6 +343,345 @@ public sealed class BlockTextureProvider : IDisposable
         }
 
         return result;
+    }
+
+    // ======================================================================
+    // ブロックの「見た目形状(elements)」と「面ごとのテクスチャ」をモデルJSONから解決する。
+    // Minecraft のモデルは assets/<ns>/models/block/<name>.json に定義され、
+    // parent 継承・elements(小箱の集合)・textures(テクスチャ変数辞書)を持つ。
+    // 各 element の faces で「どの面にどのテクスチャ変数を使うか」を指定する。
+    // ======================================================================
+
+    // 1個の小箱の1面ぶんのテクスチャ指定。
+    // Tex は解決済みテクスチャ参照(例 "create:block/shaft_side")。
+    // Uv は [x1,y1,x2,y2] の 0..16 座標。null なら from/to から自動算出させる。
+    // Rotation は 0/90/180/270。
+    public sealed class ShapeFace
+    {
+        public string Tex = "";
+        public double[]? Uv = null;
+        public int Rotation = 0;
+    }
+
+    // 1個の小箱。from/to は 0〜16 のピクセル座標。faces は面名→面テクスチャ指定。
+    // 要素単位の回転(Minecraftモデルの element.rotation 相当、および簡易形状の円形配置用)を持つ。
+    public sealed class ShapeElement
+    {
+        public double[] From = new double[3]; // x,y,z (0..16)
+        public double[] To = new double[3];   // x,y,z (0..16)
+        // 面名(north/south/east/west/up/down) → 解決済み面テクスチャ指定。
+        // 面指定が無い面は含まれない。
+        public Dictionary<string, ShapeFace> Faces = new(StringComparer.Ordinal);
+
+        // 要素の回転(2段)。まず Rot(1段目)、その後 Rot2(2段目)を同じ原点まわりに適用。
+        // 水車パドルは「外周へ45度刻みで配置(1段目)」+「羽根を軸方向へ傾ける(2段目)」で作る。
+        // モデルJSON由来の element.rotation は1段目(Rot)にのみ入る。
+        public double RotAngle = 0;
+        public string RotAxis = "x";
+        public double[] RotOrigin = new double[] { 8, 8, 8 };
+
+        public double Rot2Angle = 0;
+        public string Rot2Axis = "y";
+    }
+
+    // ブロック1個ぶんの形状。elements と、blockstates 由来の回転(度)。
+    public sealed class BlockShape
+    {
+        public List<ShapeElement> Elements = new();
+        public int RotX = 0; // blockstates variant の x 回転(0/90/180/270)
+        public int RotY = 0; // blockstates variant の y 回転(0/90/180/270)
+    }
+
+    // 解決済みモデルのキャッシュ。model名 → elements。
+    private readonly Dictionary<string, List<ShapeElement>?> _modelElemCache =
+        new(StringComparer.Ordinal);
+
+    // ブロックID + プロパティ から形状を解決する。
+    public BlockShape? GetBlockShape(string blockId, IReadOnlyDictionary<string, string>? props)
+    {
+        try
+        {
+            var (ns, name) = SplitId(blockId);
+            if (!_nsToJar.TryGetValue(ns, out var jar)) return null;
+            var za = GetZip(ns, jar);
+
+            var (modelRef, rotX, rotY) = ResolveVariantModel(za, ns, name, props);
+            if (string.IsNullOrEmpty(modelRef)) return null;
+
+            var elems = ResolveModelElements(za, ns, modelRef!, 0);
+            if (elems == null || elems.Count == 0) return null;
+
+            return new BlockShape { Elements = elems, RotX = rotX, RotY = rotY };
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return null;
+        }
+    }
+
+    // blockstates/<name>.json を読み、props に合う variant の model 名と回転を返す。
+    private (string? model, int rotX, int rotY) ResolveVariantModel(
+        ZipArchive za, string ns, string name, IReadOnlyDictionary<string, string>? props)
+    {
+        var entry = za.GetEntry($"assets/{ns}/blockstates/{name}.json");
+        if (entry == null) return (null, 0, 0);
+
+        string json;
+        using (var sr = new StreamReader(entry.Open())) json = sr.ReadToEnd();
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) return (null, 0, 0);
+        if (!root.TryGetProperty("variants", out var variants) ||
+            variants.ValueKind != JsonValueKind.Object)
+            return (null, 0, 0); // multipart 等は非対応
+
+        JsonElement bestVal = default;
+        int bestScore = -1;
+        bool found = false;
+
+        foreach (var v in variants.EnumerateObject())
+        {
+            string key = v.Name;
+            int score = 0;
+            bool ok = true;
+
+            if (key.Length > 0)
+            {
+                foreach (var pair in key.Split(','))
+                {
+                    int eq = pair.IndexOf('=');
+                    if (eq <= 0) { ok = false; break; }
+                    string pName = pair.Substring(0, eq).Trim();
+                    string pVal = pair.Substring(eq + 1).Trim();
+                    string? cur = null;
+                    if (props != null) props.TryGetValue(pName, out cur);
+                    if (!string.Equals(cur, pVal, StringComparison.Ordinal)) { ok = false; break; }
+                    score++;
+                }
+            }
+            if (!ok) continue;
+            if (score > bestScore) { bestScore = score; bestVal = v.Value; found = true; }
+        }
+
+        if (!found) return (null, 0, 0);
+
+        JsonElement obj = bestVal;
+        if (bestVal.ValueKind == JsonValueKind.Array)
+        {
+            if (bestVal.GetArrayLength() == 0) return (null, 0, 0);
+            obj = bestVal[0];
+        }
+        if (obj.ValueKind != JsonValueKind.Object) return (null, 0, 0);
+
+        string? model = obj.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String
+            ? m.GetString() : null;
+        int rx = obj.TryGetProperty("x", out var xe) && xe.ValueKind == JsonValueKind.Number
+            ? xe.GetInt32() : 0;
+        int ry = obj.TryGetProperty("y", out var ye) && ye.ValueKind == JsonValueKind.Number
+            ? ye.GetInt32() : 0;
+
+        return (model, rx, ry);
+    }
+
+    // model 参照名から elements(faces解決済み)を得る。
+    // parent を辿り、textures 辞書を子優先でマージしながら、elements を持つ階層で
+    // 各 face のテクスチャ変数を実パスへ解決する。
+    private List<ShapeElement>? ResolveModelElements(
+        ZipArchive za, string defaultNs, string modelRef, int depth)
+    {
+        string cacheKey = NormalizeModelKey(defaultNs, modelRef);
+        if (_modelElemCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+        // textures 辞書を継承チェーン全体でマージしてから elements を解決する必要がある。
+        var mergedTextures = new Dictionary<string, string>(StringComparer.Ordinal);
+        var elems = ResolveElementsWithTextures(za, defaultNs, modelRef, 0, mergedTextures);
+
+        _modelElemCache[cacheKey] = elems;
+        return elems;
+    }
+
+    // 継承チェーンを辿りながら textures をマージし、elements を持つ階層で faces を解決する。
+    // textures は「子が優先」。呼び出し時に子側の textures を先に inout 辞書へ入れておき、
+    // 親の textures は未設定キーだけ補完する。
+    private List<ShapeElement>? ResolveElementsWithTextures(
+        ZipArchive za, string defaultNs, string modelRef, int depth,
+        Dictionary<string, string> textures)
+    {
+        if (depth > 16) return null;
+
+        string mns, mpath;
+        int c = modelRef.IndexOf(':');
+        if (c >= 0) { mns = modelRef.Substring(0, c); mpath = modelRef.Substring(c + 1); }
+        else { mns = defaultNs; mpath = modelRef; }
+
+        JsonDocument? doc = ReadModelJson(za, mns, mpath) ?? ReadModelJsonFromNs(mns, mpath);
+        if (doc == null) return null;
+
+        using (doc)
+        {
+            var root = doc.RootElement;
+
+            // このモデルの textures を辞書へ取り込む(子優先なので未設定キーのみ補完)。
+            if (root.TryGetProperty("textures", out var texEl) &&
+                texEl.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var p in texEl.EnumerateObject())
+                {
+                    if (p.Value.ValueKind != JsonValueKind.String) continue;
+                    if (!textures.ContainsKey(p.Name))
+                        textures[p.Name] = p.Value.GetString()!;
+                }
+            }
+
+            // 自分が elements を持つならここで faces を解決して返す。
+            if (root.TryGetProperty("elements", out var elemsEl) &&
+                elemsEl.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<ShapeElement>();
+                foreach (var e in elemsEl.EnumerateArray())
+                {
+                    if (!e.TryGetProperty("from", out var fe) ||
+                        !e.TryGetProperty("to", out var te)) continue;
+                    var from = ReadVec3(fe);
+                    var to = ReadVec3(te);
+                    if (from == null || to == null) continue;
+
+                    var se = new ShapeElement { From = from, To = to };
+
+                    // element.rotation: { origin:[x,y,z], axis:"x"|"y"|"z", angle:±22.5..±45 }
+                    if (e.TryGetProperty("rotation", out var erot) &&
+                        erot.ValueKind == JsonValueKind.Object)
+                    {
+                        if (erot.TryGetProperty("angle", out var ang) &&
+                            ang.ValueKind == JsonValueKind.Number)
+                            se.RotAngle = ang.GetDouble();
+                        if (erot.TryGetProperty("axis", out var ax) &&
+                            ax.ValueKind == JsonValueKind.String)
+                            se.RotAxis = ax.GetString() ?? "x";
+                        if (erot.TryGetProperty("origin", out var org) &&
+                            org.ValueKind == JsonValueKind.Array)
+                        {
+                            var o = ReadVec3(org);
+                            if (o != null) se.RotOrigin = o;
+                        }
+                    }
+
+                    if (e.TryGetProperty("faces", out var facesEl) &&
+                        facesEl.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var face in facesEl.EnumerateObject())
+                        {
+                            if (face.Value.ValueKind != JsonValueKind.Object) continue;
+                            if (!face.Value.TryGetProperty("texture", out var texRefEl) ||
+                                texRefEl.ValueKind != JsonValueKind.String) continue;
+                            string resolved = ResolveTextureVar(texRefEl.GetString()!, textures);
+                            if (string.IsNullOrEmpty(resolved)) continue;
+
+                            var sf = new ShapeFace { Tex = resolved };
+
+                            // uv: [x1,y1,x2,y2] 0..16。省略時は null(JS側で from/to から算出)。
+                            if (face.Value.TryGetProperty("uv", out var uvEl) &&
+                                uvEl.ValueKind == JsonValueKind.Array &&
+                                uvEl.GetArrayLength() >= 4)
+                            {
+                                var uv = new double[4];
+                                int i = 0;
+                                foreach (var n in uvEl.EnumerateArray())
+                                {
+                                    if (i >= 4) break;
+                                    if (n.ValueKind != JsonValueKind.Number) { i = -1; break; }
+                                    uv[i++] = n.GetDouble();
+                                }
+                                if (i == 4) sf.Uv = uv;
+                            }
+
+                            // rotation: 面テクスチャの回転(0/90/180/270)。
+                            if (face.Value.TryGetProperty("rotation", out var rotEl) &&
+                                rotEl.ValueKind == JsonValueKind.Number)
+                            {
+                                sf.Rotation = rotEl.GetInt32();
+                            }
+
+                            se.Faces[face.Name] = sf;
+                        }
+                    }
+                    list.Add(se);
+                }
+                if (list.Count > 0) return list;
+            }
+
+            // elements が無ければ親を辿る(textures は既にこの階層ぶん取り込み済み)。
+            if (root.TryGetProperty("parent", out var pe) &&
+                pe.ValueKind == JsonValueKind.String)
+            {
+                return ResolveElementsWithTextures(za, mns, pe.GetString()!, depth + 1, textures);
+            }
+        }
+        return null;
+    }
+
+    // テクスチャ変数("#side" 等)を textures 辞書で実パスへ解決する。
+    // 変数が別の変数を指す多段参照("#0" → "#texture" → 実パス)にも対応(上限あり)。
+    private static string ResolveTextureVar(string texRef, Dictionary<string, string> textures)
+    {
+        string cur = texRef;
+        for (int i = 0; i < 8; i++)
+        {
+            if (cur.Length == 0) return "";
+            if (cur[0] != '#') return cur; // 変数でない = 実パス
+            string key = cur.Substring(1);
+            if (!textures.TryGetValue(key, out var next)) return ""; // 未解決
+            cur = next;
+        }
+        return ""; // 循環など
+    }
+
+    private static string NormalizeModelKey(string defaultNs, string modelRef)
+    {
+        int c = modelRef.IndexOf(':');
+        if (c >= 0) return modelRef;
+        return $"{defaultNs}:{modelRef}";
+    }
+
+    private JsonDocument? ReadModelJson(ZipArchive za, string ns, string mpath)
+    {
+        string rel = mpath.Contains('/') ? mpath : $"block/{mpath}";
+        var entry = za.GetEntry($"assets/{ns}/models/{rel}.json");
+        if (entry == null) return null;
+        try
+        {
+            string json;
+            using (var sr = new StreamReader(entry.Open())) json = sr.ReadToEnd();
+            return JsonDocument.Parse(json);
+        }
+        catch { return null; }
+    }
+
+    private JsonDocument? ReadModelJsonFromNs(string ns, string mpath)
+    {
+        if (!_nsToJar.TryGetValue(ns, out var jar)) return null;
+        try
+        {
+            var za = GetZip(ns, jar);
+            return ReadModelJson(za, ns, mpath);
+        }
+        catch { return null; }
+    }
+
+    private static double[]? ReadVec3(JsonElement arr)
+    {
+        if (arr.ValueKind != JsonValueKind.Array || arr.GetArrayLength() < 3) return null;
+        var v = new double[3];
+        int i = 0;
+        foreach (var n in arr.EnumerateArray())
+        {
+            if (i >= 3) break;
+            if (n.ValueKind != JsonValueKind.Number) return null;
+            v[i++] = n.GetDouble();
+        }
+        return i == 3 ? v : null;
     }
 
     public void Dispose()
