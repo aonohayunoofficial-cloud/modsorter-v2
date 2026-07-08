@@ -306,7 +306,8 @@ function addBlock(b, bbox) {
       // ---- elements 方式 ----
       const rx = (typeof b.rotX === 'number') ? b.rotX : 0;
       const ry = (typeof b.rotY === 'number') ? b.rotY : 0;
-      const needRot = (rx !== 0 || ry !== 0);
+      const rz = (typeof b.rotZ === 'number') ? b.rotZ : 0;
+      const needRot = (rx !== 0 || ry !== 0 || rz !== 0);
       const container = needRot ? new THREE.Group() : group;
 
       for (const el of b.elements) {
@@ -325,30 +326,21 @@ function addBlock(b, bbox) {
         const mats = faceMaterials(el.faces, baseId);
         const mesh = new THREE.Mesh(geo, mats);
 
-        // 要素の2段回転(水車パドル等)。原点(0..16px)中心で1段目→2段目を適用。
-        // 1段目(outer): 外周へ45度刻み配置。2段目(inner): 羽根を軸方向へ傾ける。
-        if ((typeof el.rotAngle === 'number' && el.rotAngle !== 0) ||
-            (typeof el.rot2Angle === 'number' && el.rot2Angle !== 0)) {
+        // 要素の1段回転(モデルJSONの element.rotation 相当)。
+        // 原点(0..16px)中心で pivot を作り、その周りに小箱を回す。
+        if (typeof el.rotAngle === 'number' && el.rotAngle !== 0) {
           const ox = (el.rotOrigin ? el.rotOrigin[0] : 8)/16 - 0.5;
           const oy = (el.rotOrigin ? el.rotOrigin[1] : 8)/16 - 0.5;
           const oz = (el.rotOrigin ? el.rotOrigin[2] : 8)/16 - 0.5;
 
-          // 2段目(内側)pivot: 板をローカルで傾ける。
-          const inner = new THREE.Object3D();
-          if (typeof el.rot2Angle === 'number' && el.rot2Angle !== 0)
-            inner.rotateOnAxis(axisVec(el.rot2Axis), el.rot2Angle * Math.PI/180);
-
-          // 1段目(外側)pivot: 外周へ配置。
-          const outer = new THREE.Object3D();
-          if (typeof el.rotAngle === 'number' && el.rotAngle !== 0)
-            outer.rotateOnAxis(axisVec(el.rotAxis), el.rotAngle * Math.PI/180);
+          const pivot = new THREE.Object3D();
+          pivot.rotateOnAxis(axisVec(el.rotAxis), el.rotAngle * Math.PI/180);
 
           mesh.position.set(lcx - ox, lcy - oy, lcz - oz);
-          inner.add(mesh);
-          outer.add(inner);
+          pivot.add(mesh);
 
-          if (needRot) { outer.position.set(ox, oy, oz); container.add(outer); }
-          else { outer.position.set(b.x + ox, b.y + oy, b.z + oz); group.add(outer); }
+          if (needRot) { pivot.position.set(ox, oy, oz); container.add(pivot); }
+          else { pivot.position.set(b.x + ox, b.y + oy, b.z + oz); group.add(pivot); }
           continue;
         }
 
@@ -363,9 +355,14 @@ function addBlock(b, bbox) {
 
       if (needRot) {
         const toRad = Math.PI / 180;
-        container.rotation.order = 'YXZ';
+        // Create の BeltRenderer は Y→Z→X の順で座標系を積む
+        // (msr.rotateYDegrees→rotateZDegrees→rotateXDegrees)。
+        // three.js の Euler は order 文字列の逆順に適用されるため、
+        // Y→Z→X を再現するには order='XZY'。符号は左手系→右手系で反転。
+        container.rotation.order = 'XZY';
         container.rotation.x = -rx * toRad;
         container.rotation.y = -ry * toRad;
+        container.rotation.z = -rz * toRad;
         container.position.set(b.x, b.y, b.z);
         group.add(container);
       }

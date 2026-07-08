@@ -134,6 +134,49 @@ public partial class MainWindow
             return;
         }
 
+        // [テスト用・消してよい] プロンプトに "belttest" と入れると、
+        // slope/part/facing を網羅した belt を直接プレビューへ流す。
+        // LLM 生成を通さず GetBeltShape の全姿勢を確認するための一時導線。
+        // 確認が済んだらこの if ブロックごと削除する。
+        if (prompt.Equals("belttest", StringComparison.OrdinalIgnoreCase))
+        {
+            var testBlocks = new List<ModSorter.Clients.ModuleGenerator.PlacedBlock>();
+            // (id, slope, part, facing, x) を並べて生成。横(x)に2マス間隔で配置。
+            var cases = new (string slope, string part, string facing)[]
+            {
+                ("horizontal", "middle", "east"),   // 平たい帯(水平)
+                ("horizontal", "start",  "east"),   // 端部品(始点)
+                ("horizontal", "end",    "east"),   // 端部品(終点)
+                ("upward",     "middle", "east"),   // 斜め(上り)
+                ("downward",   "middle", "east"),   // 斜め(下り)
+                ("vertical",   "middle", "east"),   // 垂直
+                ("sideways",   "middle", "east"),   // 横倒し
+                ("horizontal", "middle", "north"),  // 水平・facing=north(Y回転差の確認)
+            };
+            int tx = 0;
+            foreach (var c in cases)
+            {
+                testBlocks.Add(new ModSorter.Clients.ModuleGenerator.PlacedBlock
+                {
+                    Id = "create:belt",
+                    X = tx,
+                    Y = 1,
+                    Z = 2,
+                    Properties = new Dictionary<string, string>
+                    {
+                        ["slope"] = c.slope,
+                        ["part"] = c.part,
+                        ["facing"] = c.facing
+                    }
+                });
+                tx += 3;
+            }
+            _lastMachinePlaced = testBlocks;
+            await RenderMachinePreviewAsync(testBlocks);
+            MachineStatus.Text = $"belttest: {testBlocks.Count} 本の belt を描画しました。";
+            return;
+        }
+
         // 空間サイズの読み取り。数値でなければエラー。
         if (!int.TryParse(MachineSizeXBox.Text.Trim(), out int sx) ||
             !int.TryParse(MachineSizeYBox.Text.Trim(), out int sy) ||
@@ -423,19 +466,18 @@ public partial class MainWindow
 
             var payload = new List<object>(placed.Count);
             int shapeHit = 0;
-            int fallbackHit = 0;
-
             foreach (var b in placed)
             {
                 string baseId = b.Id.Split('[')[0];
 
-                // 動的描画ブロックは GetBlockShape が中途半端な形状を返すことがあるため、
-                // 先に判定して強制的に簡易形状を使う。
-                var forced = FallbackShapeFor(baseId);
-                if (forced != null && forced.Count > 0)
+                // belt は blockstates を持たない特殊ブロック。専用リゾルバで
+                // slope/part/facing からモデルと姿勢を解決する。
+                var beltShape = tp.GetBeltShape(b.Id, b.Properties);
+                if (beltShape != null && beltShape.Elements.Count > 0)
                 {
-                    fallbackHit++;
-                    payload.Add(BuildElementPayload(b, forced, 0, 0, AddFaceTexture));
+                    shapeHit++;
+                    payload.Add(BuildElementPayload(
+                        b, beltShape.Elements, beltShape.RotX, beltShape.RotY, beltShape.RotZ, AddFaceTexture));
                 }
                 else
                 {
@@ -443,11 +485,13 @@ public partial class MainWindow
                     if (shape != null && shape.Elements.Count > 0)
                     {
                         shapeHit++;
-                        payload.Add(BuildElementPayload(b, shape.Elements, shape.RotX, shape.RotY, AddFaceTexture));
+                        payload.Add(BuildElementPayload(
+                            b, shape.Elements, shape.RotX, shape.RotY, shape.RotZ, AddFaceTexture));
                     }
                     else
                     {
-                        // 完全に不明 → elements 無し。JS側で 1×1×1、色は baseId のテクスチャ。
+                        // 形状不明(OBJ描画ブロックや未知ブロック) → elements 無し。
+                        // JS側で 1×1×1、色は baseId のテクスチャ。水車系OBJは次段で対応。
                         payload.Add(new { x = b.X, y = b.Y, z = b.Z, id = b.Id });
                     }
                 }
@@ -463,8 +507,8 @@ public partial class MainWindow
             }
 
             blocksJson = JsonSerializer.Serialize(payload);
-            Log($"プレビュー形状: {placed.Count} ブロック中 {shapeHit} 件を elements、" +
-                $"{fallbackHit} 件を簡易形状で描画。テクスチャ {texMap.Count} 種。");
+            Log($"プレビュー形状: {placed.Count} ブロック中 {shapeHit} 件を elements で描画。" +
+                $"テクスチャ {texMap.Count} 種。");
         }
 
         // テクスチャを先に送ってから描画する。
@@ -489,13 +533,12 @@ public partial class MainWindow
     private static object BuildElementPayload(
         ModSorter.Clients.ModuleGenerator.PlacedBlock b,
         List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement> elements,
-        int rotX, int rotY,
+        int rotX, int rotY, double rotZ,
         Action<string> addFaceTex)
     {
         var elems = new List<object>(elements.Count);
         foreach (var el in elements)
         {
-            // faces: 面名 → {tex, uv, rot}。uv は無ければ null(JS側で from/to から算出)。
             var faces = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var f in el.Faces)
             {
@@ -503,7 +546,7 @@ public partial class MainWindow
                 faces[f.Key] = new
                 {
                     tex = f.Value.Tex,
-                    uv = f.Value.Uv,   // double[4] または null
+                    uv = f.Value.Uv,
                     rot = f.Value.Rotation
                 };
             }
@@ -514,9 +557,7 @@ public partial class MainWindow
                 faces,
                 rotAngle = el.RotAngle,
                 rotAxis = el.RotAxis,
-                rotOrigin = el.RotOrigin,
-                rot2Angle = el.Rot2Angle,
-                rot2Axis = el.Rot2Axis
+                rotOrigin = el.RotOrigin
             });
         }
         return new
@@ -527,88 +568,9 @@ public partial class MainWindow
             id = b.Id,
             elements = elems,
             rotX = rotX,
-            rotY = rotY
+            rotY = rotY,
+            rotZ = rotZ
         };
-    }
-
-    // 動的描画(BlockEntityRenderer)で本体形状がモデルJSONに無いブロック向けの簡易形状。
-    // 水車は本物に寄せて「中心の金属ハブ + 8角形の外周板リング + 斜めの水受けパドル8枚」で作る。
-    // 要素の2段回転を使い、1段目(X軸)で外周へ45度刻み配置、2段目(Z軸)で羽根を軸方向へ傾ける。
-    // 座標は 0..16 のピクセル単位。軸はX方向、車輪面はYZ平面に立てる。
-    private static List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>?
-        FallbackShapeFor(string baseId)
-    {
-        const string PLANK = "minecraft:block/oak_planks";
-        const string AXIS = "create:block/axis";
-
-        static Dictionary<string, ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace>
-            AllFaces(string tex)
-        {
-            var d = new Dictionary<string, ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace>(
-                StringComparer.Ordinal);
-            foreach (var fn in new[] { "north", "south", "east", "west", "up", "down" })
-                d[fn] = new ModSorter.Architect.Generation.BlockTextureProvider.ShapeFace
-                { Tex = tex, Uv = null, Rotation = 0 };
-            return d;
-        }
-
-        // テクスチャ+2段回転つきの小箱。
-        // 1段目: angle 度を axis 軸まわり。2段目: angle2 度を axis2 軸まわり。中心[8,8,8]。
-        static ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement Box(
-            double x0, double y0, double z0, double x1, double y1, double z1,
-            string tex, double angle = 0, string axis = "x",
-            double angle2 = 0, string axis2 = "y")
-            => new()
-            {
-                From = new double[] { x0, y0, z0 },
-                To = new double[] { x1, y1, z1 },
-                Faces = AllFaces(tex),
-                RotAngle = angle,
-                RotAxis = axis,
-                RotOrigin = new double[] { 8, 8, 8 },
-                Rot2Angle = angle2,
-                Rot2Axis = axis2
-            };
-
-        switch (baseId)
-        {
-            case "create:water_wheel":
-            case "create:large_water_wheel":
-                {
-                    var list = new List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>
-                    {
-                        // 中心の金属ハブ(ケース+軸)。X方向に薄い四角。
-                        Box(6, 5, 5, 10, 11, 11, AXIS),
-                    };
-                    for (int i = 0; i < 8; i++)
-                    {
-                        double a = i * 45.0;
-                        // 8角形リングの外周板。中心から上へオフセットした薄板をX軸で45度刻み配置。
-                        list.Add(Box(6.5, 13, 4, 9.5, 15.5, 12, PLANK, a, "x"));
-                        // パドル(水受け板)。軸方向(Z)にまっすぐ長い板。傾けない。
-                        list.Add(Box(6, 12.5, 2, 10, 15.5, 14, PLANK, a, "x"));
-                    }
-                    return list;
-                }
-
-            case "create:crushing_wheel":
-                {
-                    var list = new List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement>
-                    {
-                        Box(1, 1, 1, 15, 15, 15, PLANK),
-                    };
-                    return list;
-                }
-
-            case "create:belt":
-                return new()
-                {
-                    Box(0, 3, 3, 16, 13, 13, AXIS),
-                };
-
-            default:
-                return null;
-        }
     }
 
 }

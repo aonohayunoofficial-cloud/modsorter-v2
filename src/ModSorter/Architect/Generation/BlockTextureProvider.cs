@@ -373,23 +373,22 @@ public sealed class BlockTextureProvider : IDisposable
         // 面指定が無い面は含まれない。
         public Dictionary<string, ShapeFace> Faces = new(StringComparer.Ordinal);
 
-        // 要素の回転(2段)。まず Rot(1段目)、その後 Rot2(2段目)を同じ原点まわりに適用。
-        // 水車パドルは「外周へ45度刻みで配置(1段目)」+「羽根を軸方向へ傾ける(2段目)」で作る。
-        // モデルJSON由来の element.rotation は1段目(Rot)にのみ入る。
+        // 要素の回転(1段)。Minecraftモデルの element.rotation 相当。
+        // 原点(RotOrigin)まわりに RotAxis 軸で RotAngle 度回す。cogwheel の45度歯車などで使う。
         public double RotAngle = 0;
         public string RotAxis = "x";
         public double[] RotOrigin = new double[] { 8, 8, 8 };
-
-        public double Rot2Angle = 0;
-        public string Rot2Axis = "y";
     }
 
-    // ブロック1個ぶんの形状。elements と、blockstates 由来の回転(度)。
+    // ブロック1個ぶんの形状。elements と、姿勢回転(度)。
+    // RotX/RotY は blockstates variant 由来(0/90/180/270)。
+    // RotZ は belt の sideways など、コード側で決める姿勢用(任意角)。
     public sealed class BlockShape
     {
         public List<ShapeElement> Elements = new();
-        public int RotX = 0; // blockstates variant の x 回転(0/90/180/270)
-        public int RotY = 0; // blockstates variant の y 回転(0/90/180/270)
+        public int RotX = 0;
+        public int RotY = 0;
+        public double RotZ = 0;
     }
 
     // 解決済みモデルのキャッシュ。model名 → elements。
@@ -419,6 +418,112 @@ public sealed class BlockTextureProvider : IDisposable
             return null;
         }
     }
+
+    // belt は blockstates を持たず、コード(BeltRenderer)がモデルと姿勢を決める特殊ブロック。
+    // slope/part/facing から BeltRenderer.getBeltPartial と同じ写像でモデルを選び、
+    // 既存の ResolveModelElements で elements を読む。姿勢は Rot X/Y/Z に載せる。
+    // 水平・傾斜は top+bottom の2モデルを重ねる。斜め(diagonal)は1枚。
+    // vertical/sideways は middle 系を回転で立てる。
+    // props が取れない/belt 以外は null(呼び出し側で通常経路へ)。
+    public BlockShape? GetBeltShape(string blockId, IReadOnlyDictionary<string, string>? props)
+    {
+        try
+        {
+            var (ns, name) = SplitId(blockId);
+            if (name != "belt") return null;
+            if (!_nsToJar.TryGetValue(ns, out var jar)) return null;
+            var za = GetZip(ns, jar);
+
+            // プロパティ読み取り(未指定は既定値)。
+            string slope = GetProp(props, "slope", "horizontal");
+            string part = GetProp(props, "part", "start");
+            string facing = GetProp(props, "facing", "north");
+
+            bool upward = slope == "upward";
+            bool downward = slope == "downward";
+            bool diagonal = upward || downward;
+            bool vertical = slope == "vertical";
+            bool sideways = slope == "sideways";
+            bool start = part == "start";
+            bool end = part == "end";
+
+            // BeltRenderer: downward もしくは vertical かつ facing が正方向のとき start/end を入れ替える。
+            var axisDir = FacingAxisDirection(facing); // +1 / -1
+            if (downward || (vertical && axisDir > 0))
+            {
+                bool tmp = start; start = end; end = tmp;
+            }
+
+            // モデル名の写像(BeltRenderer.getBeltPartial 準拠)。
+            // 水平・傾斜以外(vertical/sideways)は middle 系を使い、回転で姿勢を作る。
+            var models = new List<string>();
+            if (diagonal)
+            {
+                models.Add("belt/" + (start ? "diagonal_start" : end ? "diagonal_end" : "diagonal_middle"));
+            }
+            else
+            {
+                // top(bottom=false) と bottom(bottom=true) の2枚。
+                models.Add("belt/" + (start ? "start" : end ? "end" : "middle"));
+                models.Add("belt/" + (start ? "start_bottom" : end ? "end_bottom" : "middle_bottom"));
+            }
+
+            // elements を全モデル分マージ。
+            var elems = new List<ShapeElement>();
+            foreach (var m in models)
+            {
+                var part2 = ResolveModelElements(za, ns, "create:block/" + m, 0);
+                if (part2 != null) elems.AddRange(part2);
+            }
+            if (elems.Count == 0) return null;
+
+            // 姿勢回転(BeltRenderer の msr と同じ)。
+            double yDeg = HorizontalAngle(facing) + (upward ? 180 : 0) + (sideways ? 270 : 0);
+            double zDeg = sideways ? 90 : 0;
+            double xDeg = (!diagonal && slope != "horizontal") ? 90 : 0; // vertical のみ90
+
+            // diagonal の傾き45度は各 element の rotation(モデルJSON側)に既に入っているため、
+            // ここでは追加しない。RotX/RotY は0/90/180/270、RotZは任意角。
+            return new BlockShape
+            {
+                Elements = elems,
+                RotX = (int)xDeg,
+                RotY = ((int)yDeg % 360 + 360) % 360,
+                RotZ = zDeg
+            };
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return null;
+        }
+    }
+
+    // props から値を取る(無ければ既定)。
+    private static string GetProp(
+        IReadOnlyDictionary<string, string>? props, string key, string def)
+        => (props != null && props.TryGetValue(key, out var v) && !string.IsNullOrEmpty(v)) ? v : def;
+
+    // facing の水平角(北=180,南=0,西=90,東=270)。BeltRenderer の AngleHelper.horizontalAngle 準拠。
+    private static double HorizontalAngle(string facing) => facing switch
+    {
+        "south" => 0,
+        "west" => 90,
+        "north" => 180,
+        "east" => 270,
+        _ => 180
+    };
+
+    // facing の軸方向(北/東=負, 南/西=正)を +1/-1 で返す。AxisDirection 準拠。
+    private static int FacingAxisDirection(string facing) => facing switch
+    {
+        "south" => 1,
+        "west" => 1,
+        "north" => -1,
+        "east" => -1,
+        _ => -1
+    };
+
 
     // blockstates/<name>.json を読み、props に合う variant の model 名と回転を返す。
     private (string? model, int rotX, int rotY) ResolveVariantModel(
