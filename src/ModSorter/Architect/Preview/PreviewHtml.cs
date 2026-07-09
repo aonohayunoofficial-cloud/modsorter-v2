@@ -298,11 +298,54 @@ function axisVec(s) {
 // 1ブロック分の描画。elements があれば複数の小箱(面別テクスチャ+UV)で、
 // 無ければ従来の単一箱(baseIdテクスチャ)で描く。
 // elements 時はエッジ線を描かない（薄い小箱が多数で黒線だらけになるため）。
+// OBJ 三角形メッシュを描く。b.mesh = [{tex, p:[9個], uv:[6個]}, ...]。
+// 頂点は 0..1 のブロック単位。-0.5 でブロック中心原点へ、+b.x/y/z で配置。
+// texKey ごとにグループ化し、テクスチャ付き DoubleSide マテリアルで描く
+// (車輪の薄板・内側面が裏面カリングで消えないように両面描画)。
+function addObjMesh(b) {
+  const baseId = b.id.split('[')[0];
+  const byTex = {};
+  for (const t of b.mesh) {
+    const key = t.tex || ('base:' + baseId);
+    (byTex[key] = byTex[key] || []).push(t);
+  }
+  for (const key in byTex) {
+    const tris = byTex[key];
+    const pos = new Float32Array(tris.length * 9);
+    const uv  = new Float32Array(tris.length * 6);
+    for (let i = 0; i < tris.length; i++) {
+      const t = tris[i];
+      for (let k = 0; k < 9; k++) pos[i*9 + k] = t.p[k];
+      for (let k = 0; k < 6; k++) uv[i*6 + k] = t.uv[k];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.computeVertexNormals();
+
+    // texKey(=解決済みテクスチャ参照)でマテリアルを引く。無ければ baseId 単色。
+    const texKey = tris[0].tex || null;
+    let tex = texKey ? getTexture(texKey) : null;
+    if (!tex && baseId) tex = getTexture(baseId);
+    const mat = tex
+      ? new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide })
+      : new THREE.MeshLambertMaterial({ color: colorFor(baseId), side: THREE.DoubleSide });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    // 0..1 → -0.5 でブロック中心、+b.x/y/z で配置。
+    mesh.position.set(b.x - 0.5, b.y - 0.5, b.z - 0.5);
+    group.add(mesh);
+  }
+}
+
 function addBlock(b, bbox) {
   try {
     const baseId = b.id.split('[')[0];
 
-    if (Array.isArray(b.elements) && b.elements.length > 0) {
+    if (Array.isArray(b.mesh) && b.mesh.length > 0) {
+      // ---- OBJ メッシュ方式(water_wheel 等) ----
+      addObjMesh(b);
+    } else if (Array.isArray(b.elements) && b.elements.length > 0) {
       // ---- elements 方式 ----
       const rx = (typeof b.rotX === 'number') ? b.rotX : 0;
       const ry = (typeof b.rotY === 'number') ? b.rotY : 0;

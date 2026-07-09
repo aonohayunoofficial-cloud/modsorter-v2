@@ -1,4 +1,5 @@
 ﻿using ModSorter.Architect;
+using ModSorter.Architect.Generation;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -131,49 +132,6 @@ public partial class MainWindow
         if (string.IsNullOrEmpty(prompt))
         {
             MachineStatus.Text = "指示(プロンプト)が空です。";
-            return;
-        }
-
-        // [テスト用・消してよい] プロンプトに "belttest" と入れると、
-        // slope/part/facing を網羅した belt を直接プレビューへ流す。
-        // LLM 生成を通さず GetBeltShape の全姿勢を確認するための一時導線。
-        // 確認が済んだらこの if ブロックごと削除する。
-        if (prompt.Equals("belttest", StringComparison.OrdinalIgnoreCase))
-        {
-            var testBlocks = new List<ModSorter.Clients.ModuleGenerator.PlacedBlock>();
-            // (id, slope, part, facing, x) を並べて生成。横(x)に2マス間隔で配置。
-            var cases = new (string slope, string part, string facing)[]
-            {
-                ("horizontal", "middle", "east"),   // 平たい帯(水平)
-                ("horizontal", "start",  "east"),   // 端部品(始点)
-                ("horizontal", "end",    "east"),   // 端部品(終点)
-                ("upward",     "middle", "east"),   // 斜め(上り)
-                ("downward",   "middle", "east"),   // 斜め(下り)
-                ("vertical",   "middle", "east"),   // 垂直
-                ("sideways",   "middle", "east"),   // 横倒し
-                ("horizontal", "middle", "north"),  // 水平・facing=north(Y回転差の確認)
-            };
-            int tx = 0;
-            foreach (var c in cases)
-            {
-                testBlocks.Add(new ModSorter.Clients.ModuleGenerator.PlacedBlock
-                {
-                    Id = "create:belt",
-                    X = tx,
-                    Y = 1,
-                    Z = 2,
-                    Properties = new Dictionary<string, string>
-                    {
-                        ["slope"] = c.slope,
-                        ["part"] = c.part,
-                        ["facing"] = c.facing
-                    }
-                });
-                tx += 3;
-            }
-            _lastMachinePlaced = testBlocks;
-            await RenderMachinePreviewAsync(testBlocks);
-            MachineStatus.Text = $"belttest: {testBlocks.Count} 本の belt を描画しました。";
             return;
         }
 
@@ -470,29 +428,39 @@ public partial class MainWindow
             {
                 string baseId = b.Id.Split('[')[0];
 
-                // belt は blockstates を持たない特殊ブロック。専用リゾルバで
-                // slope/part/facing からモデルと姿勢を解決する。
-                var beltShape = tp.GetBeltShape(b.Id, b.Properties);
-                if (beltShape != null && beltShape.Elements.Count > 0)
+                // water_wheel 等の OBJ 描画ブロックを最優先で解決する。
+                // モデルJSONの box では本体が取れないため、OBJ メッシュを直接読む。
+                var objMesh = tp.GetObjMesh(b.Id);
+                if (objMesh != null && objMesh.Tris.Count > 0)
                 {
                     shapeHit++;
-                    payload.Add(BuildElementPayload(
-                        b, beltShape.Elements, beltShape.RotX, beltShape.RotY, beltShape.RotZ, AddFaceTexture));
+                    payload.Add(BuildObjMeshPayload(b, objMesh, AddFaceTexture));
                 }
+                // belt は blockstates を持たない特殊ブロック。専用リゾルバで
+                // slope/part/facing からモデルと姿勢を解決する。
                 else
                 {
-                    var shape = tp.GetBlockShape(b.Id, b.Properties);
-                    if (shape != null && shape.Elements.Count > 0)
+                    var beltShape = tp.GetBeltShape(b.Id, b.Properties);
+                    if (beltShape != null && beltShape.Elements.Count > 0)
                     {
                         shapeHit++;
                         payload.Add(BuildElementPayload(
-                            b, shape.Elements, shape.RotX, shape.RotY, shape.RotZ, AddFaceTexture));
+                            b, beltShape.Elements, beltShape.RotX, beltShape.RotY, beltShape.RotZ, AddFaceTexture));
                     }
                     else
                     {
-                        // 形状不明(OBJ描画ブロックや未知ブロック) → elements 無し。
-                        // JS側で 1×1×1、色は baseId のテクスチャ。水車系OBJは次段で対応。
-                        payload.Add(new { x = b.X, y = b.Y, z = b.Z, id = b.Id });
+                        var shape = tp.GetBlockShape(b.Id, b.Properties);
+                        if (shape != null && shape.Elements.Count > 0)
+                        {
+                            shapeHit++;
+                            payload.Add(BuildElementPayload(
+                                b, shape.Elements, shape.RotX, shape.RotY, shape.RotZ, AddFaceTexture));
+                        }
+                        else
+                        {
+                            // 形状不明(未知ブロック) → elements 無し。JS側で 1×1×1。
+                            payload.Add(new { x = b.X, y = b.Y, z = b.Z, id = b.Id });
+                        }
                     }
                 }
 
@@ -570,6 +538,47 @@ public partial class MainWindow
             rotX = rotX,
             rotY = rotY,
             rotZ = rotZ
+        };
+    }
+
+    // OBJ メッシュ(三角形リスト)から JS へ渡す payload を組み立てる。
+    // 頂点は 0..1 のブロック単位のまま。JS 側で -0.5 平行移動しブロック中心原点に置く。
+    // 各三角形の texKey を addFaceTex で texMap に集める。
+    // mesh:[{tex, p:[x,y,z, x,y,z, x,y,z], uv:[u,v, u,v, u,v]}, ...] の形。
+    private static object BuildObjMeshPayload(
+        ModSorter.Clients.ModuleGenerator.PlacedBlock b,
+        ObjMesh mesh,
+        Action<string> addFaceTex)
+    {
+        foreach (var tk in mesh.TexKeys) addFaceTex(tk);
+
+        var tris = new List<object>(mesh.Tris.Count);
+        foreach (var t in mesh.Tris)
+        {
+            tris.Add(new
+            {
+                tex = t.TexKey,
+                p = new[]
+                {
+                    t.P0[0], t.P0[1], t.P0[2],
+                    t.P1[0], t.P1[1], t.P1[2],
+                    t.P2[0], t.P2[1], t.P2[2],
+                },
+                uv = new[]
+                {
+                    t.Uv0[0], t.Uv0[1],
+                    t.Uv1[0], t.Uv1[1],
+                    t.Uv2[0], t.Uv2[1],
+                }
+            });
+        }
+        return new
+        {
+            x = b.X,
+            y = b.Y,
+            z = b.Z,
+            id = b.Id,
+            mesh = tris
         };
     }
 

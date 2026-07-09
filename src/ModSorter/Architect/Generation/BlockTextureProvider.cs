@@ -196,6 +196,30 @@ public sealed class BlockTextureProvider : IDisposable
         return result;
     }
 
+    // OBJ 描画ブロック(water_wheel/large_water_wheel/crushing_wheel/flywheel)の
+    // 三角形メッシュを返す。対象外/失敗時は null。
+    // 内部の ZipArchive(_nsToJar 経由)を ObjModelLoader に渡して読ませる。
+    public ObjMesh? GetObjMesh(string blockId)
+    {
+        string baseId = blockId.Split('[')[0];
+        if (!ObjModelLoader.IsObjBlock(baseId)) return null;
+
+        try
+        {
+            return ObjModelLoader.Load(baseId, ns =>
+            {
+                if (_nsToJar.TryGetValue(ns, out var jar))
+                    return GetZip(ns, jar);
+                return null;
+            });
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return null;
+        }
+    }
+
     private ZipArchive GetZip(string ns, string jar)
     {
         if (_zips.TryGetValue(ns, out var za)) return za;
@@ -560,8 +584,15 @@ public sealed class BlockTextureProvider : IDisposable
                     if (eq <= 0) { ok = false; break; }
                     string pName = pair.Substring(0, eq).Trim();
                     string pVal = pair.Substring(eq + 1).Trim();
+
+                    // props にそのプロパティが無い場合は「制約なし」とみなしスキップする。
+                    // (Create のファンネル等は variant キーが powered/waterlogged まで含む一方、
+                    //  生成側は facing/extracting しか持たないため、全一致要求だと全 variant が
+                    //  不一致になり 1×1×1 のフォールバック箱に落ちてしまう。)
+                    // props が値を持つプロパティだけを一致条件とし、一致した数をスコアにする。
                     string? cur = null;
-                    if (props != null) props.TryGetValue(pName, out cur);
+                    bool has = props != null && props.TryGetValue(pName, out cur);
+                    if (!has) continue; // 指定されていない制約は無視(不一致にしない)
                     if (!string.Equals(cur, pVal, StringComparison.Ordinal)) { ok = false; break; }
                     score++;
                 }
