@@ -80,6 +80,12 @@ public static class ModuleGenerator
         "create:gantry_shaft",            // gantry本体と組でないと意味を持たない補助
         "create:contraption_controls",
         "create:minecart_anchor",
+        // Create 0.5 で削除済み。現行 jar には無いが旧 jar 対策として明示除外(保険)。
+        "create:furnace_engine",
+        // flywheel は単体では動力を生まない。steam_engine + ボイラー(加熱した流体タンク)に
+        // 接続して初めて機能する装飾/接続ブロックのため、動力源パレットから除外する。
+        // (これを許可すると「flywheel + steam_engine + shaft」の非動作構成が生成される。)
+        "create:flywheel",
     };
 
     // フルパレットから、create の機能ブロックを「原則すべて」許可リストに入れる。

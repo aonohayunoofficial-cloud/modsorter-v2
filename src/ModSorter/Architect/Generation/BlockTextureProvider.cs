@@ -196,30 +196,6 @@ public sealed class BlockTextureProvider : IDisposable
         return result;
     }
 
-    // OBJ 描画ブロック(water_wheel/large_water_wheel/crushing_wheel/flywheel)の
-    // 三角形メッシュを返す。対象外/失敗時は null。
-    // 内部の ZipArchive(_nsToJar 経由)を ObjModelLoader に渡して読ませる。
-    public ObjMesh? GetObjMesh(string blockId)
-    {
-        string baseId = blockId.Split('[')[0];
-        if (!ObjModelLoader.IsObjBlock(baseId)) return null;
-
-        try
-        {
-            return ObjModelLoader.Load(baseId, ns =>
-            {
-                if (_nsToJar.TryGetValue(ns, out var jar))
-                    return GetZip(ns, jar);
-                return null;
-            });
-        }
-        catch (Exception ex)
-        {
-            LastError = ex.Message;
-            return null;
-        }
-    }
-
     private ZipArchive GetZip(string ns, string jar)
     {
         if (_zips.TryGetValue(ns, out var za)) return za;
@@ -419,6 +395,17 @@ public sealed class BlockTextureProvider : IDisposable
     private readonly Dictionary<string, List<ShapeElement>?> _modelElemCache =
         new(StringComparer.Ordinal);
 
+    // 一部の Create ブロックは、本体モデル(blockstates 経由)とは別に、
+    // BlockEntityRenderer が動的描画する追加モデルを持つ(millstone の挽き臼など)。
+    // これらは blockstates に現れないため、本体 elements にこの追加モデルの
+    // elements を連結して「中身入り」に見せる。baseId → 追加モデル参照の対応表。
+    private static readonly Dictionary<string, string[]> ExtraModels =
+        new(StringComparer.Ordinal)
+        {
+            // 石臼: 中央の挽き臼(cogwheel)+軸は inner.json(BER描画)にある。
+            ["create:millstone"] = new[] { "create:block/millstone/inner" },
+        };
+
     // ブロックID + プロパティ から形状を解決する。
     public BlockShape? GetBlockShape(string blockId, IReadOnlyDictionary<string, string>? props)
     {
@@ -433,6 +420,22 @@ public sealed class BlockTextureProvider : IDisposable
 
             var elems = ResolveModelElements(za, ns, modelRef!, 0);
             if (elems == null || elems.Count == 0) return null;
+
+            // BER 描画の追加モデル(millstone の inner 等)があれば elements を連結する。
+            string baseId = $"{ns}:{name}";
+            if (ExtraModels.TryGetValue(baseId, out var extras))
+            {
+                // ResolveModelElements は _modelElemCache の実体を返すため、そのまま
+                // AddRange するとキャッシュを汚染し、2回目以降に追加モデルが二重連結される。
+                // 新しいリストへ複製してから連結する。
+                elems = new List<ShapeElement>(elems);
+                foreach (var extraRef in extras)
+                {
+                    var extraElems = ResolveModelElements(za, ns, extraRef, 0);
+                    if (extraElems != null && extraElems.Count > 0)
+                        elems.AddRange(extraElems);
+                }
+            }
 
             return new BlockShape { Elements = elems, RotX = rotX, RotY = rotY };
         }
@@ -584,15 +587,8 @@ public sealed class BlockTextureProvider : IDisposable
                     if (eq <= 0) { ok = false; break; }
                     string pName = pair.Substring(0, eq).Trim();
                     string pVal = pair.Substring(eq + 1).Trim();
-
-                    // props にそのプロパティが無い場合は「制約なし」とみなしスキップする。
-                    // (Create のファンネル等は variant キーが powered/waterlogged まで含む一方、
-                    //  生成側は facing/extracting しか持たないため、全一致要求だと全 variant が
-                    //  不一致になり 1×1×1 のフォールバック箱に落ちてしまう。)
-                    // props が値を持つプロパティだけを一致条件とし、一致した数をスコアにする。
                     string? cur = null;
-                    bool has = props != null && props.TryGetValue(pName, out cur);
-                    if (!has) continue; // 指定されていない制約は無視(不一致にしない)
+                    if (props != null) props.TryGetValue(pName, out cur);
                     if (!string.Equals(cur, pVal, StringComparison.Ordinal)) { ok = false; break; }
                     score++;
                 }
@@ -818,6 +814,28 @@ public sealed class BlockTextureProvider : IDisposable
             v[i++] = n.GetDouble();
         }
         return i == 3 ? v : null;
+    }
+
+    // water_wheel / large_water_wheel / crushing_wheel / flywheel は blockstates の
+    // box モデルでは本体が取れず Forge OBJ ローダーで描画される。これらの OBJ を
+    // ObjModelLoader で読み、三角形リスト(ObjMesh)として返す。対象外/失敗時は null。
+    // b.Id は "create:water_wheel" 形式(状態[...]付きの場合は除去してから判定)。
+    // OBJ が参照する assets は namespace ごとに開いた zip(GetZip)から取り出す。
+    public ObjMesh? GetObjMesh(string blockId)
+    {
+        try
+        {
+            string baseId = blockId.Split('[')[0];
+            if (!ObjModelLoader.IsObjBlock(baseId)) return null;
+
+            return ObjModelLoader.Load(baseId, ns =>
+                _nsToJar.TryGetValue(ns, out var jar) ? GetZip(ns, jar) : null);
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return null;
+        }
     }
 
     public void Dispose()
