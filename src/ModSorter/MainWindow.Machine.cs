@@ -370,10 +370,11 @@ public partial class MainWindow
     // {x,y,z,id,elements:[{from,to,faces:{面名:{tex,uv,rot}}}], rotX,rotY} の形で渡す。
     // faces のテクスチャ参照(例 create:block/shaft_side)は texKey として使い、
     // その PNG を texMap[texKey] で送る。JS側は面ごとにこの texKey で貼り、uv でUVを合わせる。
-    // 形状が取れないブロックは elements 無し → JS側で 1×1×1 にフォールバック。
-    // water_wheel 等の動的描画(BlockEntityRenderer)ブロックは、モデルJSONに本体形状が
-    // 無い(枠や別モデルの断片しか取れない)ため、GetBlockShape の結果を使わず
-    // 強制的に専用の簡易形状(FallbackShapeFor)を当てて「それらしい塊」にする。
+    // 解決の優先順は OBJ(GetObjMesh) → belt(GetBeltShape) → 通常モデル(GetBlockShape)。
+    // water_wheel/large_water_wheel/crushing_wheel/flywheel は blockstates の box では
+    // 本体が取れず Forge OBJ ローダー描画のため、GetObjMesh で OBJ 三角形メッシュを直接読み、
+    // {x,y,z,id,mesh:[{tex,p,uv}]} の形で渡す(JS側で BufferGeometry として描く)。
+    // いずれでも形状が取れないブロックは elements/mesh 無し → JS側で 1×1×1 にフォールバック。
     private async Task RenderMachinePreviewAsync(
         List<ModSorter.Clients.ModuleGenerator.PlacedBlock> placed)
     {
@@ -497,7 +498,7 @@ public partial class MainWindow
 
     // elements(faces解決済み) から JS へ渡す payload オブジェクトを組み立てる。
     // 各面の texKey を addFaceTex で texMap に集めつつ、from/to/faces(tex,uv,rot)、
-    // 要素の2段回転(rotAngle/rotAxis/rotOrigin と rot2Angle/rot2Axis)を載せる。
+    // 要素の回転(rotAngle/rotAxis/rotOrigin: Minecraftモデルの element.rotation 1段)を載せる。
     private static object BuildElementPayload(
         ModSorter.Clients.ModuleGenerator.PlacedBlock b,
         List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement> elements,

@@ -58,6 +58,14 @@ public sealed class RotationSpec
     // true のとき他の動力入力フラグより優先し、Validator の (A''') で判定する。
     public bool IsSaw = false;
 
+    // steam_engine 専用。steam_engine は単体では動力を生まない(Create 0.5 実機仕様)。
+    //  加熱した fluid_tank(ボイラー)の側面に取り付けて初めて動力を出し、
+    //  取り付け面の反対側(背面=shaft_input)から動力を取り出す。
+    //  ここでは最低条件として「隣接6方向に create:fluid_tank が1つ以上あること」を検証する
+    //  (ボイラーの加熱段階・タンク数の妥当性までは検証しない=将来)。
+    //  true のとき Validator の (A'') で判定する。
+    public bool IsSteamEngine = false;
+
     // 動力入力の正しいやり方をLLMへ伝える具体文(再生成プロンプト用)。
     // 「どこにどの部材をどの向きで置けば動くか」を明記する。
     public string PowerInputHint = "";
@@ -110,6 +118,20 @@ public static class ConnectionCatalog
                 BlockId = "create:hand_crank",
                 AxisSource = AxisSource.FacingAxis,
                 IsSource = true
+            },
+            // steam_engine: 動力源だが単体では動かない。加熱した fluid_tank(ボイラー)の側面に
+            //  取り付け、背面(shaft_input)から動力を取り出す。IsSource だが Validator (A'') で
+            //  隣接 fluid_tank の有無を追加検証する。
+            ["create:steam_engine"] = new()
+            {
+                BlockId = "create:steam_engine",
+                AxisSource = AxisSource.FacingAxis,
+                IsSource = true,
+                IsSteamEngine = true,
+                PowerInputHint =
+                    "steam_engineは単体では動力を出さない。加熱したcreate:fluid_tank(ボイラー)の側面に" +
+                    "取り付け、その反対側(背面=shaft_input)にcreate:shaftを挿して動力を取り出す。" +
+                    "fluid_tankは火/溶岩/ブレイズバーナー等で加熱する。ボイラー無しのsteam_engine単体は動かない。"
             },
             // millstone: 上面=動力不可(アイテム投入), 側面=cogのみ, 底面=shaft可。
             ["create:millstone"] = new()
@@ -239,6 +261,12 @@ public static class ConnectionCatalog
     //  depot は1個しか持てず連続排出で詰まるため除外する(depotは加工台・belt終点用)。
     public static bool IsBulkStorage(string id)
         => id is "create:item_vault" or "minecraft:barrel" || id.Contains("chest");
+
+    // steam_engine のボイラーに使える流体タンク。
+    //  実機で確認済みは create:fluid_tank のみ。加熱すると内部でボイラー化し、
+    //  側面の steam_engine に蒸気圧を供給する。
+    public static bool IsBoilerTank(string id)
+        => id is "create:fluid_tank";
 
     // 方向 → facing のブロックステート文字列。
     public static string DirToFacing(Dir d) => d switch

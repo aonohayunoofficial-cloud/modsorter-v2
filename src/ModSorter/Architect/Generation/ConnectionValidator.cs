@@ -29,62 +29,47 @@ public static class ConnectionValidator
             var spec = ConnectionCatalog.GetRotation(b.Id);
             if (spec == null) continue;
 
-            // --- (A') press型: facing軸の両端2面だけがshaft/cog動力入力。残りは不可。 ---
-            if (spec.PowerOnAxisEnds)
+            // --- (A'') steam_engine 専用: ボイラー(隣接 fluid_tank)が無いと動力を生まない。 ---
+            //  steam_engine は単体では動力ゼロ。加熱した create:fluid_tank の側面に付いて初めて
+            //  動力を出す(Create 0.5 実機仕様)。ここでは最低条件として、隣接6方向に fluid_tank が
+            //  1つ以上あるかだけを検証する。ボイラーの加熱・タンク数の妥当性は検証しない(将来)。
+            //  ボイラー自動生成はタンク数/加熱源が可変で限られた空間に確実配置できないため行わない。
+            //  無ければ AutoFix 不可の NoPowerSource Issue を出し、再生成に回す。
+            if (spec.IsSteamEngine)
             {
-                string coreAxis = ConnectionCatalog.GetRotationAxis(b) ?? "z";
-                var (endA, endB) = ConnectionCatalog.AxisToDirs(coreAxis);
+                bool hasBoiler = false;
                 foreach (Dir d in Enum.GetValues(typeof(Dir)))
                 {
                     var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
-                    var npos = (b.X + dx, b.Y + dy, b.Z + dz);
-                    if (!idx.TryGetValue(npos, out var n)) continue;
-
-                    bool nIsPart = n.Id is "create:shaft" or "create:cogwheel" or "create:large_cogwheel";
-                    if (!nIsPart) continue;
-
-                    bool isAxisEnd = d == endA || d == endB;
-                    if (isAxisEnd)
+                    if (idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
+                        && ConnectionCatalog.IsBoilerTank(n.Id))
                     {
-                        // 軸端に繋がる部材は、軸がコア(=facing軸)と一致している必要がある。
-                        string? nAxis = ConnectionCatalog.GetRotationAxis(n);
-                        if (nAxis != coreAxis)
-                        {
-                            issues.Add(new ValidationIssue
-                            {
-                                Category = IssueCategory.RotationAxisMismatch,
-                                AutoFixable = true,
-                                TargetPos = npos,
-                                SuggestedAxis = coreAxis,
-                                HumanMessage =
-                                    $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}がaxis={nAxis}だが、" +
-                                    $"({b.X},{b.Y},{b.Z})の{b.Id}の軸端で繋ぐにはコアと同じaxis={coreAxis}が必要。" +
-                                    $"axis={coreAxis}にすること。",
-                                GeneralAdvice =
-                                    "pressはfacingの向きとその反対の2側面(facing軸の両端)からのみ動力を受ける。" +
-                                    "そこに繋ぐshaft/cogはpressと同じ軸にすること。"
-                            });
-                        }
-                    }
-                    else
-                    {
-                        // 軸端以外(facingに垂直な側面・上下)に部材が接している → 動力を受けられない。
-                        issues.Add(new ValidationIssue
-                        {
-                            Category = IssueCategory.PowerInputFaceInvalid,
-                            AutoFixable = false,
-                            TargetPos = npos,
-                            HumanMessage =
-                                $"({npos.Item1},{npos.Item2},{npos.Item3})の{n.Id}が{b.Id}の動力を受けない面に接している。" +
-                                (string.IsNullOrEmpty(spec.PowerInputHint)
-                                    ? "pressはfacingの向きとその反対の2側面(facing軸の両端)からのみ動力を受ける。"
-                                    : spec.PowerInputHint),
-                            GeneralAdvice =
-                                "pressの動力入力はfacing軸の両端2面のみ。上下やfacingに垂直な側面に軸を挿しても繋がらない。"
-                        });
+                        hasBoiler = true;
+                        break;
                     }
                 }
+
+                if (!hasBoiler)
+                {
+                    issues.Add(new ValidationIssue
+                    {
+                        Category = IssueCategory.NoPowerSource,
+                        AutoFixable = false,
+                        TargetPos = (b.X, b.Y, b.Z),
+                        HumanMessage =
+                            $"({b.X},{b.Y},{b.Z})のcreate:steam_engineに隣接するcreate:fluid_tank(ボイラー)が無い。" +
+                            $"steam_engineは単体では動力を出さない。隣接面にcreate:fluid_tankを置き、" +
+                            $"火/溶岩/ブレイズバーナー等で加熱してボイラーにすること。" +
+                            $"動力はsteam_engineの背面(ボイラーと反対側)にcreate:shaftを挿して取り出す。",
+                        GeneralAdvice =
+                            "steam_engineは加熱したfluid_tank(ボイラー)の側面に取り付けて初めて動力を生む。" +
+                            "ボイラー無しのsteam_engine単体は動かない。動力は背面(shaft_input)から取り出す。"
+                    });
+                }
             }
+
+            // --- (A''') mechanical_saw 専用: facingで動力入力面が二分される。 ---
+
 
             // --- (A''') mechanical_saw 専用: facingで動力入力面が二分される。 ---
             //  縦置き(facing=up/down)=加工: ブレード軸に直交する両側面のいずれか1面にshaft(同軸)。

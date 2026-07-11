@@ -24,3 +24,21 @@
 # --- steam_engine(蒸気機関) ---
 - 出力: 2048 SU / 16 RPM 以上(供給する熱と水で増大)。
 - fluid_tank の側面に取り付け、shaft_input から動力を取り出す。
+
+# --- steam_engine の補足(実機仕様・確定) ---
+- steam_engine 単体では動力を生まない。加熱した fluid_tank で組んだ「ボイラー」に
+  取り付けて初めて動力を出す。ボイラーは steam_engine 1台につき fluid_tank を一定数
+  必要とし、加熱源(火/溶岩/ブレイズバーナー等)で温める。
+- 禁止: ボイラー(加熱した fluid_tank 群)を伴わない steam_engine 単体の動力源配置。
+
+# --- flywheel(フライホイール) ---
+- flywheel は単体では動力を生まない。装飾/接続用ブロックであり、動力源ではない。
+- 本来は steam_engine + ボイラーに連結して回転を受ける見せ場用の部品。
+  動力源モジュールの構成要素として単独で使ってはならない。
+- 生成上の扱い: 動力源パレットから除外済み(ModuleGenerator.PowerExcluded)。
+
+# --- furnace_engine(ファーネスエンジン) ---
+- Create 0.5 で削除済み。現行バージョンには存在しない。
+  出典: Creators-of-Create/Create issue #3510(開発者が削除・steam_engine へ置換と明言)。
+- 生成上の扱い: 現行 jar には出現しないが、旧 jar 対策として明示除外済み
+  (ModuleGenerator.PowerExcluded)。
