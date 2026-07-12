@@ -404,6 +404,10 @@ public sealed class BlockTextureProvider : IDisposable
         {
             // 石臼: 中央の挽き臼(cogwheel)+軸は inner.json(BER描画)にある。
             ["create:millstone"] = new[] { "create:block/millstone/inner" },
+            // ハンドクランク: 回すハンドル(Arm/Grip)は handle.json(BER描画)にあり、
+            // block.json 本体は軸だけ。handle.json は静的 elements なので連結して見せる。
+            ["create:hand_crank"] = new[] { "create:block/hand_crank/handle" },
+
         };
 
     // ブロックID + プロパティ から形状を解決する。

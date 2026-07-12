@@ -119,9 +119,11 @@ public static class ConnectionCatalog
                 AxisSource = AxisSource.FacingAxis,
                 IsSource = true
             },
-            // steam_engine: 動力源だが単体では動かない。加熱した fluid_tank(ボイラー)の側面に
-            //  取り付け、背面(shaft_input)から動力を取り出す。IsSource だが Validator (A'') で
-            //  隣接 fluid_tank の有無を追加検証する。
+            // steam_engine: 動力源だが単体では動かない。加熱した fluid_tank(ボイラー)タワーの
+            //  「側面」(水平方向)に取り付けて初めて動力を出す。上面・下面には取り付かない
+            //  (上面は steam whistle 用)。加熱源はタンクの真下、動力は背面(shaft_input)から取り出す。
+            //  ボイラーは最低4個の fluid_tank をまとめて組む。IsSource だが Validator (A'') で
+            //  「水平隣接に fluid_tank があるか」を追加検証する。
             ["create:steam_engine"] = new()
             {
                 BlockId = "create:steam_engine",
@@ -129,9 +131,11 @@ public static class ConnectionCatalog
                 IsSource = true,
                 IsSteamEngine = true,
                 PowerInputHint =
-                    "steam_engineは単体では動力を出さない。加熱したcreate:fluid_tank(ボイラー)の側面に" +
-                    "取り付け、その反対側(背面=shaft_input)にcreate:shaftを挿して動力を取り出す。" +
-                    "fluid_tankは火/溶岩/ブレイズバーナー等で加熱する。ボイラー無しのsteam_engine単体は動かない。"
+                    "steam_engineは単体では動力を出さない。加熱したcreate:fluid_tank(ボイラー)の「側面」" +
+                    "(north/south/east/westの水平方向)に取り付ける。上面・下面には取り付かない。" +
+                    "加熱源(ブレイズバーナー/溶岩等)はタンクの真下に置き、動力はsteam_engineの背面" +
+                    "(ボイラーと反対側=shaft_input)にcreate:shaftを挿して取り出す。" +
+                    "ボイラーは最低4個のfluid_tankをまとめて組むと安定する。単体のsteam_engineは動かない。"
             },
             // millstone: 上面=動力不可(アイテム投入), 側面=cogのみ, 底面=shaft可。
             ["create:millstone"] = new()

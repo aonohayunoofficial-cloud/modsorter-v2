@@ -22,14 +22,23 @@
 - facing が回転軸の方向。取り出す shaft は facing と同じ軸で正面に置く。
 
 # --- steam_engine(蒸気機関) ---
-- 出力: 2048 SU / 16 RPM 以上(供給する熱と水で増大)。
-- fluid_tank の側面に取り付け、shaft_input から動力を取り出す。
+- 出力: passive(level 0)で 2048 SU。level を上げると 1台あたり最大 16,384 SU まで増える
+  (最大回転数 64 RPM)。ボイラーの level は「サイズ・熱・水」の最も低い値で決まる。
+- fluid_tank で組んだボイラーの「側面」(水平方向)に取り付け、その反対側(背面=shaft_input)に
+  shaft を挿して動力を取り出す。
 
 # --- steam_engine の補足(実機仕様・確定) ---
-- steam_engine 単体では動力を生まない。加熱した fluid_tank で組んだ「ボイラー」に
-  取り付けて初めて動力を出す。ボイラーは steam_engine 1台につき fluid_tank を一定数
-  必要とし、加熱源(火/溶岩/ブレイズバーナー等)で温める。
-- 禁止: ボイラー(加熱した fluid_tank 群)を伴わない steam_engine 単体の動力源配置。
+- steam_engine 単体では動力を生まない。fluid_tank を最低4個まとめて組んだ(melded)タワー
+  (1x1 / 2x2 / 3x3)の「側面」に取り付けて初めて動力を出す。取り付けた時点でタンクが
+  ボイラー化する。
+- 取り付け面は必ず側面(north/south/east/west の水平方向)。上面・下面には取り付かない
+  (上面は steam whistle 用)。
+- 加熱源(ブレイズバーナー/溶岩/火/マグマ/焚き火等)はボイラータンクの「真下」に置く。
+  ブレイズバーナー(点火)以外の熱源は passive 扱いで level が上がらない。
+- 水はボイラーへ機械式ポンプで継続的に注ぐ必要がある(生成では省略可、動力検証の対象外)。
+- 出典: create wiki(Steam Engine)および実機検証。furnace_engine の後継として Create 0.5 で追加。
+- 禁止: ボイラー(fluid_tank 群)を伴わない steam_engine 単体配置。
+  steam_engine を fluid_tank の上面・下面に付ける配置(側面のみ有効)。
 
 # --- flywheel(フライホイール) ---
 - flywheel は単体では動力を生まない。装飾/接続用ブロックであり、動力源ではない。

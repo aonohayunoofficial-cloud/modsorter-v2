@@ -29,27 +29,31 @@ public static class ConnectionValidator
             var spec = ConnectionCatalog.GetRotation(b.Id);
             if (spec == null) continue;
 
-            // --- (A'') steam_engine 専用: ボイラー(隣接 fluid_tank)が無いと動力を生まない。 ---
-            //  steam_engine は単体では動力ゼロ。加熱した create:fluid_tank の側面に付いて初めて
-            //  動力を出す(Create 0.5 実機仕様)。ここでは最低条件として、隣接6方向に fluid_tank が
-            //  1つ以上あるかだけを検証する。ボイラーの加熱・タンク数の妥当性は検証しない(将来)。
+            // --- (A'') steam_engine 専用: 加熱した fluid_tank(ボイラー)の「側面」に付かないと動かない。 ---
+            //  steam_engine は単体では動力ゼロ。fluid_tank タワー(1x1/2x2/3x3)の側面(水平方向隣接)に
+            //  取り付けて初めて動力を出す(Create 実機仕様: "placed on Fluid Tanks", 側面取り付き)。
+            //  加熱源(blaze burner/溶岩等)はボイラータンクの真下に置く。steam_engine の上面や下面に
+            //  fluid_tank があっても取り付かない(上面は steam whistle 用)。
+            //  ここでは最も基本の条件「水平方向(north/south/east/west)の隣接に fluid_tank があること」
+            //  のみを厳格に検証する。facing とボイラー方向の厳密対応、タンク数(4個以上)の妥当性は
+            //  blockstates 確認後の第2段に回す(現状は憶測を避ける)。
             //  ボイラー自動生成はタンク数/加熱源が可変で限られた空間に確実配置できないため行わない。
-            //  無ければ AutoFix 不可の NoPowerSource Issue を出し、再生成に回す。
+            //  水平隣接に fluid_tank が無ければ AutoFix 不可の NoPowerSource Issue を出し再生成に回す。
             if (spec.IsSteamEngine)
             {
-                bool hasBoiler = false;
-                foreach (Dir d in Enum.GetValues(typeof(Dir)))
+                bool hasSideBoiler = false;
+                foreach (Dir d in new[] { Dir.North, Dir.South, Dir.East, Dir.West })
                 {
                     var (dx, dy, dz) = ConnectionCatalog.DirToVec(d);
                     if (idx.TryGetValue((b.X + dx, b.Y + dy, b.Z + dz), out var n)
                         && ConnectionCatalog.IsBoilerTank(n.Id))
                     {
-                        hasBoiler = true;
+                        hasSideBoiler = true;
                         break;
                     }
                 }
 
-                if (!hasBoiler)
+                if (!hasSideBoiler)
                 {
                     issues.Add(new ValidationIssue
                     {
@@ -57,13 +61,16 @@ public static class ConnectionValidator
                         AutoFixable = false,
                         TargetPos = (b.X, b.Y, b.Z),
                         HumanMessage =
-                            $"({b.X},{b.Y},{b.Z})のcreate:steam_engineに隣接するcreate:fluid_tank(ボイラー)が無い。" +
-                            $"steam_engineは単体では動力を出さない。隣接面にcreate:fluid_tankを置き、" +
-                            $"火/溶岩/ブレイズバーナー等で加熱してボイラーにすること。" +
-                            $"動力はsteam_engineの背面(ボイラーと反対側)にcreate:shaftを挿して取り出す。",
+                            $"({b.X},{b.Y},{b.Z})のcreate:steam_engineが正しく取り付いていない。" +
+                            $"steam_engineはcreate:fluid_tank(ボイラー)の「側面」(north/south/east/westの水平方向)に" +
+                            $"取り付ける。上面・下面に置いても動力は出ない(上面はsteam whistle用)。" +
+                            $"水平隣接にcreate:fluid_tankを置き、加熱源(ブレイズバーナー/溶岩等)はそのタンクの真下に、" +
+                            $"動力はsteam_engineの背面(ボイラーと反対側)にcreate:shaftを挿して取り出すこと。" +
+                            $"ボイラーは最低4個のfluid_tankをまとめて組むと安定する。",
                         GeneralAdvice =
-                            "steam_engineは加熱したfluid_tank(ボイラー)の側面に取り付けて初めて動力を生む。" +
-                            "ボイラー無しのsteam_engine単体は動かない。動力は背面(shaft_input)から取り出す。"
+                            "steam_engineは加熱したfluid_tankタワーの側面(水平方向)に取り付けて初めて動力を生む。" +
+                            "上面・下面には取り付かない。加熱源はタンクの真下、動力は背面(shaft_input)から取り出す。" +
+                            "ボイラーは4個以上のfluid_tankで組む。"
                     });
                 }
             }
