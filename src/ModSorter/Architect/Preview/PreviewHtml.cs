@@ -184,11 +184,23 @@ function faceTexKey(fi) {
   return (typeof fi.tex === 'string') ? fi.tex : null;
 }
 
-// 面別マテリアル配列(6要素)を返す。faces が無い面は baseId 全面。
+// 未定義面用の透明マテリアル(共有)。実機モデルで face が省かれた面は
+// 「見えない前提」でCreateが省略している(例: hand_crankの軸柱の内向き面)。
+// BoxGeometry は6面固定のため、未定義面はこの透明マテリアルで実質非表示にし、
+// フォールバック単色(緑の断面)が描かれるのを防ぐ。実機の面省略をそのまま再現する。
+const _invisibleMat = new THREE.MeshBasicMaterial({
+  transparent: true, opacity: 0, depthWrite: false
+});
+
+// 面別マテリアル配列(6要素)を返す。
+// block.json で定義された面だけ実マテリアルを割り当て、未定義面は透明にする。
+// (従来は未定義面も baseId フォールバック→単色で塗られ、実機で見えない面が
+//  緑の断面として露出していた。elements 方式のブロックにのみ影響する。)
 function faceMaterials(elFaces, baseId) {
   const mats = [];
   for (const fn of FACE_ORDER) {
     const fi = (elFaces && elFaces[fn]) ? elFaces[fn] : null;
+    if (!fi) { mats.push(_invisibleMat); continue; } // 未定義面は描かない
     const texKey = faceTexKey(fi);
     mats.push(faceMaterialFor(texKey, baseId));
   }
