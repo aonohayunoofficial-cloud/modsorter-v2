@@ -591,8 +591,17 @@ public sealed class BlockTextureProvider : IDisposable
                     if (eq <= 0) { ok = false; break; }
                     string pName = pair.Substring(0, eq).Trim();
                     string pVal = pair.Substring(eq + 1).Trim();
+
+                    // props にそのプロパティが無い場合は、生成側が指定していない状態
+                    // (例: hand_crank の waterlogged)。blockstates の variant キーは
+                    // 全プロパティを列挙するため、厳密全一致にすると未指定プロパティで
+                    // 全 variant が外れて 1x1x1 フォールバック箱に落ちる。
+                    // そこで「props が指定した条件は一致必須／props に無い条件は照合スキップ」
+                    // とする。指定された制約だけを課し、未指定状態は問わない。
                     string? cur = null;
-                    if (props != null) props.TryGetValue(pName, out cur);
+                    bool hasProp = props != null && props.TryGetValue(pName, out cur);
+                    if (!hasProp) continue; // 未指定プロパティはこの variant の採否に影響させない
+
                     if (!string.Equals(cur, pVal, StringComparison.Ordinal)) { ok = false; break; }
                     score++;
                 }
