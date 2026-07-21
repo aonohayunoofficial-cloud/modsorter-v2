@@ -120,6 +120,8 @@ public static class StructureExpander
             BuildGableRoof(cells, spec, w, d, h, roof, wall);
         else if (roofType == "gable_stairs")
             BuildGableStairsRoof(cells, spec, w, d, h, roof, wall);
+        else if (roofType == "shed")
+            BuildShedRoof(cells, spec, w, d, h, roof, wall);
         else if (roofType == "dome")
             BuildDomeRoof(cells, spec, w, d, h, roof);
         else if (roofType == "pyramid")
@@ -389,6 +391,8 @@ public static class StructureExpander
 
     // 切妻屋根: 棟の向き(ridge_axis)に沿って段々に三角を作る。
     // 屋根は本体の上(y=h から上)に積む。傾斜方向の端から中央へ向け段を上げる。
+    // 勾配(spec.RoofPitch)は run 何マスにつき rise 1マス上げるか。
+    // 1(既定)=1マスで1段=45°で従来と完全一致。2以上で緩勾配になる。
     private static void BuildGableRoof(
     Dictionary<(int x, int y, int z), string> cells,
     StructureSpec spec, int w, int d, int h, string roof, string wall)
@@ -402,10 +406,17 @@ public static class StructureExpander
         // 端から中央までの段数。中央で最も高い。
         int half = (slopeLen + 1) / 2;
 
+        // 勾配。null/0/1 は 1（45°・従来どおり）。大きいほど緩い（1〜4に制限）。
+        int pitch = spec.RoofPitch.HasValue && spec.RoofPitch.Value >= 1
+            ? System.Math.Min(4, spec.RoofPitch.Value)
+            : 1;
+
         for (int i = 0; i < slopeLen; i++)
         {
-            // 端(0 と slopeLen-1)が低く、中央が高い。step = 端からの距離。
-            int step = System.Math.Min(i, slopeLen - 1 - i);
+            // 端(0 と slopeLen-1)が低く、中央が高い。端からの距離を勾配で割って段数にする。
+            // pitch=1 なら距離そのまま(=45°、従来と一致)。pitch が大きいほど段が緩くなる。
+            int dist = System.Math.Min(i, slopeLen - 1 - i);
+            int step = dist / pitch;
             int yLevel = (h - 1) + step; // 壁の最上層と同じ高さ(y=h-1)から積む
 
             if (ridgeAlongX)
@@ -436,7 +447,62 @@ public static class StructureExpander
                 }
             }
         }
+    }
 
+    // 片流れ屋根(shed/skillion): 一方の端から反対端へ一直線に上がる非対称の傾斜。
+    // 棟の向き(ridge_axis)に直交する方向へ傾く。gable と同じ座標系・妻壁充填を流用する。
+    // 勾配は RoofPitch(1..4)。pitch マスの水平移動につき1段上がる（pitch=1 で45度）。
+    private static void BuildShedRoof(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string roof, string wall)
+    {
+        string axis = (spec.RidgeAxis ?? "x").Trim().ToLowerInvariant();
+        // 棟がx軸に平行 → z方向に傾斜（z=0 が低く、z=d-1 へ向け高くなる）
+        // 棟がz軸に平行 → x方向に傾斜（x=0 が低く、x=w-1 へ向け高くなる）
+        bool ridgeAlongX = (axis != "z");
+
+        int slopeLen = ridgeAlongX ? d : w; // 傾斜する方向の長さ
+
+        // 勾配: RoofPitch 未指定は1(=45度)。大きいほど緩い。1..4にクランプ。
+        int pitch = spec.RoofPitch ?? 1;
+        if (pitch < 1) pitch = 1;
+        if (pitch > 4) pitch = 4;
+
+        for (int i = 0; i < slopeLen; i++)
+        {
+            // 端(i=0)が最も低く、反対端(i=slopeLen-1)へ一直線に上がる。
+            // gable の Min(i, slopeLen-1-i) と違い、距離 i をそのまま使うのが片流れ。
+            int step = i / pitch;
+            int yLevel = (h - 1) + step; // 壁の最上層(y=h-1)から積む
+
+            if (ridgeAlongX)
+            {
+                // 屋根: z=i の列。棟方向(x)は全幅に渡って同じ高さ。
+                for (int x = 0; x < w; x++)
+                    cells[(x, yLevel, i)] = roof;
+
+                // 妻壁: 傾斜に直交する2面(x=0 と x=w-1)を、壁の上端(y=h-1)から
+                //       この列の屋根の手前(yLevel-1)まで埋める。左右で高さが変わり階段状に閉じる。
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(0, y, i)] = wall;
+                    cells[(w - 1, y, i)] = wall;
+                }
+            }
+            else
+            {
+                // 屋根: x=i の列。棟方向(z)は全奥行きに渡って同じ高さ。
+                for (int z = 0; z < d; z++)
+                    cells[(i, yLevel, z)] = roof;
+
+                // 妻壁: 傾斜に直交する2面(z=0 と z=d-1)を埋める。
+                for (int y = h - 1; y < yLevel; y++)
+                {
+                    cells[(i, y, 0)] = wall;
+                    cells[(i, y, d - 1)] = wall;
+                }
+            }
+        }
     }
 
     // 切妻屋根（階段ブロック版）: 各段の屋根面を階段ブロックにし、

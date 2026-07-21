@@ -347,5 +347,48 @@
         </Setter>
     </Style>
 
+    <!-- ===== Minecraft風トグルスイッチ（四角ボタン型・2値切替） ===== -->
+    <!-- McButton と同じ影付き二重Border。IsChecked=false は石灰色、true は草色。 -->
+    <!-- Content は使わず、OFF/ON のラベルを Tag(OFF) と ToolTip 併用ではなく、-->
+    <!-- 呼び出し側が Content を IsChecked で切り替える運用（下の Manual.cs 参照）。 -->
+    <Style x:Key="McToggle" TargetType="ToggleButton">
+        <Setter Property="FontFamily" Value="{StaticResource PixelFont}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="{StaticResource StoneDark}" Padding="0,0,2,2">
+                        <Border x:Name="inner" Background="{StaticResource StoneLight}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- ON(チェック時)は草色系にして状態を色で示す。 -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="inner" Property="Background"
+                                    Value="{StaticResource GrassGreen}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="inner" Property="Background" Value="#A5A5A5"/>
+                        </Trigger>
+                        <!-- ON かつホバーは明るい草色。 -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True"/>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="inner" Property="Background" Value="#8FC840"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
 </ResourceDictionary>

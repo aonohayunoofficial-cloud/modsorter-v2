@@ -19,6 +19,12 @@ public sealed class StructureSpec
     // 屋根の形: "flat"（平屋根・既定） または "gable"（切妻・三角）
     [JsonPropertyName("roof_type")] public string? RoofType { get; set; }
 
+    // 屋根勾配（gable/gable_stairs のとき有効）。run 何マス進むごとに rise 1マス上げるか。
+    // 1 = 1マスにつき1段＝45°（既定・従来と同じ後方互換）。
+    // 2 ≒ 26.6°（6:12相当の標準的な緩勾配）、3 ≒ 18.4°（4:12相当）、と大きいほど緩い。
+    // null/0/1 はすべて 1（45°）として扱う。
+    [JsonPropertyName("roof_pitch")] public int? RoofPitch { get; set; }
+
     // gable のときの棟の向き: "x"（棟がx軸に平行・z方向に傾斜） または "z"
     [JsonPropertyName("ridge_axis")] public string? RidgeAxis { get; set; }
 
