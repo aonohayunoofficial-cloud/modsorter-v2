@@ -135,6 +135,24 @@ public sealed class StructureSpec
     // 各 VolumePart は完全な StructureSpec を内包し、オフセット分だけ平行移動して重ねる。
     // 重なったセルは後勝ち（リストで後ろの Part が上書き）。
     [JsonPropertyName("volumes")] public List<VolumePart> Volumes { get; set; } = new();
+
+    // ===== 煙突 =====
+    // 本数。0（既定）なら煙突なし。1以上で屋根の上に自動で等間隔に立てる。
+    [JsonPropertyName("chimney_count")] public int ChimneyCount { get; set; }
+
+    // 建物内部を貫くか。true=床(y=1)から屋根を貫いて上端まで通す（暖炉風）。
+    // false=屋根の上に出る部分だけ（見た目だけの煙突）。
+    [JsonPropertyName("chimney_pierce")] public bool ChimneyPierce { get; set; }
+
+    // 寄せ方向。"center"（既定・中心線上） | "north" | "south" | "east" | "west"。
+    // 寄せた方向へ列全体が寄り、それと直交する軸に沿って本数ぶん等間隔に並ぶ。
+    [JsonPropertyName("chimney_align")] public string? ChimneyAlign { get; set; }
+
+    // 屋根の上に出す高さ（マス）。未指定/0以下なら既定 2。
+    [JsonPropertyName("chimney_height")] public int? ChimneyHeight { get; set; }
+
+    // 煙突の素材。未指定なら roof_block → wall_block の順で流用。
+    [JsonPropertyName("chimney_block")] public string? ChimneyBlock { get; set; }
 }
 
 // 複数ボリューム合成の1要素（フェーズ2）。

@@ -1269,6 +1269,72 @@
                                     <Slider x:Name="ManualArchWestSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
                                 </DockPanel>
 
+                                <!-- ===== 煙突 ===== -->
+                                <TextBlock Text="煙突"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                                <ToggleButton x:Name="ManualChimneyToggle"
+                                          Style="{StaticResource McToggle}"
+                                          Content="煙突なし" Margin="0,4,0,4"
+                                          Checked="ManualChimney_Toggled"
+                                          Unchecked="ManualChimney_Toggled"/>
+
+                                <!-- 煙突ON時だけ以下を表示 -->
+                                <StackPanel Visibility="{Binding IsChecked, ElementName=ManualChimneyToggle, Converter={StaticResource BoolToVis}}">
+                                    <!-- 貫通トグル -->
+                                    <ToggleButton x:Name="ManualChimneyPierceToggle"
+                                              Style="{StaticResource McToggle}"
+                                              Content="貫かない（屋根上のみ）" Margin="0,4,0,8"
+                                              Checked="ManualChimneyPierce_Toggled"
+                                              Unchecked="ManualChimneyPierce_Toggled"/>
+
+                                    <!-- 本数 -->
+                                    <DockPanel Margin="0,2,0,2">
+                                        <TextBlock Text="本数" Width="48"
+                                               Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="ManualChimneyCountLabel" Text="1" Width="32"
+                                               DockPanel.Dock="Right" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        <Slider x:Name="ManualChimneyCountSlider"
+                                            Minimum="1" Maximum="6" Value="1"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" Margin="0,0,8,0"
+                                            ValueChanged="ManualWinCount_Changed"/>
+                                    </DockPanel>
+
+                                    <!-- 屋根上に出す高さ -->
+                                    <DockPanel Margin="0,2,0,2">
+                                        <TextBlock Text="高さ" Width="48"
+                                               Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="ManualChimneyHeightLabel" Text="2" Width="32"
+                                               DockPanel.Dock="Right" Style="{StaticResource PixelText}"
+                                               VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        <Slider x:Name="ManualChimneyHeightSlider"
+                                            Minimum="1" Maximum="8" Value="2"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" Margin="0,0,8,0"
+                                            ValueChanged="ManualWinCount_Changed"/>
+                                    </DockPanel>
+
+                                    <!-- 寄せ方向 -->
+                                    <TextBlock Text="寄せ方向"
+                                           Style="{StaticResource PixelText}" Margin="0,4,0,0"/>
+                                    <ComboBox x:Name="ManualChimneyAlignCombo"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          Width="180" HorizontalAlignment="Left"
+                                          Margin="0,4,0,12" SelectedIndex="0"
+                                          SelectionChanged="ManualParam_SelectionChanged">
+                                        <ComboBoxItem Content="中央" Tag="center"/>
+                                        <ComboBoxItem Content="北寄せ" Tag="north"/>
+                                        <ComboBoxItem Content="南寄せ" Tag="south"/>
+                                        <ComboBoxItem Content="東寄せ" Tag="east"/>
+                                        <ComboBoxItem Content="西寄せ" Tag="west"/>
+                                    </ComboBox>
+                                </StackPanel>
+
                                 <!-- ===== 使用ブロック（壁/床/屋根 個別・出力ファイル名の前） ===== -->
                                 <TextBlock Text="使用ブロック"
                                        Style="{StaticResource PixelText}"

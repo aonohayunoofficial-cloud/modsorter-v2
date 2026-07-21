@@ -129,6 +129,14 @@ public static class StructureExpander
         else
             BuildFlatRoof(cells, foot, h, roof);
 
+        // 煙突。屋根生成の後に呼ぶ（各列の屋根の実際の最高yを見て、そこから上へ積むため）。
+        // 本数0なら何もしない。素材は chimney_block → roof → wall の順で流用。
+        if (spec.ChimneyCount > 0)
+        {
+            string chimney = Pick(spec.ChimneyBlock, allowedBlocks, roof);
+            BuildChimney(cells, spec, w, d, h, chimney);
+        }
+
         // 建物様式。colonnade/temple は矩形前提（柱の等間隔配置・柱廊）なので、
         // 非矩形フットプリントのときは walled（壁のリング）へフォールバックする。
         string buildingStyle = (spec.BuildingStyle ?? "walled").Trim().ToLowerInvariant();
@@ -359,6 +367,75 @@ public static class StructureExpander
     {
         foreach (var (x, z) in foot)
             cells[(x, h - 1, z)] = roof;
+    }
+
+    // 煙突: 屋根の上に本数ぶん自動で等間隔に立てる。位置は寄せ方向(chimney_align)で決める。
+    //   center（既定）… 建物の中心線上に、x軸に沿って等間隔で並ぶ。
+    //   north/south   … その面寄り（z を端側へ）に寄せ、x軸に沿って並ぶ。
+    //   east/west     … その面寄り（x を端側へ）に寄せ、z軸に沿って並ぶ。
+    // 各煙突の(x,z)で、既に積まれた屋根の「その列の最大y」を調べ、そこから上へ
+    // chimney_height マス積む。貫通ON(chimney_pierce)なら床上(y=1)から屋根を貫いて通す。
+    private static void BuildChimney(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string chimney)
+    {
+        int count = spec.ChimneyCount;
+        if (count <= 0) return;
+
+        int stackH = spec.ChimneyHeight.HasValue && spec.ChimneyHeight.Value > 0
+            ? spec.ChimneyHeight.Value : 2;
+
+        string align = (spec.ChimneyAlign ?? "center").Trim().ToLowerInvariant();
+
+        // 端から少し内側に寄せる余白（角に食い込ませない）。
+        int margin = 1;
+
+        // 並ぶ軸(along)と、寄せる固定座標を決める。
+        // north/south は z を固定して x 方向に並ぶ。east/west は x を固定して z 方向に並ぶ。
+        bool alongX; // true: x方向に並ぶ, false: z方向に並ぶ
+        int fixedCoord; // 並ぶ軸に直交する側の固定値
+
+        switch (align)
+        {
+            case "north": alongX = true; fixedCoord = margin; break;                 // z=手前寄り
+            case "south": alongX = true; fixedCoord = d - 1 - margin; break;          // z=奥寄り
+            case "west": alongX = false; fixedCoord = margin; break;                  // x=左寄り
+            case "east": alongX = false; fixedCoord = w - 1 - margin; break;          // x=右寄り
+            default: alongX = true; fixedCoord = (d - 1) / 2; break;                  // center: z中央、x方向
+        }
+        if (fixedCoord < 0) fixedCoord = 0;
+
+        // 並ぶ軸の有効範囲（角を避けた内側）。
+        int span = alongX ? w : d;
+        int lo = margin, hi = span - 1 - margin;
+        if (hi < lo) { lo = 0; hi = span - 1; }
+
+        int n = Math.Min(count, Math.Max(1, hi - lo + 1));
+
+        for (int i = 0; i < n; i++)
+        {
+            int p = (n == 1)
+                ? (lo + hi) / 2
+                : lo + (int)System.Math.Round((double)(hi - lo) * i / (n - 1));
+
+            int cx = alongX ? p : fixedCoord;
+            int cz = alongX ? fixedCoord : p;
+            if (cx < 0 || cx >= w || cz < 0 || cz >= d) continue;
+
+            // その(x,z)列の屋根の最高y（既に cells に積まれた最大y）。無ければ壁上端 h-1。
+            int topY = h - 1;
+            foreach (var k in cells.Keys)
+                if (k.x == cx && k.z == cz && k.y > topY) topY = k.y;
+
+            // 積み始めのy。貫通ONは床上(y=1)から、OFFは屋根上端の1つ上から。
+            int startY = spec.ChimneyPierce ? 1 : topY + 1;
+
+            // 煙突頂上 = 屋根上端 + stackH。
+            int endY = topY + stackH;
+
+            for (int y = startY; y <= endY; y++)
+                cells[(cx, y, cz)] = chimney;
+        }
     }
 
     // ピラミッド屋根（四角錐）: 底面(w×d)を y=h-1 に全面で敷き、そこから上へ

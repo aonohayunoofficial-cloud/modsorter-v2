@@ -116,6 +116,23 @@ public partial class MainWindow
         ManualScheduleRender();
     }
 
+    // 煙突トグル。OFF=煙突なし / ON=煙突あり。Content を切り替えて再描画予約。
+    private void ManualChimney_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (ManualChimneyToggle != null)
+            ManualChimneyToggle.Content = (ManualChimneyToggle.IsChecked == true) ? "煙突あり" : "煙突なし";
+        ManualScheduleRender();
+    }
+
+    // 貫通トグル。OFF=屋根上のみ / ON=建物を貫く。Content を切り替えて再描画予約。
+    private void ManualChimneyPierce_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (ManualChimneyPierceToggle != null)
+            ManualChimneyPierceToggle.Content =
+                (ManualChimneyPierceToggle.IsChecked == true) ? "貫く（床から通す）" : "貫かない（屋根上のみ）";
+        ManualScheduleRender();
+    }
+
     // 面チェック ON/OFF → 再描画予約（スライダー出現は XAML の BoolToVis が担当）。
     private void ManualParam_Toggled(object sender, RoutedEventArgs e)
         => ManualScheduleRender();
@@ -262,7 +279,14 @@ public partial class MainWindow
             WallBlock = _manualWallBlock,
             FloorBlock = _manualFloorBlock,
             RoofBlock = _manualRoofBlock,
-            Openings = openings
+            Openings = openings,
+            // 煙突: トグルONのときだけ本数を渡す。OFFなら0で煙突なし。
+            ChimneyCount = (ManualChimneyToggle?.IsChecked == true)
+                ? (int)Math.Round(ManualChimneyCountSlider.Value) : 0,
+            ChimneyPierce = (ManualChimneyPierceToggle?.IsChecked == true),
+            ChimneyHeight = (int)Math.Round(ManualChimneyHeightSlider.Value),
+            ChimneyAlign = (ManualChimneyAlignCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "center",
+            ChimneyBlock = _manualRoofBlock
         };
 
         _manualBlocks = StructureExpander.Expand(spec, allowed);
