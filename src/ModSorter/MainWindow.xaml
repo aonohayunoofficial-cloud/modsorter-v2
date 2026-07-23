@@ -1065,7 +1065,7 @@
                     <Border Grid.Column="0" Background="{StaticResource BgPanel}" Padding="16">
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel>
+                            <StackPanel Cursor="">
                                 <Button Content="← 戻る" Style="{StaticResource McButtonGray}"
                                     HorizontalAlignment="Left" Click="Back_Click"/>
                                 <TextBlock Text="手動生成" FontSize="18" Margin="0,16,0,0"
@@ -1333,6 +1333,26 @@
                                         <ComboBoxItem Content="東寄せ" Tag="east"/>
                                         <ComboBoxItem Content="西寄せ" Tag="west"/>
                                     </ComboBox>
+
+                                    <!-- 太さ -->
+                                    <TextBlock Text="太さ"
+                                           Style="{StaticResource PixelText}" Margin="0,4,0,0"/>
+                                    <ComboBox x:Name="ManualChimneyThickCombo"
+                                          Style="{StaticResource McComboBox}"
+                                          ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                          Width="180" HorizontalAlignment="Left"
+                                          Margin="0,4,0,12" SelectedIndex="0"
+                                          SelectionChanged="ManualParam_SelectionChanged">
+                                        <ComboBoxItem Content="細（1マス）" Tag="thin"/>
+                                        <ComboBoxItem Content="中（ひし形・中空）" Tag="medium"/>
+                                        <ComboBoxItem Content="太（4×4・中空）" Tag="thick"/>
+                                    </ComboBox>
+
+                                    <!-- 煙突ブロック -->
+                                    <Button x:Name="ManualChimneyBtn" Content="煙突ブロックを選択…"
+                                        Style="{StaticResource McButtonGray}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,12"
+                                        Click="ManualPickChimney_Click"/>
                                 </StackPanel>
 
                                 <!-- ===== 使用ブロック（壁/床/屋根 個別・出力ファイル名の前） ===== -->

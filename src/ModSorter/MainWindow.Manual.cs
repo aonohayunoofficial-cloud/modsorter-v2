@@ -24,6 +24,8 @@ public partial class MainWindow
     private string _manualWallBlock = "minecraft:oak_planks";
     private string _manualFloorBlock = "minecraft:spruce_planks";
     private string _manualRoofBlock = "minecraft:dark_oak_planks";
+    // 煙突ブロック（1種）。既定は屋根と同じにして従来の見た目を維持。
+    private string _manualChimneyBlock = "minecraft:dark_oak_planks";
 
     // トップメニューの「手動生成」ボタン → Tab 6。初回にプレビュー初期化＋初描画。
     private async void NavManual_Click(object sender, RoutedEventArgs e)
@@ -171,6 +173,12 @@ public partial class MainWindow
         if (b != null) { _manualRoofBlock = b; Log($"手動生成: 屋根ブロック = {b}"); ManualScheduleRender(); }
     }
 
+    private void ManualPickChimney_Click(object sender, RoutedEventArgs e)
+    {
+        var b = PickSingleBlock(_manualChimneyBlock);
+        if (b != null) { _manualChimneyBlock = b; Log($"手動生成: 煙突ブロック = {b}"); ManualScheduleRender(); }
+    }
+
     // 再描画をデバウンス（250ms）して予約。
     private void ManualScheduleRender()
     {
@@ -238,8 +246,8 @@ public partial class MainWindow
         string roofType = (ManualRoofCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "flat";
         string ridgeAxis = (ManualRidgeToggle?.IsChecked == true) ? "z" : "x";
 
-        // 許可リストには壁・床・屋根の3種を必ず入れる（Pick がこの中からしか採用しないため）。
-        var allowed = new List<string> { _manualWallBlock, _manualFloorBlock, _manualRoofBlock }
+        // 許可リストには壁・床・屋根・煙突の4種を必ず入れる（Pick がこの中からしか採用しないため）。
+        var allowed = new List<string> { _manualWallBlock, _manualFloorBlock, _manualRoofBlock, _manualChimneyBlock }
             .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
         if (allowed.Count == 0) allowed.Add("minecraft:oak_planks");
 
@@ -286,7 +294,8 @@ public partial class MainWindow
             ChimneyPierce = (ManualChimneyPierceToggle?.IsChecked == true),
             ChimneyHeight = (int)Math.Round(ManualChimneyHeightSlider.Value),
             ChimneyAlign = (ManualChimneyAlignCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "center",
-            ChimneyBlock = _manualRoofBlock
+            ChimneyThickness = (ManualChimneyThickCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "thin",
+            ChimneyBlock = _manualChimneyBlock
         };
 
         _manualBlocks = StructureExpander.Expand(spec, allowed);

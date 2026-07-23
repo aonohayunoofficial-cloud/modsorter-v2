@@ -153,6 +153,10 @@ public sealed class StructureSpec
 
     // 煙突の素材。未指定なら roof_block → wall_block の順で流用。
     [JsonPropertyName("chimney_block")] public string? ChimneyBlock { get; set; }
+
+    // 煙突の太さ。"thin"（既定・中実1マス柱） | "medium"（プラス型・中空） | "thick"（4×4外周・中空2×2）。
+    // medium/thick の中空は全高（貫通ONなら床から屋根上まで）にわたって適用する。
+    [JsonPropertyName("chimney_thickness")] public string? ChimneyThickness { get; set; }
 }
 
 // 複数ボリューム合成の1要素（フェーズ2）。

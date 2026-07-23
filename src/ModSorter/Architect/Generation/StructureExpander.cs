@@ -405,12 +405,53 @@ public static class StructureExpander
         }
         if (fixedCoord < 0) fixedCoord = 0;
 
-        // 並ぶ軸の有効範囲（角を避けた内側）。
+        // 太さ → 断面オフセット（中心(cx,cz)からの相対(dx,dz)）と占有幅。
+        //   thin   … 中心1マスのみ（従来）。占有幅1。
+        //   medium … プラス型（中心を抜いた上下左右4マス・中空）。占有幅3。
+        //   thick  … 中央2×2を抜いた4×4外周（12マス・中空2×2）。占有幅4。
+        string thickness = (spec.ChimneyThickness ?? "thin").Trim().ToLowerInvariant();
+        (int dx, int dz)[] section;
+        int footprint;
+        if (thickness == "medium")
+        {
+            section = new[] { (0, -1), (-1, 0), (1, 0), (0, 1) };
+            footprint = 3;
+        }
+        else if (thickness == "thick")
+        {
+            // -1..2 の 4×4 から、中央2×2(0..1, 0..1)を除いた外周12マス。
+            var ring = new List<(int, int)>();
+            for (int ox = -1; ox <= 2; ox++)
+                for (int oz = -1; oz <= 2; oz++)
+                {
+                    bool hole = (ox >= 0 && ox <= 1 && oz >= 0 && oz <= 1);
+                    if (!hole) ring.Add((ox, oz));
+                }
+            section = ring.ToArray();
+            footprint = 4;
+        }
+        else
+        {
+            section = new[] { (0, 0) };
+            footprint = 1;
+        }
+
+        // 並ぶ軸の有効範囲（角を避けた内側）。太い煙突は断面が縁からはみ出さないよう
+        // さらに (footprint-1) ぶん内側へ寄せる。
         int span = alongX ? w : d;
-        int lo = margin, hi = span - 1 - margin;
+        int extra = footprint - 1;
+        int lo = margin + extra, hi = span - 1 - margin - extra;
         if (hi < lo) { lo = 0; hi = span - 1; }
 
-        int n = Math.Min(count, Math.Max(1, hi - lo + 1));
+        // 本数クランプ: 並ぶ範囲に占有幅ぶんの間隔で収まる数を上限にする。
+        int rangeLen = hi - lo + 1;
+        int capacity = Math.Max(1, rangeLen / footprint);
+        int n = Math.Min(count, capacity);
+
+        // 固定座標側も断面が範囲外に出ないようクランプ（中/太で端寄せしたとき用）。
+        int fixedClamped = Math.Clamp(fixedCoord, extra + 0,
+            (alongX ? d : w) - 1 - extra);
+        if (fixedClamped < 0) fixedClamped = 0;
 
         for (int i = 0; i < n; i++)
         {
@@ -418,23 +459,28 @@ public static class StructureExpander
                 ? (lo + hi) / 2
                 : lo + (int)System.Math.Round((double)(hi - lo) * i / (n - 1));
 
-            int cx = alongX ? p : fixedCoord;
-            int cz = alongX ? fixedCoord : p;
+            int cx = alongX ? p : fixedClamped;
+            int cz = alongX ? fixedClamped : p;
             if (cx < 0 || cx >= w || cz < 0 || cz >= d) continue;
 
-            // その(x,z)列の屋根の最高y（既に cells に積まれた最大y）。無ければ壁上端 h-1。
+            // その中心列の屋根の最高y（既に cells に積まれた最大y）。無ければ壁上端 h-1。
             int topY = h - 1;
             foreach (var k in cells.Keys)
                 if (k.x == cx && k.z == cz && k.y > topY) topY = k.y;
 
             // 積み始めのy。貫通ONは床上(y=1)から、OFFは屋根上端の1つ上から。
             int startY = spec.ChimneyPierce ? 1 : topY + 1;
-
             // 煙突頂上 = 屋根上端 + stackH。
             int endY = topY + stackH;
 
-            for (int y = startY; y <= endY; y++)
-                cells[(cx, y, cz)] = chimney;
+            // 断面を全高に積む。medium/thick は中心が抜けるので自然に中空の筒になる。
+            foreach (var (ox, oz) in section)
+            {
+                int bx = cx + ox, bz = cz + oz;
+                if (bx < 0 || bx >= w || bz < 0 || bz >= d) continue;
+                for (int y = startY; y <= endY; y++)
+                    cells[(bx, y, bz)] = chimney;
+            }
         }
     }
 
