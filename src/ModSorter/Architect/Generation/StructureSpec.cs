@@ -157,6 +157,18 @@ public sealed class StructureSpec
     // 煙突の太さ。"thin"（既定・中実1マス柱） | "medium"（プラス型・中空） | "thick"（4×4外周・中空2×2）。
     // medium/thick の中空は全高（貫通ONなら床から屋根上まで）にわたって適用する。
     [JsonPropertyName("chimney_thickness")] public string? ChimneyThickness { get; set; }
+
+    // 軒の出（eave overhang）。屋根を壁より外側へ何マス張り出すか。0（既定）で軒なし。
+    // 対応する屋根形状は flat / gable / shed のみ。pyramid/dome/gable_stairs では無視される。
+    // 実装は屋根の軒先を水平に外へ伸ばし、最後に建物全体を +eave シフトして負座標を出さない。
+    [JsonPropertyName("eave_overhang")] public int? EaveOverhang { get; set; }
+
+    // 軒をどの面に出すか（面の外側へ張り出す）。EaveOverhang>0 のとき有効。
+    // north=z<0側 / south=z>=d側 / west=x<0側 / east=x>=w側。既定は全 false（＝軒なし）。
+    [JsonPropertyName("eave_north")] public bool EaveNorth { get; set; }
+    [JsonPropertyName("eave_south")] public bool EaveSouth { get; set; }
+    [JsonPropertyName("eave_east")] public bool EaveEast { get; set; }
+    [JsonPropertyName("eave_west")] public bool EaveWest { get; set; }
 }
 
 // 複数ボリューム合成の1要素（フェーズ2）。

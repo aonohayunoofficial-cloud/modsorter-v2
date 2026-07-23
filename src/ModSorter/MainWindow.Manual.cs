@@ -88,6 +88,7 @@ public partial class MainWindow
             case "d": if (ManualDepthLabel != null) ManualDepthLabel.Text = v.ToString(); break;
             case "h": if (ManualHeightLabel != null) ManualHeightLabel.Text = v.ToString(); break;
             case "p": if (ManualPitchLabel != null) ManualPitchLabel.Text = v.ToString(); break;
+            case "e": if (ManualEaveLabel != null) ManualEaveLabel.Text = v.ToString(); break;
         }
         ManualScheduleRender();
     }
@@ -295,7 +296,12 @@ public partial class MainWindow
             ChimneyHeight = (int)Math.Round(ManualChimneyHeightSlider.Value),
             ChimneyAlign = (ManualChimneyAlignCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "center",
             ChimneyThickness = (ManualChimneyThickCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "thin",
-            ChimneyBlock = _manualChimneyBlock
+            ChimneyBlock = _manualChimneyBlock,
+            EaveOverhang = (int)Math.Round(ManualEaveSlider.Value),
+            EaveNorth = ManualEaveNorth?.IsChecked == true,
+            EaveSouth = ManualEaveSouth?.IsChecked == true,
+            EaveEast = ManualEaveEast?.IsChecked == true,
+            EaveWest = ManualEaveWest?.IsChecked == true
         };
 
         _manualBlocks = StructureExpander.Expand(spec, allowed);

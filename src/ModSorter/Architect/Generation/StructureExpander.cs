@@ -224,16 +224,105 @@ public static class StructureExpander
             }
         }
 
+        // 軒の出（eaves）。flat/gable/shed のときだけ、屋根の軒先を外側へ水平に伸ばす。
+        // ここでは負座標(x=-1 等)も一時的に許し、直後の一括シフトで 0 以上へ寄せる。
+        int eave = Math.Clamp(spec.EaveOverhang ?? 0, 0, 8);
+        if (eave > 0 && rectangular &&
+            (roofType == "flat" || roofType == "gable" || roofType == "shed"))
+        {
+            BuildEaves(cells, foot, spec, w, d, h, roof, roofType, eave);
+        }
+
+        // 全ブロックの最小座標を求め、負のぶんだけ全体をシフトして 0 起点に正規化する。
+        // 軒で x=-1/z=-1 が出ても、ここで +eave 相当のシフトがかかり負座標は消える。
+        // StructureNbtWriter は負座標を書けないため、この正規化は必須。
+        int minX = 0, minZ = 0;
+        foreach (var k in cells.Keys)
+        {
+            if (k.x < minX) minX = k.x;
+            if (k.z < minZ) minZ = k.z;
+        }
+        int shiftX = -minX, shiftZ = -minZ;
+
         return cells
             .OrderBy(kv => kv.Key.y).ThenBy(kv => kv.Key.z).ThenBy(kv => kv.Key.x)
             .Select(kv => new GeneratedBlock
             {
-                X = kv.Key.x,
+                X = kv.Key.x + shiftX,
                 Y = kv.Key.y,
-                Z = kv.Key.z,
+                Z = kv.Key.z + shiftZ,
                 Id = kv.Value
             })
             .ToList();
+    }
+
+    // 軒の出: 選択された面(north/south/east/west)の外側 eave マスへ、屋根を張り出す。
+    //   各面の軒の高さは「屋根の実際の高さ」に合わせる。妻側(傾斜方向)は列ごとに
+    //   階段状の高さで、軒先(棟に平行な面)は端の列の高さ(=水平)で伸びる。
+    //   隣接2面がともに選択されたときは、その角も屋根の角の高さで埋めて穴を防ぐ。
+    // 負座標(x=-1 等)も書くが、呼び出し元の一括シフトで 0 以上へ正規化される。
+    private static void BuildEaves(
+        Dictionary<(int x, int y, int z), string> cells,
+        HashSet<(int x, int z)> foot, StructureSpec spec,
+        int w, int d, int h, string roof, string roofType, int eave)
+    {
+        bool en = spec.EaveNorth, es = spec.EaveSouth, ee = spec.EaveEast, ew = spec.EaveWest;
+        if (!en && !es && !ee && !ew) return; // どの面も選ばれていなければ軒なし。
+
+        // 屋根の (x,z) 列の最高y。屋根が無い列は h-1（壁上端）を返す。
+        // flat/gable/shed いずれも、既に cells に積まれた屋根の実高さをそのまま使うので
+        // 屋根形状に依らず正しい高さで軒が揃う。
+        int RoofTop(int x, int z)
+        {
+            int top = int.MinValue;
+            foreach (var k in cells.Keys)
+                if (k.x == x && k.z == z && k.y >= h - 1 && k.y > top) top = k.y;
+            return top == int.MinValue ? (h - 1) : top;
+        }
+
+        // 北面(z=0の外側 z<0)。x=0..w-1 の各列を、その列の屋根高さで z<0 へ伸ばす。
+        if (en)
+            for (int x = 0; x < w; x++)
+            {
+                int y = RoofTop(x, 0);
+                for (int e = 1; e <= eave; e++) cells[(x, y, -e)] = roof;
+            }
+        // 南面(z=d-1の外側 z>=d)。
+        if (es)
+            for (int x = 0; x < w; x++)
+            {
+                int y = RoofTop(x, d - 1);
+                for (int e = 1; e <= eave; e++) cells[(x, y, d - 1 + e)] = roof;
+            }
+        // 西面(x=0の外側 x<0)。
+        if (ew)
+            for (int z = 0; z < d; z++)
+            {
+                int y = RoofTop(0, z);
+                for (int e = 1; e <= eave; e++) cells[(-e, y, z)] = roof;
+            }
+        // 東面(x=w-1の外側 x>=w)。
+        if (ee)
+            for (int z = 0; z < d; z++)
+            {
+                int y = RoofTop(w - 1, z);
+                for (int e = 1; e <= eave; e++) cells[(w - 1 + e, y, z)] = roof;
+            }
+
+        // ===== 角埋め: 隣接2面がともに選ばれたら、その隅の eave×eave を屋根の角高さで埋める =====
+        // 角の高さは屋根のその隅(0,0)/(w-1,0)/(0,d-1)/(w-1,d-1)の実高さに合わせる。
+        void FillCorner(bool cond, int cornerX, int cornerZ, int sxSign, int szSign)
+        {
+            if (!cond) return;
+            int y = RoofTop(cornerX, cornerZ);
+            for (int ex = 1; ex <= eave; ex++)
+                for (int ez = 1; ez <= eave; ez++)
+                    cells[(cornerX + sxSign * ex, y, cornerZ + szSign * ez)] = roof;
+        }
+        FillCorner(ew && en, 0, 0, -1, -1);         // 北西
+        FillCorner(ee && en, w - 1, 0, +1, -1);      // 北東
+        FillCorner(ew && es, 0, d - 1, -1, +1);      // 南西
+        FillCorner(ee && es, w - 1, d - 1, +1, +1);  // 南東
     }
 
     // ===== フットプリント（平面形状マスク）=====

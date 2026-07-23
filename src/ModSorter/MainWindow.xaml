@@ -1160,6 +1160,43 @@
                                         ValueChanged="ManualSlider_Changed"/>
                                 </DockPanel>
 
+                                <!-- 軒の出 -->
+                                <DockPanel Margin="0,4,0,12">
+                                    <TextBlock Text="軒" Width="36"
+                                           Style="{StaticResource PixelText}"
+                                           VerticalAlignment="Center"
+                                           ToolTip="屋根を壁より外へ張り出す量（0=軒なし）。平屋根・切妻・片流れのみ"/>
+                                    <TextBlock x:Name="ManualEaveLabel" Text="0" Width="40"
+                                           DockPanel.Dock="Right"
+                                           Style="{StaticResource PixelText}"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Right"/>
+                                    <Slider x:Name="ManualEaveSlider" Tag="e"
+                                        Minimum="0" Maximum="3" Value="0"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" Margin="0,0,8,0"
+                                        ValueChanged="ManualSlider_Changed"/>
+                                </DockPanel>
+
+                                <!-- 軒を出す面（EaveSlider>0 のとき有効） -->
+                                <TextBlock Text="軒を出す面"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                                <WrapPanel Margin="0,4,0,12">
+                                    <CheckBox x:Name="ManualEaveNorth" Content="北" Margin="0,0,12,0"
+                                          Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}"
+                                          Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+                                    <CheckBox x:Name="ManualEaveSouth" Content="南" Margin="0,0,12,0"
+                                          Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}"
+                                          Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+                                    <CheckBox x:Name="ManualEaveEast" Content="東" Margin="0,0,12,0"
+                                          Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}"
+                                          Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+                                    <CheckBox x:Name="ManualEaveWest" Content="西"
+                                          Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}"
+                                          Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+                                </WrapPanel>
+
                                 <!-- 棟の向き（トグル: OFF=X軸 / ON=Z軸） -->
                                 <TextBlock Text="棟の向き（切妻・片流れ）"
                                        Style="{StaticResource PixelText}"
