@@ -1,5 +1,7 @@
 ﻿# ModSorter v2 建築モード 形状語彙拡張 仕様書（確定版 v2）
 
+注意・廃案です。20260726現在
+
 ## 0. この文書の位置づけ
 
 本書は、建築モードで生成できる形状の語彙を、単一直方体から「任意平面形状（L字・コの字・凹み）」および「複数塊の合成（双胴・胴体＋部品）」へ拡張するための設計仕様である。草案段階の「要確認」7項目はリポジトリ実物（StructureExpander.cs / StructureSpec.cs / ArchitectGenClient.cs / PreviewHtml.cs / MainWindow.Architect.cs）の精査で全て解決済み。本 v2 は、確定版に対しレビューで判明した4つの補強点（決定性の順序非依存、IsRectangular の定義、開口スナップの一意規則、テスト段取り）を追記した最新版である。実装コードは含まない。ai_collab_rules.md とは独立した文書として管理する。
