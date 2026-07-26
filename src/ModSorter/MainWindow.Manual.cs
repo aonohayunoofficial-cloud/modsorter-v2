@@ -104,8 +104,39 @@ public partial class MainWindow
         var spec = active.BuildSpec(out var allowed, out var summary);
 
         _manualBlocks = StructureExpander.Expand(spec, allowed);
+        ApplyManualFenceStates(_manualBlocks);
         await ManualRenderAsync(_manualBlocks);
         ManualStatus.Text = $"{summary} / {_manualBlocks.Count} ブロック";
+    }
+
+    // 手動生成で配置したフェンスへ接続方向を確定して持たせる。
+    // 同一Y面で隣接するフェンスだけを接続対象にし、プレビューとNBT出力で同じ状態を使う。
+    private static void ApplyManualFenceStates(List<GeneratedBlock> blocks)
+    {
+        var fencePositions = blocks
+            .Where(b => IsManualFence(b.Id))
+            .Select(b => (b.X, b.Y, b.Z))
+            .ToHashSet();
+
+        foreach (var block in blocks)
+        {
+            if (!IsManualFence(block.Id)) continue;
+
+            block.Properties ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            block.Properties["north"] = fencePositions.Contains((block.X, block.Y, block.Z - 1)) ? "true" : "false";
+            block.Properties["south"] = fencePositions.Contains((block.X, block.Y, block.Z + 1)) ? "true" : "false";
+            block.Properties["west"] = fencePositions.Contains((block.X - 1, block.Y, block.Z)) ? "true" : "false";
+            block.Properties["east"] = fencePositions.Contains((block.X + 1, block.Y, block.Z)) ? "true" : "false";
+        }
+    }
+
+    private static bool IsManualFence(string id)
+    {
+        string baseId = id.Split('[')[0];
+        int separator = baseId.IndexOf(':');
+        string name = separator >= 0 ? baseId[(separator + 1)..] : baseId;
+        return name.EndsWith("_fence", StringComparison.Ordinal) ||
+               name == "nether_brick_fence";
     }
 
     // タブ内 WebView2 へ描画（setTextures→renderBlocks）。
@@ -247,7 +278,14 @@ public partial class MainWindow
         }
 
         var nbtBlocks = _manualBlocks
-            .Select(b => new StructureNbtWriter.Block { Name = b.Id, X = b.X, Y = b.Y, Z = b.Z })
+            .Select(b => new StructureNbtWriter.Block
+            {
+                Name = b.Id,
+                X = b.X,
+                Y = b.Y,
+                Z = b.Z,
+                Properties = b.Properties
+            })
             .ToList();
 
         try

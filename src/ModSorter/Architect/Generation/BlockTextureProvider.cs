@@ -419,6 +419,24 @@ public sealed class BlockTextureProvider : IDisposable
             if (!_nsToJar.TryGetValue(ns, out var jar)) return null;
             var za = GetZip(ns, jar);
 
+            var multipartModels = ResolveMultipartModels(za, ns, name, props);
+            if (multipartModels != null)
+            {
+                // multipart は一致した apply をすべて重ねる。
+                // フェンスでは post に各方向の side を加え、state 回転も要素座標へ反映する。
+                var multipartElements = new List<ShapeElement>();
+                foreach (var model in multipartModels)
+                {
+                    var part = ResolveModelElements(za, ns, model.modelRef, 0);
+                    if (part == null || part.Count == 0) continue;
+                    foreach (var element in part)
+                        multipartElements.Add(RotateMultipartElement(element, model.rotX, model.rotY));
+                }
+                return multipartElements.Count == 0
+                    ? null
+                    : new BlockShape { Elements = multipartElements };
+            }
+
             var (modelRef, rotX, rotY) = ResolveVariantModel(za, ns, name, props);
             if (string.IsNullOrEmpty(modelRef)) return null;
 
@@ -628,6 +646,132 @@ public sealed class BlockTextureProvider : IDisposable
             ? ye.GetInt32() : 0;
 
         return (model, rx, ry);
+    }
+
+    // multipart blockstate の一致するモデルをすべて返す。variants のブロックは null を返し、
+    // 従来の ResolveVariantModel 経路へ渡す。
+    private List<(string modelRef, int rotX, int rotY)>? ResolveMultipartModels(
+        ZipArchive za, string ns, string name, IReadOnlyDictionary<string, string>? props)
+    {
+        var entry = za.GetEntry($"assets/{ns}/blockstates/{name}.json");
+        if (entry == null) return null;
+
+        string json;
+        using (var sr = new StreamReader(entry.Open())) json = sr.ReadToEnd();
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("multipart", out var multipart) ||
+            multipart.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var result = new List<(string modelRef, int rotX, int rotY)>();
+        foreach (var part in multipart.EnumerateArray())
+        {
+            if (part.ValueKind != JsonValueKind.Object) continue;
+            if (part.TryGetProperty("when", out var when) && !MatchesMultipartWhen(when, props))
+                continue;
+            if (!part.TryGetProperty("apply", out var apply)) continue;
+
+            // 重み付きモデル配列は既存 variants と同じく先頭を採用する。
+            var model = apply.ValueKind == JsonValueKind.Array && apply.GetArrayLength() > 0
+                ? apply[0] : apply;
+            if (model.ValueKind != JsonValueKind.Object ||
+                !model.TryGetProperty("model", out var modelName) ||
+                modelName.ValueKind != JsonValueKind.String)
+                continue;
+
+            int rotX = model.TryGetProperty("x", out var x) && x.ValueKind == JsonValueKind.Number
+                ? x.GetInt32() : 0;
+            int rotY = model.TryGetProperty("y", out var y) && y.ValueKind == JsonValueKind.Number
+                ? y.GetInt32() : 0;
+            result.Add((modelName.GetString()!, rotX, rotY));
+        }
+        return result;
+    }
+
+    private static bool MatchesMultipartWhen(
+        JsonElement when, IReadOnlyDictionary<string, string>? props)
+    {
+        if (when.ValueKind != JsonValueKind.Object) return false;
+
+        if (when.TryGetProperty("OR", out var orConditions) &&
+            orConditions.ValueKind == JsonValueKind.Array)
+            return orConditions.EnumerateArray().Any(c => MatchesMultipartWhen(c, props));
+        if (when.TryGetProperty("AND", out var andConditions) &&
+            andConditions.ValueKind == JsonValueKind.Array)
+            return andConditions.EnumerateArray().All(c => MatchesMultipartWhen(c, props));
+
+        foreach (var condition in when.EnumerateObject())
+        {
+            if (props == null || !props.TryGetValue(condition.Name, out var current)) return false;
+            if (condition.Value.ValueKind != JsonValueKind.String) return false;
+            if (!condition.Value.GetString()!.Split('|').Contains(current, StringComparer.Ordinal))
+                return false;
+        }
+        return true;
+    }
+
+    // blockstate apply の直交回転を要素座標へ焼き込む。
+    // フェンスの各 side は同一モデルを y 回転して使うため、BlockShape 全体の1回転では表せない。
+    private static ShapeElement RotateMultipartElement(ShapeElement source, int rotX, int rotY)
+    {
+        if (rotX == 0 && rotY == 0)
+        {
+            return new ShapeElement
+            {
+                From = (double[])source.From.Clone(),
+                To = (double[])source.To.Clone(),
+                Faces = source.Faces,
+                RotAngle = source.RotAngle,
+                RotAxis = source.RotAxis,
+                RotOrigin = (double[])source.RotOrigin.Clone()
+            };
+        }
+
+        var corners = new List<double[]>(8);
+        foreach (double x in new[] { source.From[0], source.To[0] })
+        foreach (double y in new[] { source.From[1], source.To[1] })
+        foreach (double z in new[] { source.From[2], source.To[2] })
+            corners.Add(RotateMultipartPoint(new[] { x, y, z }, rotX, rotY));
+
+        return new ShapeElement
+        {
+            From = new[]
+            {
+                corners.Min(p => p[0]), corners.Min(p => p[1]), corners.Min(p => p[2])
+            },
+            To = new[]
+            {
+                corners.Max(p => p[0]), corners.Max(p => p[1]), corners.Max(p => p[2])
+            },
+            Faces = source.Faces,
+            RotAngle = source.RotAngle,
+            RotAxis = source.RotAxis,
+            RotOrigin = RotateMultipartPoint(source.RotOrigin, rotX, rotY)
+        };
+    }
+
+    // PreviewHtml の blockstate 回転と同じく、Y→X の順に中心(8,8,8)まわりで回す。
+    private static double[] RotateMultipartPoint(double[] point, int rotX, int rotY)
+    {
+        double x = point[0] - 8;
+        double y = point[1] - 8;
+        double z = point[2] - 8;
+
+        double yRadians = -rotY * Math.PI / 180.0;
+        double cosY = Math.Cos(yRadians);
+        double sinY = Math.Sin(yRadians);
+        (x, z) = (x * cosY + z * sinY, -x * sinY + z * cosY);
+
+        double xRadians = -rotX * Math.PI / 180.0;
+        double cosX = Math.Cos(xRadians);
+        double sinX = Math.Sin(xRadians);
+        (y, z) = (y * cosX - z * sinX, y * sinX + z * cosX);
+
+        return new[]
+        {
+            Math.Round(x + 8, 6), Math.Round(y + 8, 6), Math.Round(z + 8, 6)
+        };
     }
 
     // model 参照名から elements(faces解決済み)を得る。
