@@ -1,0 +1,174 @@
+﻿<UserControl
+    x:Class="ModSorter.Architect.Manual.HouseParamsControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:ModSorter.Architect.Manual">
+
+    <StackPanel Cursor="">
+
+        <!-- 幅 -->
+        <DockPanel Margin="0,4,0,2">
+            <TextBlock Text="幅" Width="36" Style="{StaticResource PixelText}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ManualWidthLabel" Text="7" Width="40" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualWidthSlider" Tag="w" Minimum="2" Maximum="64" Value="7" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualSlider_Changed"/>
+        </DockPanel>
+
+        <!-- 奥行 -->
+        <DockPanel Margin="0,4,0,2">
+            <TextBlock Text="奥行" Width="36" Style="{StaticResource PixelText}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ManualDepthLabel" Text="9" Width="40" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualDepthSlider" Tag="d" Minimum="2" Maximum="64" Value="9" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualSlider_Changed"/>
+        </DockPanel>
+
+        <!-- 高さ -->
+        <DockPanel Margin="0,4,0,12">
+            <TextBlock Text="高さ" Width="36" Style="{StaticResource PixelText}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ManualHeightLabel" Text="6" Width="40" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualHeightSlider" Tag="h" Minimum="2" Maximum="64" Value="6" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualSlider_Changed"/>
+        </DockPanel>
+
+        <!-- 屋根タイプ -->
+        <TextBlock Text="屋根タイプ" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <ComboBox x:Name="ManualRoofCombo" Style="{StaticResource McComboBox}" ItemContainerStyle="{StaticResource McComboBoxItem}" Width="180" HorizontalAlignment="Left" Margin="0,4,0,8" SelectedIndex="1" SelectionChanged="ManualParam_SelectionChanged">
+            <ComboBoxItem Content="平屋根 (flat)" Tag="flat"/>
+            <ComboBoxItem Content="切妻 (gable)" Tag="gable"/>
+            <ComboBoxItem Content="片流れ (shed)" Tag="shed"/>
+            <ComboBoxItem Content="ピラミッド (pyramid)" Tag="pyramid"/>
+        </ComboBox>
+
+        <!-- 勾配 -->
+        <DockPanel Margin="0,4,0,12">
+            <TextBlock Text="勾配" Width="36" Style="{StaticResource PixelText}" VerticalAlignment="Center" ToolTip="1=急(45°) / 2=標準 / 3〜4=緩やか"/>
+            <TextBlock x:Name="ManualPitchLabel" Text="1" Width="40" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualPitchSlider" Tag="p" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualSlider_Changed"/>
+        </DockPanel>
+
+        <!-- 軒の出 -->
+        <DockPanel Margin="0,4,0,12">
+            <TextBlock Text="軒" Width="36" Style="{StaticResource PixelText}" VerticalAlignment="Center" ToolTip="屋根を壁より外へ張り出す量（0=軒なし）。平屋根・切妻・片流れのみ"/>
+            <TextBlock x:Name="ManualEaveLabel" Text="0" Width="40" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualEaveSlider" Tag="e" Minimum="0" Maximum="3" Value="0" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualSlider_Changed"/>
+        </DockPanel>
+
+        <!-- 軒を出す面 -->
+        <TextBlock Text="軒を出す面" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <WrapPanel Margin="0,4,0,12">
+            <CheckBox x:Name="ManualEaveNorth" Content="北" Margin="0,0,12,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+            <CheckBox x:Name="ManualEaveSouth" Content="南" Margin="0,0,12,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+            <CheckBox x:Name="ManualEaveEast" Content="東" Margin="0,0,12,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+            <CheckBox x:Name="ManualEaveWest" Content="西" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        </WrapPanel>
+
+        <!-- 棟の向き -->
+        <TextBlock Text="棟の向き（切妻・片流れ）" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <ToggleButton x:Name="ManualRidgeToggle" Style="{StaticResource McToggle}" Content="X軸" Margin="0,4,0,12" Checked="ManualRidge_Toggled" Unchecked="ManualRidge_Toggled"/>
+
+        <!-- 窓 -->
+        <TextBlock Text="窓を付ける面と本数" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <CheckBox x:Name="ManualWinNorth" Content="北面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualWinNorth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualWinNorthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualWinNorthSlider" Minimum="1" Maximum="8" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualWinSouth" Content="南面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualWinSouth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualWinSouthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualWinSouthSlider" Minimum="1" Maximum="8" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualWinEast" Content="東面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualWinEast, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualWinEastLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualWinEastSlider" Minimum="1" Maximum="8" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualWinWest" Content="西面" Margin="0,6,0,12" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,12" Visibility="{Binding IsChecked, ElementName=ManualWinWest, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualWinWestLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualWinWestSlider" Minimum="1" Maximum="8" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+
+        <!-- 入り口(ドア) -->
+        <TextBlock Text="入り口を付ける面と本数" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <CheckBox x:Name="ManualDoorNorth" Content="北面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualDoorNorth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualDoorNorthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualDoorNorthSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualDoorSouth" Content="南面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualDoorSouth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualDoorSouthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualDoorSouthSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualDoorEast" Content="東面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualDoorEast, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualDoorEastLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualDoorEastSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualDoorWest" Content="西面" Margin="0,6,0,12" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,12" Visibility="{Binding IsChecked, ElementName=ManualDoorWest, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualDoorWestLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualDoorWestSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+
+        <!-- アーチ -->
+        <TextBlock Text="アーチを付ける面と本数" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <CheckBox x:Name="ManualArchNorth" Content="北面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualArchNorth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualArchNorthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualArchNorthSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualArchSouth" Content="南面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualArchSouth, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualArchSouthLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualArchSouthSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualArchEast" Content="東面" Margin="0,6,0,0" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,2" Visibility="{Binding IsChecked, ElementName=ManualArchEast, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualArchEastLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualArchEastSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+        <CheckBox x:Name="ManualArchWest" Content="西面" Margin="0,6,0,12" Foreground="{StaticResource TextMain}" FontFamily="{StaticResource PixelFont}" Checked="ManualParam_Toggled" Unchecked="ManualParam_Toggled"/>
+        <DockPanel Margin="16,2,0,12" Visibility="{Binding IsChecked, ElementName=ManualArchWest, Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="ManualArchWestLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Slider x:Name="ManualArchWestSlider" Minimum="1" Maximum="4" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+        </DockPanel>
+
+        <!-- 煙突 -->
+        <TextBlock Text="煙突" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <ToggleButton x:Name="ManualChimneyToggle" Style="{StaticResource McToggle}" Content="煙突なし" Margin="0,4,0,4" Checked="ManualChimney_Toggled" Unchecked="ManualChimney_Toggled"/>
+        <StackPanel Visibility="{Binding IsChecked, ElementName=ManualChimneyToggle, Converter={StaticResource BoolToVis}}">
+            <ToggleButton x:Name="ManualChimneyPierceToggle" Style="{StaticResource McToggle}" Content="貫かない（屋根上のみ）" Margin="0,4,0,8" Checked="ManualChimneyPierce_Toggled" Unchecked="ManualChimneyPierce_Toggled"/>
+            <DockPanel Margin="0,2,0,2">
+                <TextBlock Text="本数" Width="48" Style="{StaticResource PixelText}" VerticalAlignment="Center"/>
+                <TextBlock x:Name="ManualChimneyCountLabel" Text="1" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                <Slider x:Name="ManualChimneyCountSlider" Minimum="1" Maximum="6" Value="1" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+            </DockPanel>
+            <DockPanel Margin="0,2,0,2">
+                <TextBlock Text="高さ" Width="48" Style="{StaticResource PixelText}" VerticalAlignment="Center"/>
+                <TextBlock x:Name="ManualChimneyHeightLabel" Text="2" Width="32" DockPanel.Dock="Right" Style="{StaticResource PixelText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                <Slider x:Name="ManualChimneyHeightSlider" Minimum="1" Maximum="8" Value="2" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" ValueChanged="ManualWinCount_Changed"/>
+            </DockPanel>
+            <TextBlock Text="寄せ方向" Style="{StaticResource PixelText}" Margin="0,4,0,0"/>
+            <ComboBox x:Name="ManualChimneyAlignCombo" Style="{StaticResource McComboBox}" ItemContainerStyle="{StaticResource McComboBoxItem}" Width="180" HorizontalAlignment="Left" Margin="0,4,0,12" SelectedIndex="0" SelectionChanged="ManualParam_SelectionChanged">
+                <ComboBoxItem Content="中央" Tag="center"/>
+                <ComboBoxItem Content="北寄せ" Tag="north"/>
+                <ComboBoxItem Content="南寄せ" Tag="south"/>
+                <ComboBoxItem Content="東寄せ" Tag="east"/>
+                <ComboBoxItem Content="西寄せ" Tag="west"/>
+            </ComboBox>
+            <TextBlock Text="太さ" Style="{StaticResource PixelText}" Margin="0,4,0,0"/>
+            <ComboBox x:Name="ManualChimneyThickCombo" Style="{StaticResource McComboBox}" ItemContainerStyle="{StaticResource McComboBoxItem}" Width="180" HorizontalAlignment="Left" Margin="0,4,0,12" SelectedIndex="0" SelectionChanged="ManualParam_SelectionChanged">
+                <ComboBoxItem Content="細（1マス）" Tag="thin"/>
+                <ComboBoxItem Content="中（ひし形・中空）" Tag="medium"/>
+                <ComboBoxItem Content="太（4×4・中空）" Tag="thick"/>
+            </ComboBox>
+            <Button x:Name="ManualChimneyBtn" Content="煙突ブロックを選択…" Style="{StaticResource McButtonGray}" HorizontalAlignment="Left" Margin="0,0,0,12" Click="ManualPickChimney_Click"/>
+        </StackPanel>
+
+        <!-- 使用ブロック -->
+        <TextBlock Text="使用ブロック" Style="{StaticResource PixelText}" Foreground="{StaticResource GrassGreen}"/>
+        <Button x:Name="ManualWallBtn" Content="① 壁ブロックを選択…" Style="{StaticResource McButtonGray}" HorizontalAlignment="Left" Margin="0,4,0,4" Click="ManualPickWall_Click"/>
+        <Button x:Name="ManualFloorBtn" Content="② 床ブロックを選択…" Style="{StaticResource McButtonGray}" HorizontalAlignment="Left" Margin="0,0,0,4" Click="ManualPickFloor_Click"/>
+        <Button x:Name="ManualRoofBtn" Content="③ 屋根ブロックを選択…" Style="{StaticResource McButtonGray}" HorizontalAlignment="Left" Margin="0,0,0,12" Click="ManualPickRoof_Click"/>
+
+    </StackPanel>
+</UserControl>
