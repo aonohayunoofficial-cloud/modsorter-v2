@@ -1140,6 +1140,7 @@
                                     <ComboBoxItem Content="平屋根 (flat)" Tag="flat"/>
                                     <ComboBoxItem Content="切妻 (gable)" Tag="gable"/>
                                     <ComboBoxItem Content="片流れ (shed)" Tag="shed"/>
+                                    <ComboBoxItem Content="ピラミッド (pyramid)" Tag="pyramid"/>
                                 </ComboBox>
 
                                 <!-- 勾配 -->

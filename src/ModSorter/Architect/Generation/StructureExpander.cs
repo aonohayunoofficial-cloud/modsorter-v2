@@ -715,6 +715,36 @@ public static class StructureExpander
                 }
             }
         }
+
+        // ===== 棟に平行な2端面（低い側・高い側）の妻壁立ち上げ（方式①）=====
+        // shed は傾斜方向の両端(棟平行の面)が屋根の下に三角の穴を残す。
+        // 各端面を、その端に対応する屋根高さ yLevel-1 まで壁で立ち上げて塞ぐ。
+        {
+            // 傾斜方向の両端インデックスと、それぞれの屋根高さ。
+            int loEnd = 0;                       // 低い側 i=0
+            int hiEnd = slopeLen - 1;            // 高い側 i=slopeLen-1
+            int loY = (h - 1) + (loEnd / pitch); // 低い側の屋根高さ（=h-1）
+            int hiY = (h - 1) + (hiEnd / pitch); // 高い側の屋根高さ
+
+            if (ridgeAlongX)
+            {
+                // 端面は z=0（低）と z=d-1（高）。棟方向 x を全幅、y は h-1..端の屋根手前。
+                for (int x = 0; x < w; x++)
+                {
+                    for (int y = h - 1; y < loY; y++) cells[(x, y, 0)] = wall;
+                    for (int y = h - 1; y < hiY; y++) cells[(x, y, d - 1)] = wall;
+                }
+            }
+            else
+            {
+                // 端面は x=0（低）と x=w-1（高）。棟方向 z を全奥行き。
+                for (int z = 0; z < d; z++)
+                {
+                    for (int y = h - 1; y < loY; y++) cells[(0, y, z)] = wall;
+                    for (int y = h - 1; y < hiY; y++) cells[(w - 1, y, z)] = wall;
+                }
+            }
+        }
     }
 
     // 切妻屋根（階段ブロック版）: 各段の屋根面を階段ブロックにし、
