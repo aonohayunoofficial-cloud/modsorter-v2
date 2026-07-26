@@ -1,0 +1,73 @@
+﻿<UserControl x:Class="ModSorter.Architect.Manual.ApartmentParamsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <!-- 幅 -->
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="幅(W)" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource TextMain}" Width="70"/>
+            <TextBlock x:Name="ApWidthLabel" Text="9" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" Width="28"
+                       TextAlignment="Right"/>
+            <Slider x:Name="ApWidthSlider" Minimum="4" Maximum="32" Value="9"
+                    Tag="w" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="ApSlider_Changed" Margin="8,0,0,0"/>
+        </DockPanel>
+        <!-- 奥行き -->
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="奥行(D)" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource TextMain}" Width="70"/>
+            <TextBlock x:Name="ApDepthLabel" Text="11" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" Width="28"
+                       TextAlignment="Right"/>
+            <Slider x:Name="ApDepthSlider" Minimum="4" Maximum="32" Value="11"
+                    Tag="d" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="ApSlider_Changed" Margin="8,0,0,0"/>
+        </DockPanel>
+        <!-- 階数 -->
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="階数" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource TextMain}" Width="70"/>
+            <TextBlock x:Name="ApFloorsLabel" Text="3" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" Width="28"
+                       TextAlignment="Right"/>
+            <Slider x:Name="ApFloorsSlider" Minimum="2" Maximum="12" Value="3"
+                    Tag="f" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="ApSlider_Changed" Margin="8,0,0,0"/>
+        </DockPanel>
+        <!-- 階高 -->
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="階高" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource TextMain}" Width="70"/>
+            <TextBlock x:Name="ApFloorHeightLabel" Text="4" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" Width="28"
+                       TextAlignment="Right"/>
+            <Slider x:Name="ApFloorHeightSlider" Minimum="3" Maximum="6" Value="4"
+                    Tag="fh" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="ApSlider_Changed" Margin="8,0,0,0"/>
+        </DockPanel>
+        <!-- 各階の窓の数(1面あたり・前後面に配置) -->
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="窓/階" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource TextMain}" Width="70"/>
+            <TextBlock x:Name="ApWinPerFloorLabel" Text="3" Style="{StaticResource PixelText}"
+                       Foreground="{StaticResource GrassGreen}" Width="28"
+                       TextAlignment="Right"/>
+            <Slider x:Name="ApWinPerFloorSlider" Minimum="0" Maximum="8" Value="3"
+                    Tag="win" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="ApSlider_Changed" Margin="8,0,0,0"/>
+        </DockPanel>
+        <!-- 屋上に土台段（陸屋根の見た目を締める） -->
+        <TextBlock Text="使用ブロック" Style="{StaticResource PixelText}"
+                   Foreground="{StaticResource GrassGreen}" Margin="0,8,0,4"/>
+        <Button x:Name="ApWallBtn" Content="壁ブロックを選択…"
+                Style="{StaticResource McButtonGray}" Margin="0,0,0,6"
+                Click="ApPickWall_Click"/>
+        <Button x:Name="ApFloorBtn" Content="床ブロックを選択…"
+                Style="{StaticResource McButtonGray}" Margin="0,0,0,6"
+                Click="ApPickFloor_Click"/>
+        <Button x:Name="ApRoofBtn" Content="屋上ブロックを選択…"
+                Style="{StaticResource McButtonGray}" Margin="0,0,0,12"
+                Click="ApPickRoof_Click"/>
+    </StackPanel>
+</UserControl>

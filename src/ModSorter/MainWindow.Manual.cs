@@ -27,12 +27,8 @@ public partial class MainWindow
         MainTabs.SelectedIndex = 6;
         Log("手動生成モードを開きました。");
 
-        // 中分類UserControlの変更通知を購読（1回だけ）。発火で再描画予約する。
-        if (!_manualParamsHooked && ManualHouseParams != null)
-        {
-            ManualHouseParams.ParamsChanged += (_, __) => ManualScheduleRender();
-            _manualParamsHooked = true;
-        }
+        // アクティブな中分類UserControlの変更通知を購読する。
+        HookActiveParams();
 
         if (!_manualPreviewReady)
         {
@@ -113,16 +109,65 @@ public partial class MainWindow
     }
 
     // タブ内 WebView2 へ描画（setTextures→renderBlocks）。
+    // モデルJSONから形状(elements)と面別テクスチャを解決し、機械プレビューと同じ
+    // {x,y,z,id,elements:[{from,to,faces:{面名:{tex,uv,rot}}}],rotX,rotY} の形で渡す。
+    // 形状が取れないブロックは elements 無し → JS側で 1×1×1 にフォールバック。
     private async System.Threading.Tasks.Task ManualRenderAsync(List<GeneratedBlock> blocks)
     {
         if (!_manualPreviewReady) return;
 
-        string json = System.Text.Json.JsonSerializer.Serialize(
-            blocks.Select(b => new { x = b.X, y = b.Y, z = b.Z, id = b.Id }));
+        var vanilla = FindVanillaJar();
+        var modJars = (_mods ?? new List<ModSorter.Models.ModEntry>())
+            .Select(m => m.FilePath)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        string blocksJson;
+        var texMap = new Dictionary<string, string>();
+
+        using (var tp = new ModSorter.Architect.Generation.BlockTextureProvider(vanilla, modJars))
+        {
+            // 面別テクスチャPNGをキーで集めるローカル関数（機械プレビューと同じ）。
+            void AddFaceTexture(string texKey)
+            {
+                if (string.IsNullOrEmpty(texKey)) return;
+                if (texMap.ContainsKey(texKey)) return;
+                var png = tp.GetTextureByPath(texKey);
+                if (png != null && png.Length > 0)
+                    texMap[texKey] = "data:image/png;base64," + System.Convert.ToBase64String(png);
+            }
+
+            var payload = new List<object>(blocks.Count);
+            foreach (var b in blocks)
+            {
+                string baseId = b.Id.Split('[')[0];
+
+                var shape = tp.GetBlockShape(b.Id, b.Properties);
+                if (shape != null && shape.Elements.Count > 0)
+                {
+                    payload.Add(BuildManualElementPayload(
+                        b, shape.Elements, shape.RotX, shape.RotY, AddFaceTexture));
+                }
+                else
+                {
+                    // 形状不明 → elements 無し。JS側で 1×1×1。
+                    payload.Add(new { x = b.X, y = b.Y, z = b.Z, id = b.Id });
+                }
+
+                // フォールバック用に baseId のテクスチャも入れておく。
+                if (!texMap.ContainsKey(baseId))
+                {
+                    var png = tp.GetTexture(baseId);
+                    if (png != null && png.Length > 0)
+                        texMap[baseId] = "data:image/png;base64," + System.Convert.ToBase64String(png);
+                }
+            }
+
+            blocksJson = System.Text.Json.JsonSerializer.Serialize(payload);
+        }
 
         try
         {
-            var texMap = BuildTextureMap(blocks);
             string texJson = System.Text.Json.JsonSerializer.Serialize(texMap);
             string texArg = System.Text.Json.JsonSerializer.Serialize(texJson);
             await ManualPreviewWeb.ExecuteScriptAsync($"setTextures({texArg})");
@@ -134,10 +179,55 @@ public partial class MainWindow
 
         try
         {
-            string blocksArg = System.Text.Json.JsonSerializer.Serialize(json);
+            string blocksArg = System.Text.Json.JsonSerializer.Serialize(blocksJson);
             await ManualPreviewWeb.ExecuteScriptAsync($"renderBlocks({blocksArg})");
         }
         catch (Exception) { }
+    }
+
+    // GeneratedBlock 用の elements payload 組み立て。機械側 BuildElementPayload の
+    // GeneratedBlock 版（機械側は PlacedBlock 引数固定のため流用不可・別実装）。
+    // faces の各 texKey を addFaceTex で texMap に集めつつ from/to/faces/要素回転を載せる。
+    private static object BuildManualElementPayload(
+        GeneratedBlock b,
+        List<ModSorter.Architect.Generation.BlockTextureProvider.ShapeElement> elements,
+        int rotX, int rotY,
+        Action<string> addFaceTex)
+    {
+        var elems = new List<object>(elements.Count);
+        foreach (var el in elements)
+        {
+            var faces = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var f in el.Faces)
+            {
+                addFaceTex(f.Value.Tex);
+                faces[f.Key] = new
+                {
+                    tex = f.Value.Tex,
+                    uv = f.Value.Uv,
+                    rot = f.Value.Rotation
+                };
+            }
+            elems.Add(new
+            {
+                from = el.From,
+                to = el.To,
+                faces,
+                rotAngle = el.RotAngle,
+                rotAxis = el.RotAxis,
+                rotOrigin = el.RotOrigin
+            });
+        }
+        return new
+        {
+            x = b.X,
+            y = b.Y,
+            z = b.Z,
+            id = b.Id,
+            elements = elems,
+            rotX = rotX,
+            rotY = rotY
+        };
     }
 
     // 「NBT出力」ボタン。
@@ -186,9 +276,46 @@ public partial class MainWindow
 
     private void ManualSubCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // 選択中分類に応じて ManualParamHost.Content を差し替える。
+        string sub = (ManualSubCategoryCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "house";
+
+        if (ManualParamHost != null)
+        {
+            var current = ManualParamHost.Content as ModSorter.Architect.Manual.IManualParamControl;
+            string currentTag = current switch
+            {
+                ModSorter.Architect.Manual.ApartmentParamsControl => "apartment",
+                ModSorter.Architect.Manual.HouseParamsControl => "house",
+                _ => ""
+            };
+
+            if (currentTag != sub)
+            {
+                ManualParamHost.Content = sub switch
+                {
+                    "apartment" => new ModSorter.Architect.Manual.ApartmentParamsControl(),
+                    _ => new ModSorter.Architect.Manual.HouseParamsControl()
+                };
+                HookActiveParams();
+            }
+        }
+
         if (!_manualPreviewReady) return;
         ManualScheduleRender();
     }
+
+    // ManualParamHost.Content（アクティブな中分類UserControl）の
+    // ParamsChanged を購読する。差し替えのたびに呼ぶ（重複購読を避けるため一旦外す）。
+    private void HookActiveParams()
+    {
+        if (ManualParamHost?.Content is ModSorter.Architect.Manual.IManualParamControl active)
+        {
+            active.ParamsChanged -= OnActiveParamsChanged;
+            active.ParamsChanged += OnActiveParamsChanged;
+        }
+    }
+
+    private void OnActiveParamsChanged(object? sender, EventArgs e) => ManualScheduleRender();
 
     // 「出力フォルダを開く」ボタン。
     private void ManualOpenFolder_Click(object sender, RoutedEventArgs e)

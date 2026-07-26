@@ -10,6 +10,11 @@ public sealed class GeneratedBlock
     [JsonPropertyName("y")] public int Y { get; set; }
     [JsonPropertyName("z")] public int Z { get; set; }
     [JsonPropertyName("id")] public string Id { get; set; } = "";
+
+    // ブロックステート（例: {"type":"top"}、{"facing":"north","half":"bottom"}）。
+    // ハーフ/フェンス/階段など形状ブロックの向き・形を描画時に GetBlockShape へ渡すため。
+    // null または空なら状態なし＝従来の単一立方体として扱われる（後方互換）。
+    [JsonPropertyName("properties")] public Dictionary<string, string>? Properties { get; set; }
 }
 
 // LLM応答のルート（{ "blocks": [ ... ] }）

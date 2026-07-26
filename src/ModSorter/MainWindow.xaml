@@ -1103,6 +1103,7 @@
                                       Margin="0,4,0,12" SelectedIndex="0"
                                       SelectionChanged="ManualSubCategory_SelectionChanged">
                                     <ComboBoxItem Content="戸建て住宅" Tag="house"/>
+                                    <ComboBoxItem Content="集合住宅" Tag="apartment"/>
                                 </ComboBox>
 
                                 <!-- 中分類UserControlの差し込み先。戸建てを差し込む(既存インラインと並存) -->
