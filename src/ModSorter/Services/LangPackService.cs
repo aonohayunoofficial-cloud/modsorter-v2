@@ -310,7 +310,14 @@ public static class LangPackService
     {
         var dir = Path.GetDirectoryName(outputZipPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        if (File.Exists(outputZipPath)) File.Delete(outputZipPath);
+
+        // 既存ファイルがロックされている場合はリトライしながら削除する。
+        // ロックが解けない場合でも FileMode.Create が上書きするため、削除失敗は無視してよい。
+        for (int attempt = 0; File.Exists(outputZipPath) && attempt < 5; attempt++)
+        {
+            try { File.Delete(outputZipPath); break; }
+            catch (IOException) { System.Threading.Thread.Sleep(200); }
+        }
 
         using var fs = new FileStream(outputZipPath, FileMode.Create);
         using var zip = new ZipArchive(fs, ZipArchiveMode.Create);
@@ -346,6 +353,30 @@ public static class LangPackService
         }
 
         result.OutputPath = outputZipPath;
+    }
+
+    // ファイルを削除する。ロック状態の場合は一定回数リトライする。
+    private static void DeleteFileWithRetry(string filePath, int maxRetries = 5, int delayMs = 200)
+    {
+        if (!File.Exists(filePath)) return;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                File.Delete(filePath);
+                return; // 成功
+            }
+            catch (IOException) when (attempt < maxRetries - 1)
+            {
+                // ロック状態の場合は待機して再試行
+                System.Threading.Thread.Sleep(delayMs);
+            }
+        }
+
+        // すべてのリトライが失敗した場合、最後の例外を発生させる
+        if (File.Exists(filePath))
+            File.Delete(filePath);
     }
 
     // ===== 内部ヘルパ =====
