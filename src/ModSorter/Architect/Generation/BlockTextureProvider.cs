@@ -430,7 +430,8 @@ public sealed class BlockTextureProvider : IDisposable
                     var part = ResolveModelElements(za, ns, model.modelRef, 0);
                     if (part == null || part.Count == 0) continue;
                     foreach (var element in part)
-                        multipartElements.Add(RotateMultipartElement(element, model.rotX, model.rotY));
+                        multipartElements.Add(RotateMultipartElement(
+                            element, model.rotX, model.rotY, model.uvLock));
                 }
                 return multipartElements.Count == 0
                     ? null
@@ -650,7 +651,8 @@ public sealed class BlockTextureProvider : IDisposable
 
     // multipart blockstate の一致するモデルをすべて返す。variants のブロックは null を返し、
     // 従来の ResolveVariantModel 経路へ渡す。
-    private List<(string modelRef, int rotX, int rotY)>? ResolveMultipartModels(
+    // uvlock は「回転させてもテクスチャは world 軸に固定」の指定。フェンス/壁は true。
+    private List<(string modelRef, int rotX, int rotY, bool uvLock)>? ResolveMultipartModels(
         ZipArchive za, string ns, string name, IReadOnlyDictionary<string, string>? props)
     {
         var entry = za.GetEntry($"assets/{ns}/blockstates/{name}.json");
@@ -664,7 +666,7 @@ public sealed class BlockTextureProvider : IDisposable
             multipart.ValueKind != JsonValueKind.Array)
             return null;
 
-        var result = new List<(string modelRef, int rotX, int rotY)>();
+        var result = new List<(string modelRef, int rotX, int rotY, bool uvLock)>();
         foreach (var part in multipart.EnumerateArray())
         {
             if (part.ValueKind != JsonValueKind.Object) continue;
@@ -684,7 +686,9 @@ public sealed class BlockTextureProvider : IDisposable
                 ? x.GetInt32() : 0;
             int rotY = model.TryGetProperty("y", out var y) && y.ValueKind == JsonValueKind.Number
                 ? y.GetInt32() : 0;
-            result.Add((modelName.GetString()!, rotX, rotY));
+            bool uvLock = model.TryGetProperty("uvlock", out var ul) &&
+                ul.ValueKind == JsonValueKind.True;
+            result.Add((modelName.GetString()!, rotX, rotY, uvLock));
         }
         return result;
     }
@@ -713,7 +717,8 @@ public sealed class BlockTextureProvider : IDisposable
 
     // blockstate apply の直交回転を要素座標へ焼き込む。
     // フェンスの各 side は同一モデルを y 回転して使うため、BlockShape 全体の1回転では表せない。
-    private static ShapeElement RotateMultipartElement(ShapeElement source, int rotX, int rotY)
+    private static ShapeElement RotateMultipartElement(
+        ShapeElement source, int rotX, int rotY, bool uvLock)
     {
         if (rotX == 0 && rotY == 0)
         {
@@ -730,9 +735,9 @@ public sealed class BlockTextureProvider : IDisposable
 
         var corners = new List<double[]>(8);
         foreach (double x in new[] { source.From[0], source.To[0] })
-        foreach (double y in new[] { source.From[1], source.To[1] })
-        foreach (double z in new[] { source.From[2], source.To[2] })
-            corners.Add(RotateMultipartPoint(new[] { x, y, z }, rotX, rotY));
+            foreach (double y in new[] { source.From[1], source.To[1] })
+                foreach (double z in new[] { source.From[2], source.To[2] })
+                    corners.Add(RotateMultipartPoint(new[] { x, y, z }, rotX, rotY));
 
         return new ShapeElement
         {
@@ -744,11 +749,70 @@ public sealed class BlockTextureProvider : IDisposable
             {
                 corners.Max(p => p[0]), corners.Max(p => p[1]), corners.Max(p => p[2])
             },
-            Faces = source.Faces,
+            Faces = RotateMultipartFaces(source.Faces, rotX, rotY, uvLock),
             RotAngle = source.RotAngle,
             RotAxis = source.RotAxis,
             RotOrigin = RotateMultipartPoint(source.RotOrigin, rotX, rotY)
         };
+    }
+
+    // 座標を回したら面名も一緒に回す。これが無いと「モデルで定義された面」が
+    // 元の名前のまま残り、回転後に外を向くべき面が未定義=透明になる。
+    // 例: fence_side は post に埋まる south 面を省略しているため、y:180 の南側の桟は
+    // 外側(south)が未定義となり、南から見ると桟が消える(スカスカ)。
+    // RotateMultipartPoint と同じ Y→X の順で写像する。
+    private static Dictionary<string, ShapeFace> RotateMultipartFaces(
+        Dictionary<string, ShapeFace> faces, int rotX, int rotY, bool uvLock)
+    {
+        var result = new Dictionary<string, ShapeFace>(StringComparer.Ordinal);
+        foreach (var kv in faces)
+        {
+            string rotated = RotateFaceNameX(RotateFaceNameY(kv.Key, rotY), rotX);
+            int delta = UvRotationDelta(kv.Key, rotX, rotY, uvLock);
+            result[rotated] = new ShapeFace
+            {
+                Tex = kv.Value.Tex,
+                Uv = kv.Value.Uv == null ? null : (double[])kv.Value.Uv.Clone(),
+                Rotation = ((kv.Value.Rotation + delta) % 360 + 360) % 360
+            };
+        }
+        return result;
+    }
+
+    // y 回転(上から見て時計回り)での面名の巡回。up/down は変わらない。
+    private static readonly string[] YFaceCycle = { "north", "east", "south", "west" };
+
+    // x 回転での面名の巡回(up→north→down→south→up)。east/west は変わらない。
+    private static readonly string[] XFaceCycle = { "north", "down", "south", "up" };
+
+    private static string RotateFaceNameY(string face, int rotY)
+    {
+        int steps = ((rotY / 90) % 4 + 4) % 4;
+        if (steps == 0) return face;
+        int i = Array.IndexOf(YFaceCycle, face);
+        return i < 0 ? face : YFaceCycle[(i + steps) % 4];
+    }
+
+    private static string RotateFaceNameX(string face, int rotX)
+    {
+        int steps = ((rotX / 90) % 4 + 4) % 4;
+        if (steps == 0) return face;
+        int i = Array.IndexOf(XFaceCycle, face);
+        return i < 0 ? face : XFaceCycle[(i + steps) % 4];
+    }
+
+    // 上面/下面のテクスチャは y 回転と一緒に回る(uvlock 無しの既定挙動)。
+    // 側面は y 回転しても縦横の対応が変わらないので補正不要。
+    // uvlock:true(フェンス・壁)はテクスチャを world 軸に固定するので補正しない。
+    // x 回転が絡む組み合わせは現状の対象ブロックに無いため補正対象外とする。
+    private static int UvRotationDelta(string originalFace, int rotX, int rotY, bool uvLock)
+    {
+        if (uvLock || rotX != 0) return 0;
+        int r = ((rotY % 360) + 360) % 360;
+        if (r == 0) return 0;
+        if (originalFace == "up") return r;
+        if (originalFace == "down") return (360 - r) % 360;
+        return 0;
     }
 
     // PreviewHtml の blockstate 回転と同じく、Y→X の順に中心(8,8,8)まわりで回す。

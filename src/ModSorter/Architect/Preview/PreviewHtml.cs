@@ -164,9 +164,18 @@ function faceMaterialFor(texKey, baseId) {
   if (!tex && baseId) tex = getTexture(baseId); // baseId フォールバック
   let mat;
   if (tex) {
-    mat = new THREE.MeshLambertMaterial({ map: tex });
+    // 鉄格子・ガラス板・葉・ドアなどは PNG のアルファで抜きを表現する。
+    // alphaTest が無いと透明部分が不透明に描かれ、格子が板状の塊になる。
+    // 不透明テクスチャは alpha=1 なので影響を受けない。
+    // side は DoubleSide。厚み0の element(鉄格子・ガラス板の板面)を
+    // 裏から見たときに裏面カリングで消えるのを防ぐ。
+    mat = new THREE.MeshLambertMaterial({
+      map: tex, alphaTest: 0.5, side: THREE.DoubleSide
+    });
   } else {
-    mat = new THREE.MeshLambertMaterial({ color: colorFor(baseId || texKey || '') });
+    mat = new THREE.MeshLambertMaterial({
+      color: colorFor(baseId || texKey || ''), side: THREE.DoubleSide
+    });
   }
   _matCache[key] = mat;
   return mat;

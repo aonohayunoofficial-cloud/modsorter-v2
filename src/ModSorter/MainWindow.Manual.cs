@@ -109,35 +109,153 @@ public partial class MainWindow
         ManualStatus.Text = $"{summary} / {_manualBlocks.Count} ブロック";
     }
 
-    // 手動生成で配置したフェンスへ接続方向を確定して持たせる。
-    // 同一Y面で隣接するフェンスだけを接続対象にし、プレビューとNBT出力で同じ状態を使う。
+    // 手動生成で配置した接続系ブロック(フェンス／塀(wall)／板ガラス・鉄格子)へ
+    // 接続状態を確定して持たせる。プレビューとNBT出力で同じ状態を使う。
+    //
+    // 実機準拠の接続規則:
+    //  fence … 同族フェンス(木製同士 / nether_brick_fence は単独)と、硬い面を持つ
+    //          フルブロックに接続する。wall とは接続しない。
+    //  wall  … 他の wall・板ガラス/鉄格子・フルブロックに接続する。
+    //          side は none|low|tall、支柱 up は true|false。
+    //  pane  … 他の板ガラス/鉄格子・wall・フルブロックに接続する(値は true|false)。
     private static void ApplyManualFenceStates(List<GeneratedBlock> blocks)
     {
-        var fencePositions = blocks
-            .Where(b => IsManualFence(b.Id))
-            .Select(b => (b.X, b.Y, b.Z))
-            .ToHashSet();
+        // 座標 → baseId。同一座標が重複したら後勝ち(Expand の後勝ち規約に合わせる)。
+        var byPos = new Dictionary<(int X, int Y, int Z), string>();
+        foreach (var b in blocks)
+            byPos[(b.X, b.Y, b.Z)] = ManualBaseId(b.Id);
 
         foreach (var block in blocks)
         {
-            if (!IsManualFence(block.Id)) continue;
+            string selfId = ManualBaseId(block.Id);
+            var kind = GetManualConnectKind(selfId);
+            if (kind == ManualConnectKind.None) continue;
+
+            bool north = ManualConnectsTo(byPos, kind, selfId, block.X, block.Y, block.Z - 1);
+            bool south = ManualConnectsTo(byPos, kind, selfId, block.X, block.Y, block.Z + 1);
+            bool west = ManualConnectsTo(byPos, kind, selfId, block.X - 1, block.Y, block.Z);
+            bool east = ManualConnectsTo(byPos, kind, selfId, block.X + 1, block.Y, block.Z);
 
             block.Properties ??= new Dictionary<string, string>(StringComparer.Ordinal);
-            block.Properties["north"] = fencePositions.Contains((block.X, block.Y, block.Z - 1)) ? "true" : "false";
-            block.Properties["south"] = fencePositions.Contains((block.X, block.Y, block.Z + 1)) ? "true" : "false";
-            block.Properties["west"] = fencePositions.Contains((block.X - 1, block.Y, block.Z)) ? "true" : "false";
-            block.Properties["east"] = fencePositions.Contains((block.X + 1, block.Y, block.Z)) ? "true" : "false";
+
+            if (kind == ManualConnectKind.Wall)
+            {
+                // 実機 WallBlock は直上の当たり判定で側面の高さを決める。
+                // 直上にブロックがあれば tall、無ければ low。
+                bool hasAbove = byPos.ContainsKey((block.X, block.Y + 1, block.Z));
+                string side = hasAbove ? "tall" : "low";
+
+                block.Properties["north"] = north ? side : "none";
+                block.Properties["south"] = south ? side : "none";
+                block.Properties["west"] = west ? side : "none";
+                block.Properties["east"] = east ? side : "none";
+
+                // 実機 shouldRaisePost 相当。南北または東西へ直線に貫通している
+                // ときだけ支柱が消える。孤立・L字・T字・十字では支柱が立つ。
+                // 直線かつ直上ありのときは側面が tall になり実機でも支柱は立たない
+                // ため、直線判定だけで一致する。
+                bool straight = (north && south && !east && !west)
+                             || (east && west && !north && !south);
+                block.Properties["up"] = straight ? "false" : "true";
+            }
+            else
+            {
+                block.Properties["north"] = north ? "true" : "false";
+                block.Properties["south"] = south ? "true" : "false";
+                block.Properties["west"] = west ? "true" : "false";
+                block.Properties["east"] = east ? "true" : "false";
+            }
         }
     }
 
-    private static bool IsManualFence(string id)
+    // 接続系ブロックの種別。
+    private enum ManualConnectKind { None, Fence, Wall, Pane }
+
+    // 状態付きID("minecraft:oak_fence[north=true]")からベースIDを取る。
+    private static string ManualBaseId(string id) => id.Split('[')[0];
+
+    // baseId から namespace を除いたブロック名を取る。
+    private static string ManualBlockName(string baseId)
     {
-        string baseId = id.Split('[')[0];
         int separator = baseId.IndexOf(':');
-        string name = separator >= 0 ? baseId[(separator + 1)..] : baseId;
-        return name.EndsWith("_fence", StringComparison.Ordinal) ||
-               name == "nether_brick_fence";
+        return separator >= 0 ? baseId[(separator + 1)..] : baseId;
     }
+
+    private static ManualConnectKind GetManualConnectKind(string baseId)
+    {
+        string name = ManualBlockName(baseId);
+        // "_fence_gate" は "_gate" で終わるためフェンスには一致しない。
+        if (name.EndsWith("_fence", StringComparison.Ordinal)) return ManualConnectKind.Fence;
+        // "wall_torch" 等は "_wall" で終わらないため塀には一致しない。
+        if (name.EndsWith("_wall", StringComparison.Ordinal)) return ManualConnectKind.Wall;
+        if (name.EndsWith("_pane", StringComparison.Ordinal) || name == "iron_bars")
+            return ManualConnectKind.Pane;
+        return ManualConnectKind.None;
+    }
+
+    // 実機ではネザーレンガのフェンスは木製フェンスと接続しない。
+    private static bool SameManualFenceGroup(string aBaseId, string bBaseId)
+        => (ManualBlockName(aBaseId) == "nether_brick_fence")
+        == (ManualBlockName(bBaseId) == "nether_brick_fence");
+
+    // 指定座標の隣接ブロックへ接続するかを判定する。
+    private static bool ManualConnectsTo(
+        Dictionary<(int X, int Y, int Z), string> byPos,
+        ManualConnectKind kind, string selfId, int x, int y, int z)
+    {
+        if (!byPos.TryGetValue((x, y, z), out var otherId)) return false;
+
+        var otherKind = GetManualConnectKind(otherId);
+        if (otherKind != ManualConnectKind.None)
+        {
+            return kind switch
+            {
+                ManualConnectKind.Fence =>
+                    otherKind == ManualConnectKind.Fence && SameManualFenceGroup(selfId, otherId),
+                ManualConnectKind.Wall =>
+                    otherKind == ManualConnectKind.Wall || otherKind == ManualConnectKind.Pane,
+                ManualConnectKind.Pane =>
+                    otherKind == ManualConnectKind.Pane || otherKind == ManualConnectKind.Wall,
+                _ => false
+            };
+        }
+        return IsManualFullCube(otherId);
+    }
+
+    // 形状ブロック・装飾ブロックを名前で除外し、残りを「硬い面を持つフルブロック」
+    // とみなす。手動生成のパレットは壁/床/屋根＋ガラス＋接続系に限られるため、
+    // モデル解析まで踏み込まずこの判定で足りる。
+    private static readonly string[] ManualNonCubeSuffixes =
+    {
+        "_slab", "_stairs", "_fence", "_wall", "_pane", "_gate", "_door", "_trapdoor",
+        "_button", "_pressure_plate", "_sign", "_torch", "_carpet", "_rod", "_chain",
+        "_ladder", "_vine", "_head", "_banner", "_candle", "_bars", "_lantern",
+        "_leaves", "_shulker_box", "_pot", "_bed"
+    };
+
+    // 実機の isExceptionForConnection 相当。フルキューブでも接続しないブロック。
+    private static readonly HashSet<string> ManualConnectionExceptions =
+        new(StringComparer.Ordinal)
+        {
+            "barrier", "pumpkin", "carved_pumpkin", "jack_o_lantern", "melon",
+            "shulker_box", "air", "cave_air", "void_air", "water", "lava"
+        };
+
+    private static bool IsManualFullCube(string baseId)
+    {
+        string name = ManualBlockName(baseId);
+        if (name.Length == 0) return false;
+        if (ManualConnectionExceptions.Contains(name)) return false;
+        if (name == "iron_bars" || name == "chain" || name == "ladder" || name == "torch")
+            return false;
+        foreach (var suffix in ManualNonCubeSuffixes)
+            if (name.EndsWith(suffix, StringComparison.Ordinal)) return false;
+        return true;
+    }
+
+    // 他 partial からの参照互換のため残す。フェンス種別かどうかだけを返す。
+    private static bool IsManualFence(string id)
+        => GetManualConnectKind(ManualBaseId(id)) == ManualConnectKind.Fence;
 
     // タブ内 WebView2 へ描画（setTextures→renderBlocks）。
     // モデルJSONから形状(elements)と面別テクスチャを解決し、機械プレビューと同じ
