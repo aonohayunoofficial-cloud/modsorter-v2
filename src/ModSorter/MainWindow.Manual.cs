@@ -1,4 +1,5 @@
 ﻿using ModSorter.Architect.Generation;
+using ModSorter.Architect.Manual;
 using ModSorter.Architect.Preview;
 using System;
 using System.Collections.Generic;
@@ -21,11 +22,25 @@ public partial class MainWindow
     // 戸建てUserControlの変更通知を購読済みか（1回だけ購読するため）。
     private bool _manualParamsHooked = false;
 
+    // セレクタに ManualCatalog を流し込み済みか（初回だけ流す）。
+    private bool _manualCatalogLoaded = false;
+
+    // ItemsSource 差し替え中に SelectionChanged が走るのを抑止するフラグ。
+    private bool _manualSuppressSelector = false;
+
+    // 現在 ManualParamHost に載っている中分類 Id（差し替え要否の判定用）。
+    // XAML が初期内容として HouseParamsControl を載せているので "house" から始める。
+    // これによりタブ初回表示で同じUIを作り直さずに済む。
+    private string _manualCurrentSubId = "house";
+
     // トップメニューの「手動生成」ボタン → Tab 6。初回にプレビュー初期化＋初描画。
     private async void NavManual_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedIndex = 6;
         Log("手動生成モードを開きました。");
+
+        // 初回だけセレクタへマスター表を流し込む。
+        ManualEnsureCatalogLoaded();
 
         // アクティブな中分類UserControlの変更通知を購読する。
         HookActiveParams();
@@ -92,14 +107,21 @@ public partial class MainWindow
     }
 
     // アクティブな中分類UserControlの BuildSpec からspecを得て展開し、タブ内プレビューへ描画。
+    // 未実装の中分類を選んだときは Content が IManualParamControl ではないので、
+    // 前の中分類の生成物が残らないようプレビューを空にする。
     private async System.Threading.Tasks.Task ManualRebuildAndRenderAsync()
     {
         if (!_manualPreviewReady) return;
 
-        // 現状は戸建て(ManualHouseParams)のみ。中分類が増えたら
-        // ManualParamHost.Content を IManualParamControl として拾う形へ広げる。
-        var active = ManualParamHost?.Content as ModSorter.Architect.Manual.IManualParamControl;
-        if (active == null) return;
+        var active = ManualParamHost?.Content as IManualParamControl;
+        if (active == null)
+        {
+            _manualBlocks = null;
+            try { await ManualPreviewWeb.ExecuteScriptAsync("renderBlocks('[]')"); }
+            catch (Exception) { }
+            ManualStatus.Text = "この中分類は未実装です。";
+            return;
+        }
 
         var spec = active.BuildSpec(out var allowed, out var summary);
 
@@ -420,43 +442,100 @@ public partial class MainWindow
         }
     }
 
-    // ===== 大分類 → 中分類 セレクタ(フェーズ1.5) =====
-    // 現状は建築物→戸建ての1経路のみ。中分類が増えたら、選択に応じて
-    // ManualParamHost.Content へ対応UserControlを差し込む形へ広げる。
+    // ===== 大分類 → 中分類 セレクタ(フェーズ1.5 → フェーズ4でマスター表駆動へ) =====
+    // 中分類の一覧・表示名・UI生成関数は ManualCatalog が単一の正。
+    // 中分類を実装するときは ManualCatalog の該当行に factory を渡すだけでよい。
+
+    // 初回だけ大分類 ComboBox にマスター表を流し込む。
+    // 大分類の選択が中分類 ComboBox を連鎖更新し、そこで初期UIが載る。
+    private void ManualEnsureCatalogLoaded()
+    {
+        if (_manualCatalogLoaded) return;
+        if (ManualCategoryCombo == null || ManualSubCategoryCombo == null) return;
+
+        _manualSuppressSelector = true;
+        try
+        {
+            ManualCategoryCombo.ItemsSource = ManualCatalog.Categories;
+            ManualCategoryCombo.SelectedIndex = 0;
+        }
+        finally { _manualSuppressSelector = false; }
+
+        _manualCatalogLoaded = true;
+        ManualReloadSubCategories();
+    }
+
+    // 選択中の大分類に属する中分類を中分類 ComboBox へ流し込む。
+    // 既定選択は最初の実装済み中分類（無ければ先頭）。
+    private void ManualReloadSubCategories()
+    {
+        if (ManualSubCategoryCombo == null) return;
+
+        var category = ManualCategoryCombo?.SelectedItem as ManualCatalog.Category;
+        IReadOnlyList<ManualCatalog.SubCategory> subs =
+            category?.Subs ?? new List<ManualCatalog.SubCategory>();
+
+        int initial = 0;
+        for (int i = 0; i < subs.Count; i++)
+        {
+            if (subs[i].Implemented) { initial = i; break; }
+        }
+
+        _manualSuppressSelector = true;
+        try
+        {
+            ManualSubCategoryCombo.ItemsSource = subs;
+            ManualSubCategoryCombo.SelectedIndex = subs.Count > 0 ? initial : -1;
+        }
+        finally { _manualSuppressSelector = false; }
+
+        ManualApplySubCategory();
+    }
+
+    // 選択中の中分類に応じて ManualParamHost.Content を差し替える。
+    // 未実装なら案内テキストを載せる（IManualParamControl ではないので描画は空になる）。
+    private void ManualApplySubCategory()
+    {
+        if (ManualParamHost == null) return;
+
+        var sub = ManualSubCategoryCombo?.SelectedItem as ManualCatalog.SubCategory;
+        string subId = sub?.Id ?? "";
+        if (subId == _manualCurrentSubId) return;
+
+        if (sub?.Factory != null)
+        {
+            ManualParamHost.Content = sub.Factory();
+            HookActiveParams();
+        }
+        else
+        {
+            ManualParamHost.Content = new TextBlock
+            {
+                Text = sub == null
+                    ? "中分類を選択してください。"
+                    : $"「{sub.DisplayName}」は未実装です。実装済みの中分類を選んでください。",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (System.Windows.Media.Brush)FindResource("TextDim"),
+                FontFamily = (System.Windows.Media.FontFamily)FindResource("PixelFont"),
+                FontSize = 11,
+                Margin = new Thickness(0, 8, 0, 12)
+            };
+        }
+
+        _manualCurrentSubId = subId;
+    }
 
     private void ManualCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_manualPreviewReady) return;
+        if (_manualSuppressSelector) return;
+        ManualReloadSubCategories();
         ManualScheduleRender();
     }
 
     private void ManualSubCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // 選択中分類に応じて ManualParamHost.Content を差し替える。
-        string sub = (ManualSubCategoryCombo?.SelectedItem as ComboBoxItem)?.Tag as string ?? "house";
-
-        if (ManualParamHost != null)
-        {
-            var current = ManualParamHost.Content as ModSorter.Architect.Manual.IManualParamControl;
-            string currentTag = current switch
-            {
-                ModSorter.Architect.Manual.ApartmentParamsControl => "apartment",
-                ModSorter.Architect.Manual.HouseParamsControl => "house",
-                _ => ""
-            };
-
-            if (currentTag != sub)
-            {
-                ManualParamHost.Content = sub switch
-                {
-                    "apartment" => new ModSorter.Architect.Manual.ApartmentParamsControl(),
-                    _ => new ModSorter.Architect.Manual.HouseParamsControl()
-                };
-                HookActiveParams();
-            }
-        }
-
-        if (!_manualPreviewReady) return;
+        if (_manualSuppressSelector) return;
+        ManualApplySubCategory();
         ManualScheduleRender();
     }
 
