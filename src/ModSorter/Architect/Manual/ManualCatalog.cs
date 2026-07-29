@@ -80,7 +80,7 @@ public static class ManualCatalog
         Impl("house", "戸建て住宅", () => new HouseParamsControl(), "建物"),
         Impl("apartment", "集合住宅", () => new ApartmentParamsControl(), "建物"),
         Impl("factory", "工場", () => new FactoryParamsControl(), "建物"),
-        Todo("laboratory", "研究所", "建物"),
+        Impl("laboratory", "研究所", () => new LaboratoryParamsControl(), "建物"),
         Todo("warehouse", "倉庫", "建物"),
         Todo("shop", "店舗・商業施設", "建物"),
         Todo("office", "オフィスビル", "建物"),

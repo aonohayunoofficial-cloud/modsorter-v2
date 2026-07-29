@@ -135,6 +135,22 @@ public static class StructureExpander
         else
             BuildFlatRoof(cells, foot, h, roof);
 
+        // パラペット（陸屋根の立ち上がり）。平屋根のときだけ、屋根面(y=h-1)の外周を
+        // その上へ立ち上げる。研究所・倉庫・オフィスなど陸屋根の建物の輪郭を作る。
+        // マスクの縁(IsEdge)に沿って回すので、L字・コの字の平面でも内側角まで正しく続く。
+        // 勾配屋根では軒先と衝突して破綻するため flat 以外では作らない。
+        int parapet = Clamp(spec.ParapetHeight ?? 0, 0, 4);
+        if (parapet > 0 && roofType == "flat")
+        {
+            string parapetBlock = Pick(spec.ParapetBlock, allowedBlocks, wall);
+            foreach (var (x, z) in foot)
+            {
+                if (!IsEdge(foot, x, z)) continue;
+                for (int py = 1; py <= parapet; py++)
+                    cells[(x, h - 1 + py, z)] = parapetBlock;
+            }
+        }
+
         // 煙突。屋根生成の後に呼ぶ（各列の屋根の実際の最高yを見て、そこから上へ積むため）。
         // 本数0なら何もしない。素材は chimney_block → roof → wall の順で流用。
         if (spec.ChimneyCount > 0)

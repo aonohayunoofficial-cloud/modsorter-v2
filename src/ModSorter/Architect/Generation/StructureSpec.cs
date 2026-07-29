@@ -64,6 +64,13 @@ public sealed class StructureSpec
     // 鋸屋根・モニター屋根の垂直採光面に使うブロック。未指定ならガラス。
     [JsonPropertyName("glazing_block")] public string? GlazingBlock { get; set; }
 
+    // パラペット（陸屋根の立ち上がり）。屋根面の外周を屋根の上へ何マス立ち上げるか。
+    // 0（既定）でパラペットなし。対応する屋根形状は flat のみ（勾配屋根では無視される）。
+    [JsonPropertyName("parapet_height")] public int? ParapetHeight { get; set; }
+
+    // パラペットの素材。未指定なら wall_block を流用。
+    [JsonPropertyName("parapet_block")] public string? ParapetBlock { get; set; }
+
     // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
     [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 
