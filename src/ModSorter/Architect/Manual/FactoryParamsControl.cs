@@ -42,8 +42,6 @@ public sealed class FactoryParamsControl : UserControl, IManualParamControl
            .IntSlider("mh", "越屋根の高さ", 1, 8, 3)
            .EndGroup();
 
-        _ui.IntSlider("eave", "軒の出", 0, 3, 1);
-
         _ui.Heading("大型シャッター")
            .Choice("gateFace", "取り付け面", new[]
            {
@@ -207,11 +205,9 @@ public sealed class FactoryParamsControl : UserControl, IManualParamControl
             ChimneyThickness = _ui.GetChoice("chimneyThick", "medium"),
             ChimneyPierce = _ui.GetBool("chimneyPierce"),
             ChimneyBlock = _ui.GetBlock("chimneyBlock", roof),
-            EaveOverhang = _ui.GetInt("eave"),
-            EaveNorth = true,
-            EaveSouth = true,
-            EaveEast = true,
-            EaveWest = true
+            // 工場に軒は不要。鋸屋根・越屋根は BuildEaves が非対応で、
+            // 切妻・平屋根でも工場の外観としては軒を出さないため 0 固定。
+            EaveOverhang = 0
         };
 
         summary = $"{w}×{d}×{h} / 屋根={roofType} / シャッター{gates} / 煙突{spec.ChimneyCount}";
