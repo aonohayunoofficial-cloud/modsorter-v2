@@ -51,6 +51,19 @@ public sealed class StructureSpec
     // ドーム屋根(roof_type="dome")の高さ。未指定なら水平半径から自動。
     [JsonPropertyName("dome_height")] public int? DomeHeight { get; set; }
 
+    // 鋸屋根(roof_type="sawtooth")の山の数。0/未指定なら長さから自動（1山およそ6マス）。
+    [JsonPropertyName("sawtooth_bays")] public int? SawtoothBays { get; set; }
+
+    // モニター屋根(roof_type="monitor")の越し屋根の幅（傾斜方向のマス数）。
+    // 0/未指定なら傾斜方向のおよそ1/3。
+    [JsonPropertyName("monitor_width")] public int? MonitorWidth { get; set; }
+
+    // モニター屋根の立ち上がり高さ（棟から天面までのマス数）。0/未指定なら2。
+    [JsonPropertyName("monitor_height")] public int? MonitorHeight { get; set; }
+
+    // 鋸屋根・モニター屋根の垂直採光面に使うブロック。未指定ならガラス。
+    [JsonPropertyName("glazing_block")] public string? GlazingBlock { get; set; }
+
     // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
     [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 
@@ -218,6 +231,12 @@ public sealed class Opening
 
     // 下から何段目か（床のすぐ上=1）。door は通常1、window は1〜2あたり。
     [JsonPropertyName("level")] public int Level { get; set; } = 1;
+
+    // 開口の横幅（マス）。kind="gate"（大型シャッター/搬入口）のとき有効。0以下なら3。
+    [JsonPropertyName("width")] public int Width { get; set; }
+
+    // 開口の縦高さ（マス）。kind="gate" のとき有効。0以下なら3。
+    [JsonPropertyName("height")] public int Height { get; set; }
 
     // 窓に使うブロック（kind=window のとき）。未指定なら glass。
     [JsonPropertyName("block")] public string? Block { get; set; }
