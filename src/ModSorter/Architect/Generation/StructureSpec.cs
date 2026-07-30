@@ -82,6 +82,13 @@ public sealed class StructureSpec
     // 塔屋の壁材。未指定なら wall_block を流用。天面は roof_block。
     [JsonPropertyName("penthouse_block")] public string? PenthouseBlock { get; set; }
 
+    // 塔屋の寄せ方向。"center"（既定）| "north" | "south" | "east" | "west" |
+    // "northeast" | "northwest" | "southeast" | "southwest"（4隅寄せ）。
+    // north が z の小さい側、south が z の大きい側、west が x の小さい側、east が x の大きい側。
+    // 展開側は文字列に north/south/east/west が含まれるかで x・z の寄せを独立に決めるため、
+    // "north_east" のような区切り付きの表記でも同じ結果になる。
+    [JsonPropertyName("penthouse_align")] public string? PenthouseAlign { get; set; }
+
     // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
     [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 

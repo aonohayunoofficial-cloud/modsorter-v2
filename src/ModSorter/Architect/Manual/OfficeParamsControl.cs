@@ -33,6 +33,14 @@ public sealed class OfficeParamsControl : UserControl, IManualParamControl
            .IntSlider("phW", "塔屋の幅", 3, 32, 7)
            .IntSlider("phD", "塔屋の奥行", 3, 32, 7)
            .IntSlider("phH", "塔屋の高さ", 2, 12, 4)
+           .Choice("phAlign", "寄せ方向", new[]
+           {
+               ("中央", "center"),
+               ("北寄せ", "north"), ("南寄せ", "south"),
+               ("東寄せ", "east"), ("西寄せ", "west"),
+               ("北東の角", "northeast"), ("北西の角", "northwest"),
+               ("南東の角", "southeast"), ("南西の角", "southwest"),
+           }, "center")
            .EndGroup();
 
         _ui.Heading("窓")
@@ -196,6 +204,7 @@ public sealed class OfficeParamsControl : UserControl, IManualParamControl
             PenthouseDepth = penthouse ? Math.Min(_ui.GetInt("phD"), Math.Max(0, d - 4)) : 0,
             PenthouseHeight = penthouse ? _ui.GetInt("phH") : 0,
             PenthouseBlock = phBlock,
+            PenthouseAlign = _ui.GetChoice("phAlign", "center"),
             Openings = ops,
             ChimneyCount = 0,
             EaveOverhang = 0
@@ -203,6 +212,7 @@ public sealed class OfficeParamsControl : UserControl, IManualParamControl
 
         string phNote = spec.PenthouseHeight > 0
             ? $"塔屋{spec.PenthouseWidth}×{spec.PenthouseDepth}×{spec.PenthouseHeight}"
+              + $"({spec.PenthouseAlign})"
             : "塔屋なし";
         summary = $"{w}×{d} / {floors}階(階高{fh}) / パラペット{spec.ParapetHeight} / {phNote}";
         return spec;

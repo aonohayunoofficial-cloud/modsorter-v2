@@ -151,17 +151,36 @@ public static class StructureExpander
             }
         }
 
-        // 塔屋（屋上の機械室・階段室）。平屋根のときだけ、屋根面の中央に壁と天面を持つ
+        // 塔屋（屋上の機械室・階段室）。平屋根のときだけ、屋根面に壁と天面を持つ
         // 小さな箱を載せる。下の屋根面がそのまま塔屋の床になるので床は作らない。
-        // 中央寄せなのでパラペット（外周）とは干渉しない。勾配屋根では作らない。
+        // 位置は penthouse_align で決める。x 方向と z 方向の寄せを独立に見るので、
+        // "northeast" のような複合指定で4隅寄せになる。
+        //   center（既定）… 平面の中央。
+        //   north / south … z 方向の端寄せ（north = z 小側、south = z 大側）。
+        //   west / east   … x 方向の端寄せ（west = x 小側、east = x 大側）。
+        // 寄せたときはパラペットがあるぶん1マス内側に置き、パラペットの環を切らない。
+        // 勾配屋根では軒・棟と干渉するため作らない。
         int phH = Clamp(spec.PenthouseHeight ?? 0, 0, 12);
         int phW = Clamp(spec.PenthouseWidth ?? 0, 0, w);
         int phD = Clamp(spec.PenthouseDepth ?? 0, 0, d);
         if (phH > 0 && phW >= 3 && phD >= 3 && roofType == "flat")
         {
             string phBlock = Pick(spec.PenthouseBlock, allowedBlocks, wall);
-            int px0 = (w - phW) / 2;
-            int pz0 = (d - phD) / 2;
+            string phAlign = (spec.PenthouseAlign ?? "center").Trim().ToLowerInvariant();
+            int inset = parapet > 0 ? 1 : 0;
+
+            // 含まれる方角で x・z を別々に決める。両方含めば角寄せ、無ければ中央。
+            int px0 = phAlign.Contains("west") ? inset
+                    : phAlign.Contains("east") ? w - phW - inset
+                    : (w - phW) / 2;
+            int pz0 = phAlign.Contains("north") ? inset
+                    : phAlign.Contains("south") ? d - phD - inset
+                    : (d - phD) / 2;
+
+            // 寄せた結果が平面から出ないよう最後にクランプする。
+            px0 = Clamp(px0, 0, Math.Max(0, w - phW));
+            pz0 = Clamp(pz0, 0, Math.Max(0, d - phD));
+
             for (int x = px0; x < px0 + phW; x++)
                 for (int z = pz0; z < pz0 + phD; z++)
                 {
