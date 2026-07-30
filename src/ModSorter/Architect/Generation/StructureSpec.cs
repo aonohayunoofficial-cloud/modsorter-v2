@@ -71,6 +71,17 @@ public sealed class StructureSpec
     // パラペットの素材。未指定なら wall_block を流用。
     [JsonPropertyName("parapet_block")] public string? ParapetBlock { get; set; }
 
+    // 塔屋（屋上の機械室・階段室）の平面寸法。3未満なら塔屋を作らない。
+    [JsonPropertyName("penthouse_width")] public int? PenthouseWidth { get; set; }
+    [JsonPropertyName("penthouse_depth")] public int? PenthouseDepth { get; set; }
+
+    // 塔屋の高さ（屋根面から上へ何マス）。0/未指定で塔屋なし。
+    // 対応する屋根形状は flat のみ（勾配屋根では無視される）。
+    [JsonPropertyName("penthouse_height")] public int? PenthouseHeight { get; set; }
+
+    // 塔屋の壁材。未指定なら wall_block を流用。天面は roof_block。
+    [JsonPropertyName("penthouse_block")] public string? PenthouseBlock { get; set; }
+
     // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
     [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 

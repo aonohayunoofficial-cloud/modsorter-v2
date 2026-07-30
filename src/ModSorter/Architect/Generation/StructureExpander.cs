@@ -151,6 +151,33 @@ public static class StructureExpander
             }
         }
 
+        // 塔屋（屋上の機械室・階段室）。平屋根のときだけ、屋根面の中央に壁と天面を持つ
+        // 小さな箱を載せる。下の屋根面がそのまま塔屋の床になるので床は作らない。
+        // 中央寄せなのでパラペット（外周）とは干渉しない。勾配屋根では作らない。
+        int phH = Clamp(spec.PenthouseHeight ?? 0, 0, 12);
+        int phW = Clamp(spec.PenthouseWidth ?? 0, 0, w);
+        int phD = Clamp(spec.PenthouseDepth ?? 0, 0, d);
+        if (phH > 0 && phW >= 3 && phD >= 3 && roofType == "flat")
+        {
+            string phBlock = Pick(spec.PenthouseBlock, allowedBlocks, wall);
+            int px0 = (w - phW) / 2;
+            int pz0 = (d - phD) / 2;
+            for (int x = px0; x < px0 + phW; x++)
+                for (int z = pz0; z < pz0 + phD; z++)
+                {
+                    // 非矩形平面では屋根が無い位置に浮かせないよう、マスク内だけに置く。
+                    if (!foot.Contains((x, z))) continue;
+
+                    bool edge = x == px0 || x == px0 + phW - 1 ||
+                                z == pz0 || z == pz0 + phD - 1;
+                    if (edge)
+                        for (int py = 1; py < phH; py++)
+                            cells[(x, h - 1 + py, z)] = phBlock;
+
+                    cells[(x, h - 1 + phH, z)] = roof;
+                }
+        }
+
         // 煙突。屋根生成の後に呼ぶ（各列の屋根の実際の最高yを見て、そこから上へ積むため）。
         // 本数0なら何もしない。素材は chimney_block → roof → wall の順で流用。
         if (spec.ChimneyCount > 0)
