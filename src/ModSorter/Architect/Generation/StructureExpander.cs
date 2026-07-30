@@ -301,6 +301,28 @@ public static class StructureExpander
             BuildEaves(cells, foot, spec, w, d, h, roof, roofType, eave);
         }
 
+        // 縁側／基壇の縁（veranda）。平面の外側へ y=0 の床を敷き足す。
+        // 深い軒の下に回り縁ができ、寺社の「軒下に縁がある」輪郭になる。
+        // 軒と同じく負座標を一時的に許し、直後の一括シフトで 0 以上へ寄せる。
+        int veranda = Math.Clamp(spec.VerandaWidth ?? 0, 0, 4);
+        if (veranda > 0)
+        {
+            string verandaBlock = Pick(
+                spec.VerandaBlock ?? spec.BaseBlock ?? spec.FloorBlock, allowedBlocks, wall);
+            BuildVeranda(cells, foot, w, d, veranda, verandaBlock);
+        }
+
+        // 塔（鐘塔・尖塔・ミナレット）。平面内に正方形の塔を立て、屋根より上へ突き出す。
+        // 屋根形状を問わないので、切妻の教会・ドームのモスク・陸屋根のどれにも載る。
+        // 必ず軒の後に呼ぶ。軒は「その列の屋根の実際の最高y」を走査して高さを決めるため、
+        // 先に塔を立てると塔の頂部の高さで軒が張り出して破綻する。
+        if ((spec.TowerWidth ?? 0) >= 3 && (spec.TowerHeight ?? 0) >= 1)
+        {
+            string towerBlock = Pick(spec.TowerBlock ?? spec.WallBlock, allowedBlocks, wall);
+            string towerRoofBlock = Pick(spec.TowerRoofBlock ?? spec.RoofBlock, allowedBlocks, roof);
+            BuildTower(cells, foot, spec, w, d, h, towerBlock, towerRoofBlock);
+        }
+
         // 全ブロックの最小座標を求め、負のぶんだけ全体をシフトして 0 起点に正規化する。
         // 軒で x=-1/z=-1 が出ても、ここで +eave 相当のシフトがかかり負座標は消える。
         // StructureNbtWriter は負座標を書けないため、この正規化は必須。
@@ -391,6 +413,215 @@ public static class StructureExpander
         FillCorner(ee && en, w - 1, 0, +1, -1);      // 北東
         FillCorner(ew && es, 0, d - 1, -1, +1);      // 南西
         FillCorner(ee && es, w - 1, d - 1, +1, +1);  // 南東
+    }
+
+    // 縁側／基壇の縁: 平面マスクの外側へ v マスぶん、y=0 に床を敷き足す。
+    // マスク内のどのマスからチェビシェフ距離 v 以内かで判定するので、
+    // L字・十字などの非矩形でも輪郭に沿って回り縁ができる（角が欠けない）。
+    // 建物の真下は既に床があるので触らない。軒と同じく負座標を一時的に作る。
+    private static void BuildVeranda(
+        Dictionary<(int x, int y, int z), string> cells,
+        HashSet<(int x, int z)> foot, int w, int d, int v, string block)
+    {
+        if (v <= 0) return;
+
+        for (int x = -v; x < w + v; x++)
+            for (int z = -v; z < d + v; z++)
+            {
+                if (foot.Contains((x, z))) continue;
+
+                bool near = false;
+                for (int ox = -v; ox <= v && !near; ox++)
+                    for (int oz = -v; oz <= v; oz++)
+                        if (foot.Contains((x + ox, z + oz))) { near = true; break; }
+
+                if (near) cells[(x, 0, z)] = block;
+            }
+    }
+
+    // 塔（鐘塔・尖塔・ミナレット）: 建物の平面内に正方形の塔を立て、屋根より上へ突き出す。
+    // 四周の壁を y=1 から塔の上端(topY = h-1+tower_height)まで塞ぎ、内側は抜いて吹き抜けにする。
+    // 内側を抜くと下の屋根面に穴が空くが、四周の壁と頂部で覆われるので外から内部は見えない。
+    // 位置は tower_align、頂部の形は tower_roof で決める。
+    // 塔は開口部の適用より後に作られるため、正面中央に塔を置くと壁に開けたドア・大開口が
+    // 塔の壁で塞がれる。正面側の外周に接する塔には足元の入口をここで開け直す。
+    private static void BuildTower(
+        Dictionary<(int x, int y, int z), string> cells,
+        HashSet<(int x, int z)> foot, StructureSpec spec,
+        int w, int d, int h, string tower, string roof)
+    {
+        int s = Clamp(spec.TowerWidth ?? 0, 0, Math.Min(w, d));
+        int th = Clamp(spec.TowerHeight ?? 0, 0, 32);
+        if (s < 3 || th < 1) return;
+
+        string align = (spec.TowerAlign ?? "front").Trim().ToLowerInvariant();
+        string cap = (spec.TowerRoof ?? "spire").Trim().ToLowerInvariant();
+        string face = (spec.FacadeFace ?? "south").Trim().ToLowerInvariant();
+        if (face != "north" && face != "south" && face != "east" && face != "west")
+            face = "south";
+
+        int topY = h - 1 + th;               // 塔の壁の上端
+        int cx = (w - s) / 2, cz = (d - s) / 2;
+        int xMax = Math.Max(0, w - s), zMax = Math.Max(0, d - s);
+
+        // 塔の左手前角(x0,z0)を align から作る。正面は facade_face で決まる。
+        var spots = new List<(int x0, int z0)>();
+        switch (align)
+        {
+            case "center":
+                spots.Add((cx, cz));
+                break;
+
+            case "rear":
+                if (face == "south") spots.Add((cx, 0));
+                else if (face == "north") spots.Add((cx, zMax));
+                else if (face == "east") spots.Add((0, cz));
+                else spots.Add((xMax, cz));
+                break;
+
+            case "front_corners":
+                if (face == "south" || face == "north")
+                {
+                    int fz = face == "south" ? zMax : 0;
+                    spots.Add((0, fz));
+                    spots.Add((xMax, fz));
+                }
+                else
+                {
+                    int fx = face == "east" ? xMax : 0;
+                    spots.Add((fx, 0));
+                    spots.Add((fx, zMax));
+                }
+                break;
+
+            case "four_corners":
+                spots.Add((0, 0));
+                spots.Add((xMax, 0));
+                spots.Add((0, zMax));
+                spots.Add((xMax, zMax));
+                break;
+
+            default: // "front"
+                if (face == "south") spots.Add((cx, zMax));
+                else if (face == "north") spots.Add((cx, 0));
+                else if (face == "east") spots.Add((xMax, cz));
+                else spots.Add((0, cz));
+                break;
+        }
+
+        foreach (var (rx0, rz0) in spots)
+        {
+            int x0 = Clamp(rx0, 0, xMax);
+            int z0 = Clamp(rz0, 0, zMax);
+            int x1 = x0 + s - 1, z1 = z0 + s - 1;
+
+            // 平面マスクから外れる位置（L字の欠けの上など）には立てない。宙抜けを防ぐ。
+            bool inMask = true;
+            for (int x = x0; x <= x1 && inMask; x++)
+                for (int z = z0; z <= z1; z++)
+                    if (!foot.Contains((x, z))) { inMask = false; break; }
+            if (!inMask) continue;
+
+            // 内側は吹き抜け。屋根・中間床・パラペットが塔の中に残ると頂部と二重になるので抜く。
+            for (int x = x0 + 1; x <= x1 - 1; x++)
+                for (int z = z0 + 1; z <= z1 - 1; z++)
+                    for (int y = 1; y <= topY; y++)
+                        cells.Remove((x, y, z));
+
+            // 四周の壁。y=1 から上端まで塞ぐ。
+            for (int y = 1; y <= topY; y++)
+                for (int x = x0; x <= x1; x++)
+                    for (int z = z0; z <= z1; z++)
+                    {
+                        if (x != x0 && x != x1 && z != z0 && z != z1) continue;
+                        cells[(x, y, z)] = tower;
+                    }
+
+            // 鐘楼の開口。上端の2段だけ四面の中央を抜く。建物の壁の高さより下は抜かない。
+            if (spec.TowerBelfry && th >= 4)
+            {
+                int bm = s / 2;
+                for (int y = topY - 2; y <= topY - 1; y++)
+                {
+                    if (y <= h - 1) continue;
+                    cells.Remove((x0 + bm, y, z0));
+                    cells.Remove((x0 + bm, y, z1));
+                    cells.Remove((x0, y, z0 + bm));
+                    cells.Remove((x1, y, z0 + bm));
+                }
+            }
+
+            // 足元の入口。塔が正面側の外周に接しているときだけ、その面の中央を抜く。
+            bool touchFront =
+                (face == "south" && z1 == d - 1) ||
+                (face == "north" && z0 == 0) ||
+                (face == "east" && x1 == w - 1) ||
+                (face == "west" && x0 == 0);
+            if (touchFront)
+            {
+                int doorW = s >= 5 ? 3 : 1;
+                int doorH = Clamp(h - 2, 2, 4);
+                int mx = x0 + s / 2, mz = z0 + s / 2;
+                for (int y = 1; y <= doorH; y++)
+                    for (int o = -(doorW / 2); o <= doorW / 2; o++)
+                    {
+                        if (face == "south") cells.Remove((mx + o, y, z1));
+                        else if (face == "north") cells.Remove((mx + o, y, z0));
+                        else if (face == "east") cells.Remove((x1, y, mz + o));
+                        else cells.Remove((x0, y, mz + o));
+                    }
+            }
+
+            BuildTowerCap(cells, x0, z0, s, topY, cap, roof);
+        }
+    }
+
+    // 塔の頂部。spire=尖塔（2段ごとに1マス絞る）、dome=丸屋根、flat=陸屋根。
+    // どの形でも最初に s×s を全面へ敷き、塔の吹き抜けを確実に塞ぐ。
+    private static void BuildTowerCap(
+        Dictionary<(int x, int y, int z), string> cells,
+        int x0, int z0, int s, int topY, string cap, string roof)
+    {
+        int x1 = x0 + s - 1, z1 = z0 + s - 1;
+
+        for (int x = x0; x <= x1; x++)
+            for (int z = z0; z <= z1; z++)
+                cells[(x, topY + 1, z)] = roof;
+
+        if (cap == "flat") return;
+
+        if (cap == "dome")
+        {
+            // 半球。段ごとの水平半径を球の式で求め、円板を敷く（中実なので穴が空かない）。
+            double r = (s - 1) / 2.0;
+            double ccx = x0 + r, ccz = z0 + r;
+            int hr = Math.Max(2, (int)Math.Round(r));
+            for (int k = 1; k <= hr; k++)
+            {
+                double t = (double)k / hr;
+                double rr = r * Math.Sqrt(Math.Max(0.0, 1.0 - t * t));
+                for (int x = x0; x <= x1; x++)
+                    for (int z = z0; z <= z1; z++)
+                    {
+                        double dx = x - ccx, dz = z - ccz;
+                        if (dx * dx + dz * dz <= (rr + 0.5) * (rr + 0.5))
+                            cells[(x, topY + 1 + k, z)] = roof;
+                    }
+            }
+            return;
+        }
+
+        // 尖塔: 2段ごとに全周を1マスずつ内側へ絞る。1段ごとに絞る四角錐より鋭く伸びる。
+        for (int k = 1; ; k++)
+        {
+            int inset = k / 2;
+            int ax0 = x0 + inset, ax1 = x1 - inset;
+            int az0 = z0 + inset, az1 = z1 - inset;
+            if (ax0 > ax1 || az0 > az1) break;
+            for (int x = ax0; x <= ax1; x++)
+                for (int z = az0; z <= az1; z++)
+                    cells[(x, topY + 1 + k, z)] = roof;
+        }
     }
 
     // ===== フットプリント（平面形状マスク）=====

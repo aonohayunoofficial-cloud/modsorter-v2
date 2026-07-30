@@ -96,6 +96,40 @@ public sealed class StructureSpec
     // "north" | "south" | "east" | "west"。未指定なら "south"。
     [JsonPropertyName("facade_face")] public string? FacadeFace { get; set; }
 
+    // ===== 塔（鐘塔・尖塔・ミナレット）=====
+    // 建物の平面内に立てる正方形の塔の一辺（マス）。3未満/未指定なら塔なし。
+    [JsonPropertyName("tower_width")] public int? TowerWidth { get; set; }
+
+    // 塔の高さ（壁の上端 y=height-1 から塔の壁の上端まで何マス）。0/未指定なら塔なし。
+    // penthouse と違い屋根形状を問わず作る。棟より低いと屋根に埋まる。
+    [JsonPropertyName("tower_height")] public int? TowerHeight { get; set; }
+
+    // 塔の位置。"front"（既定・正面の中央） | "front_corners"（正面の両角） |
+    // "four_corners"（四隅） | "center"（平面の中央） | "rear"（背面の中央）。
+    // 「正面」は facade_face で決まる。
+    [JsonPropertyName("tower_align")] public string? TowerAlign { get; set; }
+
+    // 塔の頂部の形。"spire"（既定・尖塔） | "dome"（丸屋根） | "flat"（陸屋根）。
+    [JsonPropertyName("tower_roof")] public string? TowerRoof { get; set; }
+
+    // 塔の壁材。未指定なら wall_block を流用。
+    [JsonPropertyName("tower_block")] public string? TowerBlock { get; set; }
+
+    // 塔の頂部の素材。未指定なら roof_block を流用。
+    [JsonPropertyName("tower_roof_block")] public string? TowerRoofBlock { get; set; }
+
+    // 鐘楼の開口を作るか。true で塔の上端付近の四面中央を抜く（tower_height が4以上のとき）。
+    [JsonPropertyName("tower_belfry")] public bool TowerBelfry { get; set; }
+
+    // ===== 縁側／基壇の縁 =====
+    // 平面の外側へこの幅だけ、y=0 に床を敷き足す（マス）。0/未指定なら無し。
+    // 寺社の縁（深い軒の下の回り縁）、神殿の基壇の縁石に使う。
+    // 軒と同じく一時的に負座標を作るが、ExpandCore 末尾の一括シフトで 0 以上へ寄る。
+    [JsonPropertyName("veranda_width")] public int? VerandaWidth { get; set; }
+
+    // 縁側に使う素材。未指定なら base_block → floor_block を流用。
+    [JsonPropertyName("veranda_block")] public string? VerandaBlock { get; set; }
+
     // 全体の構造タイプ。"building"（既定・通常の建物。床/壁/屋根/開口部のロジックを通す）
     // または特殊形状。特殊形状は床/壁/屋根/開口部を一切作らず、専用ビルダーが座標を作る。
     // "building"（既定） | "ramp"（スロープ） | "bridge"（橋） | "ship"（船）。今後 pool 等を追加予定。
