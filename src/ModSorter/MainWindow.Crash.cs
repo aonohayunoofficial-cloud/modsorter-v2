@@ -15,22 +15,58 @@ public partial class MainWindow : Window
     {
         CrashFileList.Items.Clear();
         if (string.IsNullOrEmpty(_instancePath)) return;
-        var dir = Path.Combine(_instancePath, "crash-reports");
-        if (!Directory.Exists(dir))
+
+        int crashCount = 0, logCount = 0;
+
+        // クラッシュレポート(crash-reports\*.txt)
+        var crashDir = Path.Combine(_instancePath, "crash-reports");
+        if (Directory.Exists(crashDir))
+        {
+            foreach (var f in Directory.GetFiles(crashDir, "*.txt")
+                                       .OrderByDescending(File.GetLastWriteTime))
+            {
+                CrashFileList.Items.Add(new CrashFileItem
+                {
+                    FullPath = f,
+                    Display = $"[レポート] {File.GetLastWriteTime(f):yyyy-MM-dd HH:mm}  " +
+                              $"{Path.GetFileName(f)}"
+                });
+                crashCount++;
+            }
+        }
+        else
         {
             Log("crash-reports\\ が見つかりません。");
-            return;
         }
-        foreach (var f in Directory.GetFiles(dir, "*.txt")
-                                   .OrderByDescending(File.GetLastWriteTime))
+
+        // 実行ログ(logs\*.log / *.log.gz)。latest.log を必ず先頭に置き、古い分は30件まで。
+        var logDir = Path.Combine(_instancePath, "logs");
+        if (Directory.Exists(logDir))
         {
-            CrashFileList.Items.Add(new CrashFileItem
+            var logs = Directory.GetFiles(logDir, "*.log")
+                .Concat(Directory.GetFiles(logDir, "*.log.gz"))
+                .OrderByDescending(f => Path.GetFileName(f)
+                    .Equals("latest.log", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(File.GetLastWriteTime)
+                .Take(30);
+
+            foreach (var f in logs)
             {
-                FullPath = f,
-                Display = $"{File.GetLastWriteTime(f):yyyy-MM-dd HH:mm}  {Path.GetFileName(f)}"
-            });
+                CrashFileList.Items.Add(new CrashFileItem
+                {
+                    FullPath = f,
+                    Display = $"[ログ] {File.GetLastWriteTime(f):yyyy-MM-dd HH:mm}  " +
+                              $"{Path.GetFileName(f)}"
+                });
+                logCount++;
+            }
         }
-        Log($"{CrashFileList.Items.Count} 件のクラッシュレポートを検出しました。");
+        else
+        {
+            Log("logs\\ が見つかりません。");
+        }
+
+        Log($"クラッシュレポート {crashCount} 件 / 実行ログ {logCount} 件を検出しました。");
     }
 
     private void CrashFile_Selected(object sender, SelectionChangedEventArgs e)
@@ -41,33 +77,63 @@ public partial class MainWindow : Window
     {
         if (CrashFileList.SelectedItem is not CrashFileItem item)
         {
-            MessageBox.Show("レポートを選択してください。", "ModSorter",
+            MessageBox.Show("レポートまたはログを選択してください。", "ModSorter",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var result = CrashAnalyzer.Analyze(item.FullPath);
+        // 拡張子で解析器を振り分ける。*.log / *.log.gz は実行ログ、それ以外はレポート。
+        bool isLog =
+            item.FullPath.EndsWith(".log", StringComparison.OrdinalIgnoreCase) ||
+            item.FullPath.EndsWith(".log.gz", StringComparison.OrdinalIgnoreCase);
+
+        var result = isLog
+            ? LogAnalyzer.Analyze(item.FullPath)
+            : CrashAnalyzer.Analyze(item.FullPath);
+
+        // ログ解析は jar 名を持たないので、スキャン済みの _mods から ModId で補う。
+        // これで右詳細のリンクと削除ボタンがレポート解析と同じように使える。
+        if (isLog)
+        {
+            foreach (var issue in result.Issues)
+            {
+                if (!string.IsNullOrEmpty(issue.ModFile)) continue;
+                if (string.IsNullOrEmpty(issue.ModId)) continue;
+                var hit = _mods.FirstOrDefault(m =>
+                    string.Equals(m.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
+                if (hit != null) issue.ModFile = hit.FileName;
+            }
+        }
+
+        string env = "";
+        if (!string.IsNullOrEmpty(result.MinecraftVersion))
+            env = $"Minecraft {result.MinecraftVersion}";
+        if (!string.IsNullOrEmpty(result.Loader))
+            env += (env.Length > 0 ? " / " : "") + result.Loader;
+
+        string missingText = result.MissingDependencies.Count > 0
+            ? $"\n不足している前提MOD: {string.Join(", ", result.MissingDependencies)}"
+            : "";
 
         // 中央サマリ
-        if (!result.ParsedAsModLoading)
+        if (isLog)
+        {
+            string head = env.Length > 0 ? env + "\n" : "";
+            string tail = string.IsNullOrEmpty(result.Description)
+                ? "" : $"\n{result.Description}";
+            CrashSummary.Text = result.Issues.Count == 0
+                ? head + "実行ログから問題は検出されませんでした。" + tail
+                : head + $"実行ログの解析: {result.Issues.Count} 件{missingText}" + tail;
+        }
+        else if (!result.ParsedAsModLoading)
         {
             CrashSummary.Text = "MODロード失敗形式として解析できませんでした。" +
                 "別の種類のクラッシュの可能性があります。";
         }
         else
         {
-            string env = "";
-            if (!string.IsNullOrEmpty(result.MinecraftVersion))
-                env = $"Minecraft {result.MinecraftVersion}";
-            if (!string.IsNullOrEmpty(result.Loader))
-                env += (env.Length > 0 ? " / " : "") + result.Loader;
-
-            string missing = result.MissingDependencies.Count > 0
-                ? $"\n不足している前提MOD: {string.Join(", ", result.MissingDependencies)}"
-                : "";
-
             CrashSummary.Text =
-                $"{env}\nMODロード失敗: {result.Issues.Count} 件{missing}";
+                $"{env}\nMODロード失敗: {result.Issues.Count} 件{missingText}";
         }
 
         // 中央リストに issue をバインド
@@ -76,8 +142,8 @@ public partial class MainWindow : Window
         // 右詳細は一旦クリア
         ClearCrashDetail();
 
-        Log($"クラッシュ解析: {Path.GetFileName(item.FullPath)} → " +
-            $"ロード失敗 {result.Issues.Count} 件");
+        Log($"{(isLog ? "ログ解析" : "クラッシュ解析")}: {Path.GetFileName(item.FullPath)} → " +
+            $"{result.Issues.Count} 件");
     }
 
     // クラッシュ詳細パネルで現在表示中のMODのURL
