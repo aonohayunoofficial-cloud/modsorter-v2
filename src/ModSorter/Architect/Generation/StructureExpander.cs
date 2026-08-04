@@ -113,7 +113,7 @@ public static class StructureExpander
                     cells[(x, 0, z)] = baseBlock;
         }
 
-        // 屋根（roof_type で分岐）。非矩形フットプリントのときは gable/dome/pyramid が
+        // 屋根（roof_type で分岐）。非矩形フットプリントのときは gable/dome/pyramid/spire が
         // 矩形前提のため崩れる。安全側として flat にフォールバックし、平屋根をマスクに沿わせる。
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
         if (!rectangular)
@@ -132,6 +132,8 @@ public static class StructureExpander
             BuildDomeRoof(cells, spec, w, d, h, roof);
         else if (roofType == "pyramid")
             BuildPyramidRoof(cells, w, d, h, roof);
+        else if (roofType == "spire")
+            BuildSpireRoof(cells, spec, w, d, h, roof);
         else
             BuildFlatRoof(cells, foot, h, roof);
 
@@ -139,15 +141,22 @@ public static class StructureExpander
         // その上へ立ち上げる。研究所・倉庫・オフィスなど陸屋根の建物の輪郭を作る。
         // マスクの縁(IsEdge)に沿って回すので、L字・コの字の平面でも内側角まで正しく続く。
         // 勾配屋根では軒先と衝突して破綻するため flat 以外では作らない。
+        // parapet_crenel が true なら最上段だけを周期的に抜いて狭間（城の胸壁）にする。
+        // 抜くのは最上段のみなので、下に必ず1段以上の環が残り屋根面は外から見えない。
         int parapet = Clamp(spec.ParapetHeight ?? 0, 0, 4);
         if (parapet > 0 && roofType == "flat")
         {
             string parapetBlock = Pick(spec.ParapetBlock, allowedBlocks, wall);
+            int crenelStep = spec.ParapetCrenel ? Clamp(spec.ParapetCrenelStep ?? 3, 2, 6) : 0;
             foreach (var (x, z) in foot)
             {
                 if (!IsEdge(foot, x, z)) continue;
                 for (int py = 1; py <= parapet; py++)
+                {
+                    if (crenelStep > 0 && py == parapet && IsCrenelGap(foot, x, z, crenelStep))
+                        continue;
                     cells[(x, h - 1 + py, z)] = parapetBlock;
+                }
             }
         }
 
@@ -437,6 +446,45 @@ public static class StructureExpander
 
                 if (near) cells[(x, 0, z)] = block;
             }
+    }
+
+    // 尖塔（spire）の頂部: 壁の上端を全面で塞いだうえで、全周を周期的に1マスずつ
+    // 内側へ絞りながら上へ積む。四角錐(pyramid)より鋭く高い輪郭になる。
+    // 絞る周期は roof_pitch を流用する。1=1段ごと（四角錐と同じ45°）、
+    // 大きいほど段数が増えて細く鋭く伸びる（4で最も鋭い）。
+    // 中実なので隙間は原理的に空かない。矩形平面のときだけ呼ばれる。
+    private static void BuildSpireRoof(
+        Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, int w, int d, int h, string roof)
+    {
+        for (int x = 0; x < w; x++)
+            for (int z = 0; z < d; z++)
+                cells[(x, h - 1, z)] = roof;
+
+        int per = Clamp(spec.RoofPitch ?? 2, 1, 4);
+
+        for (int k = 1; ; k++)
+        {
+            int inset = k / per;
+            int x0 = inset, x1 = w - 1 - inset;
+            int z0 = inset, z1 = d - 1 - inset;
+            if (x0 > x1 || z0 > z1) break;
+            for (int x = x0; x <= x1; x++)
+                for (int z = z0; z <= z1; z++)
+                    cells[(x, h - 1 + k, z)] = roof;
+        }
+    }
+
+    // 狭間（クレネル）の位置か。縁がどちら向きに走っているかを隣接セルの有無で判定し、
+    // x 方向に走る縁は x、z 方向に走る縁は z を周期で見る。向かい合う壁で狭間が揃う。
+    // 両方向の隣がある／どちらも無い位置（角・出隅入隅・孤立点）は矢壁を残して false。
+    private static bool IsCrenelGap(HashSet<(int x, int z)> foot, int x, int z, int step)
+    {
+        bool alongX = foot.Contains((x - 1, z)) && foot.Contains((x + 1, z));
+        bool alongZ = foot.Contains((x, z - 1)) && foot.Contains((x, z + 1));
+        if (alongX == alongZ) return false;
+        int i = alongX ? x : z;
+        return ((i % step) + step) % step == step - 1;
     }
 
     // 塔（鐘塔・尖塔・ミナレット）: 建物の平面内に正方形の塔を立て、屋根より上へ突き出す。

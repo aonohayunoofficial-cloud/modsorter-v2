@@ -71,6 +71,16 @@ public sealed class StructureSpec
     // パラペットの素材。未指定なら wall_block を流用。
     [JsonPropertyName("parapet_block")] public string? ParapetBlock { get; set; }
 
+    // パラペットの最上段に狭間（クレネル）を抜くか。true で矢壁と狭間の凹凸になる。
+    // 抜くのは最上段だけなので、下の段が環として残り屋根面は隠れたまま。
+    // parapet_height が0のときは無視される（flat 以外でも無視）。
+    [JsonPropertyName("parapet_crenel")] public bool ParapetCrenel { get; set; }
+
+    // 狭間の周期（マス）。3（既定）で「矢壁2マス＋狭間1マス」。2〜6にクランプ。
+    // 縁が x 方向に走る位置は x、z 方向に走る位置は z を周期で判定するので、
+    // 向かい合う壁の狭間が揃う。角（両方向の縁が交わる位置）は必ず矢壁を残す。
+    [JsonPropertyName("parapet_crenel_step")] public int? ParapetCrenelStep { get; set; }
+
     // 塔屋（屋上の機械室・階段室）の平面寸法。3未満なら塔屋を作らない。
     [JsonPropertyName("penthouse_width")] public int? PenthouseWidth { get; set; }
     [JsonPropertyName("penthouse_depth")] public int? PenthouseDepth { get; set; }

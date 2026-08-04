@@ -85,7 +85,7 @@ public static class ManualCatalog
         Impl("shop", "店舗・商業施設", () => new ShopParamsControl(), "建物"),
         Impl("office", "オフィスビル", () => new OfficeParamsControl(), "建物"),
         Impl("religious", "宗教建築", () => new ReligiousParamsControl(), "建物"),
-        Todo("tower", "塔", "建物"),
+        Impl("tower", "塔", () => new TowerParamsControl(), "建物"),
         Todo("monument", "記念建築", "建物"),
         Todo("event_venue", "屋外イベント会場", "建物"),
         Todo("public_facility", "公共施設", "建物"),
