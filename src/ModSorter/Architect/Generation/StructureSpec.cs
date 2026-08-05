@@ -179,18 +179,25 @@ public sealed class StructureSpec
     // 確定的に導く＝同じ寸法なら毎回同じ船種。値を変えると同寸法でも別の船種になる。
     [JsonPropertyName("ship_seed")] public int ShipSeed { get; set; }
 
+    // 入口の自動生成を止めるか。true で「door が1つも無ければ正面中央に1つ開ける」保証を
+    // 通さない。記念碑・オベリスク・台座のように穴を開けてはいけない塊のための指定。
+    // openings に明示したドア・アーチ・大開口は true でもそのまま適用される。
+    [JsonPropertyName("no_entrance")] public bool NoEntrance { get; set; }
+
     // 開口部（窓・ドア）。面と面内の相対位置で指定する。
     [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
 
     // ===== 平面形状（フットプリント）=====
     // 建物の平面(X-Z)を矩形以外にするための指定。未指定なら従来どおり width×depth の矩形。
     // 展開は StructureExpander.BuildFootprint が確定的に行い、床・土台・壁・平屋根は
-    // このマスクの範囲だけに作られる。非矩形のときは屋根が自動で "flat" に、
-    // 様式が "walled" 相当にフォールバックする（gable/dome/pyramid/colonnade/temple は
-    // 矩形前提のため。将来のフェーズで対応予定）。
+    // このマスクの範囲だけに作られる。非矩形のときは様式が "walled" 相当にフォールバックし、
+    // 棟や軒が矩形前提の屋根（gable/gable_stairs/shed/sawtooth/monitor）は "flat" に寄る。
+    // 頂冠形（dome/pyramid/spire）はマスクに沿って絞れるので、平面が "circle"（かつ
+    // footprint_add/footprint_sub が空）のときだけ非矩形でもそのまま使える。
     //
     // 形状の決め方（後勝ちではなく集合演算）:
-    //   1. footprint_shape のプリセットで大枠を作る（"rect" 既定 / "l" / "u" / "t" / "plus"）。
+    //   1. footprint_shape のプリセットで大枠を作る
+    //      （"rect" 既定 / "l" / "u" / "t" / "plus" / "circle"）。
     //   2. footprint_add の矩形をすべて OR で足す。
     //   3. footprint_sub の矩形をすべて削る（最後に一括で引く）。
     // add をすべて足してから sub をすべて引くため、add 同士・sub 同士の順序は結果に影響しない。
@@ -200,6 +207,8 @@ public sealed class StructureSpec
     // プリセット "u"（コの字）: 手前(z大側)の中央を削り込む。開口幅は cut_w、深さは cut_d。
     // プリセット "t"（T字）: 縦棒＋横棒。横棒は z 小側、縦棒は中央。太さは cut_w / cut_d。
     // プリセット "plus"（十字）: 中央の縦帯＋横帯。帯の太さは cut_w / cut_d。
+    // プリセット "circle"（円形）: width×depth を直径とする楕円。cut_w / cut_d は使わない。
+    //   壁は円周1マス厚のリングになる。記念柱・円形霊廟・灯台・サイロに使う。
     [JsonPropertyName("footprint_shape")] public string? FootprintShape { get; set; }
 
     // プリセットの寸法パラメータ（省略可）。cut_w は x 方向、cut_d は z 方向の切り欠き/帯幅。

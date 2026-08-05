@@ -82,6 +82,23 @@ public static partial class StructureExpander
                 }
                 break;
 
+            case "circle":
+                // 円形: w×d を直径とする楕円。中心は整数格子の中央、半径は w/2・d/2。
+                // 端の列も内側に入るので、幅・奥行いっぱいの円になる。
+                // 壁は IsEdge によって円周1マス厚のリングになる（中は吹き抜け）。
+                {
+                    double ccx = (w - 1) / 2.0, ccz = (d - 1) / 2.0;
+                    double crx = w / 2.0, crz = d / 2.0;
+                    for (int x = 0; x < w; x++)
+                        for (int z = 0; z < d; z++)
+                        {
+                            double nx = (x - ccx) / (crx <= 0 ? 1 : crx);
+                            double nz = (z - ccz) / (crz <= 0 ? 1 : crz);
+                            if (nx * nx + nz * nz <= 1.0) mask.Add((x, z));
+                        }
+                }
+                break;
+
             default: // "rect" ほか未知の値は矩形一杯（従来互換）。
                 for (int x = 0; x < w; x++)
                     for (int z = 0; z < d; z++)

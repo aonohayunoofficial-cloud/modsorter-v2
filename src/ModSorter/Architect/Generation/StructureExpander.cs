@@ -125,10 +125,19 @@ public static partial class StructureExpander
                     cells[(x, 0, z)] = baseBlock;
         }
 
-        // 屋根（roof_type で分岐）。非矩形フットプリントのときは gable/dome/pyramid/spire が
-        // 矩形前提のため崩れる。安全側として flat にフォールバックし、平屋根をマスクに沿わせる。
+        // 屋根（roof_type で分岐）。非矩形フットプリントでは棟・軒が矩形前提の屋根
+        //（gable / gable_stairs / shed / sawtooth / monitor）が崩れるので flat へ寄せる。
+        // 頂冠形（dome / pyramid / spire）はマスクに沿って絞れるため、円形平面のときだけ許す。
+        // 円形と認めるのは footprint_shape="circle" かつ add/sub 無指定のときに限る。
+        // 欠けた円は輪郭が読めず、ドームが平面の外へ張り出して宙に浮くおそれがある。
+        string footShape = (spec.FootprintShape ?? "rect").Trim().ToLowerInvariant();
+        bool roundPlan = footShape == "circle"
+            && (spec.FootprintAdd == null || spec.FootprintAdd.Count == 0)
+            && (spec.FootprintSub == null || spec.FootprintSub.Count == 0);
+
         string roofType = (spec.RoofType ?? "flat").Trim().ToLowerInvariant();
-        if (!rectangular)
+        bool capRoof = roofType == "dome" || roofType == "pyramid" || roofType == "spire";
+        if (!rectangular && !(roundPlan && capRoof))
             roofType = "flat";
         if (roofType == "gable")
             BuildGableRoof(cells, spec, w, d, h, roof, wall);
@@ -141,11 +150,11 @@ public static partial class StructureExpander
         else if (roofType == "monitor")
             BuildMonitorRoof(cells, spec, w, d, h, roof, wall, glazing);
         else if (roofType == "dome")
-            BuildDomeRoof(cells, spec, w, d, h, roof);
+            BuildDomeRoof(cells, foot, spec, w, d, h, roof);
         else if (roofType == "pyramid")
-            BuildPyramidRoof(cells, w, d, h, roof);
+            BuildPyramidRoof(cells, foot, h, roof);
         else if (roofType == "spire")
-            BuildSpireRoof(cells, spec, w, d, h, roof);
+            BuildSpireRoof(cells, foot, spec, h, roof);
         else
             BuildFlatRoof(cells, foot, h, roof);
 
@@ -296,9 +305,11 @@ public static partial class StructureExpander
 
             // 入口の保証: door が1つも指定されていない場合、正面(facade_face、既定 south)の
             // 中央に自動でドアを1つ開ける。LLM がドアを出さなくても必ず入口ができる。
+            // no_entrance=true のときは通さない。記念碑・オベリスク・台座のように
+            // 穴を開けてはいけない塊で、勝手に壁が抜けるのを防ぐ。
             bool hasDoor = ops.Any(o =>
                 string.Equals((o.Kind ?? "").Trim(), "door", StringComparison.OrdinalIgnoreCase));
-            if (!hasDoor)
+            if (!hasDoor && !spec.NoEntrance)
             {
                 string doorFace = (spec.FacadeFace ?? "south").Trim().ToLowerInvariant();
                 if (doorFace != "north" && doorFace != "south" &&

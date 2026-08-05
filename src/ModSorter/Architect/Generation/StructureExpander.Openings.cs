@@ -60,31 +60,33 @@ public static partial class StructureExpander
 
         if (isArch)
         {
-            // アーチ: 中央列を高く抜き、左右1マスずつは1段低く抜いて上端を丸める。
-            //   中央列: y=1 .. archTop を開口
-            //   左右列: y=1 .. archTop-1 を開口（上端を内側へ詰めて曲線風に）
-            // archTop は壁の高さに収める（最上段=屋根の手前 h-2 まで）。
+            // アーチ: 半円の頭を持つ開口を床から抜く。offset を中心に width マス、
+            // 中央で height に達し、両端で起拱線(height - 半径)まで下がる。
+            // width/height 未指定(0以下)なら幅3・高さ3で、旧実装（中央列を archTop まで、
+            // 左右1列を archTop-1 まで抜く）と1マスも変わらない結果になる。
+            //   幅3・高さ3 → 半径1・起拱線2 → 中央 top=3、左右 top=2（旧実装と一致）
+            // 指定ありなら凱旋門・霊廟のような大型アーチになる。
             int wallTop = Math.Max(1, h - 2);
-            int archTop = Math.Min(wallTop, 3); // 標準的なアーチ高（3段）。低い壁では自動で縮む。
+            int aw = op.Width > 0 ? op.Width : 3;
+            int ah = op.Height > 0 ? op.Height : 3;
+            if (aw % 2 == 0) aw--;              // 中心を1マスに保つため奇数へ寄せる
+            if (aw < 1) aw = 1;
+            ah = Math.Min(ah, wallTop);         // 壁の高さ（屋根の手前 h-2）に収める
+            int r = (aw - 1) / 2;               // 半円の半径＝幅の半分
+            int springY = Math.Max(1, ah - r);  // 起拱線。ここから上が半円になる。
+
             int cx = target2.Value.x, cz = target2.Value.z;
-
-            // 中央列を抜く。
-            for (int yy = 1; yy <= archTop; yy++)
-                cells.Remove((cx, yy, cz));
-
-            // 左右の列（offset±1）を1段低く抜く。壁セルのときのみ。
-            for (int side = -1; side <= 1; side += 2)
+            for (int s = -r; s <= r; s++)
             {
-                int sx = alongX ? cx + side : cx;
-                int sz = alongX ? cz : cz + side;
+                int sx = alongX ? cx + s : cx;
+                int sz = alongX ? cz : cz + s;
                 // 開口が壁の外周面からはみ出さないよう、その面上の有効範囲かを確認する。
-                bool inRange = alongX ? (sx >= 0 && sx < w) : (sz >= 0 && sz < d);
-                if (!inRange) continue;
-                for (int yy = 1; yy <= Math.Max(1, archTop - 1); yy++)
-                {
-                    var sk = (sx, yy, sz);
-                    if (cells.ContainsKey(sk)) cells.Remove(sk);
-                }
+                if (sx < 0 || sx >= w || sz < 0 || sz >= d) continue;
+
+                int top = springY + (int)Math.Round(Math.Sqrt(Math.Max(0, r * r - s * s)));
+                if (top > wallTop) top = wallTop;
+                for (int yy = 1; yy <= top; yy++)
+                    cells.Remove((sx, yy, sz));
             }
             return;
         }
