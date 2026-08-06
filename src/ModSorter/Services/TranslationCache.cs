@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace ModSorter.Services;
@@ -19,6 +20,15 @@ public static class TranslationCache
     private static string _engine = "";
     private static Dictionary<string, string> _entries = new();
 
+    // 保存オプション。既定のエンコーダだと日本語が "\u6625" になり目視できないため、
+    // 緩和エンコーダでそのまま書き出す（キャッシュを手で覗くとき用）。
+    // 出力先は自前の JSON ファイルのみで HTML に埋め込まないため、これで問題ない。
+    private static readonly JsonSerializerOptions SaveOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private static string FilePathFor(string engine) =>
         Path.Combine(Dir, $"trans_cache_{engine}.json");
 
@@ -33,7 +43,7 @@ public static class TranslationCache
     // 指定エンジンのキャッシュをロードする。既にロード済みなら何もしない。
     public static void Load(string engine)
     {
-        if (_engine == engine && _entries.Count >= 0 && !string.IsNullOrEmpty(_engine))
+        if (!string.IsNullOrEmpty(_engine) && _engine == engine)
             return;
         _engine = engine;
         _entries = new();
@@ -56,12 +66,17 @@ public static class TranslationCache
         try
         {
             Directory.CreateDirectory(Dir);
-            var json = JsonSerializer.Serialize(_entries,
-                new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(_entries, SaveOptions);
             File.WriteAllText(FilePathFor(_engine), json);
         }
         catch { }
     }
+
+    // 現在ロード中エンジンのエントリ数(UI表示用)。
+    public static int Count => _entries.Count;
+
+    // キャッシュファイルの実パス(UI/ログ表示用)。
+    public static string PathOf(string engine) => FilePathFor(engine);
 
     // 原文に対応する訳文を返す。無ければ null。
     public static string? Get(string source)
@@ -85,11 +100,41 @@ public static class TranslationCache
         return _entries.Remove(KeyOf(source));
     }
 
+    // 訳文に needle を含むエントリ数を数える（削除前の確認用）。
+    // キーはハッシュなので原文からは引けないが、訳文なら走査で探せる。
+    public static int CountWhereTranslatedContains(string engine, string needle)
+    {
+        if (string.IsNullOrEmpty(needle)) return 0;
+        Load(engine);
+        return _entries.Count(kv =>
+            !string.IsNullOrEmpty(kv.Value) &&
+            kv.Value.Contains(needle, StringComparison.Ordinal));
+    }
+
+    // 訳文に needle を含むエントリだけを削除する。戻り値は削除件数。
+    // 「春」のような誤訳語を指定すると、その訳になった原文だけが次回再翻訳される。
+    // 全消しと違い DeepL 枠の消費を最小に抑えられる。削除後は即座に永続化する。
+    public static int RemoveWhereTranslatedContains(string engine, string needle)
+    {
+        if (string.IsNullOrEmpty(needle)) return 0;
+        Load(engine);
+        var keys = _entries
+            .Where(kv => !string.IsNullOrEmpty(kv.Value) &&
+                         kv.Value.Contains(needle, StringComparison.Ordinal))
+            .Select(kv => kv.Key)
+            .ToList();
+        foreach (var k in keys) _entries.Remove(k);
+        if (keys.Count > 0) Save();
+        return keys.Count;
+    }
+
     // 指定エンジンのキャッシュを全削除する。
+    // 未ロードのエンジンを指定された場合でも件数を正しく返すため、先にロードする。
     public static int ClearAll(string engine)
     {
-        int count = (_engine == engine) ? _entries.Count : 0;
-        if (_engine == engine) _entries = new();
+        Load(engine);
+        int count = _entries.Count;
+        _entries = new();
         try
         {
             var path = FilePathFor(engine);

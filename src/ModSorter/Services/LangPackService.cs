@@ -26,10 +26,25 @@ public static class LangPackService
     public sealed class NamespaceLang
     {
         public string Namespace = "";
-        // キー -> 原文(en_us)。ja_jp が既にあるものは対象に含めない。
+        // キー -> 原文(en_us)。名前空間内の en_us 全キーを入力順で保持する。
+        // 出力する ja_jp.json のキー順もこの順に合わせる。
         public Dictionary<string, string> Entries = new();
+        // MOD 同梱の ja_jp に既に入っている訳。キー -> 訳文。
+        // リソースパックは同名の lang ファイルを丸ごと置き換えるため、
+        // ここを出力にそのまま載せ直さないと同梱の日本語が英語に戻る。
+        public Dictionary<string, string> Existing = new();
+        // Entries のうち翻訳が必要なキー。
+        // 同梱 ja_jp に無いキーと、値が英語のまま残っているキーだけが入る。
+        public HashSet<string> TranslateKeys = new();
         // 抽出元(複数 jar にまたがる場合の記録用)
         public List<string> SourceJars = new();
+
+        // 翻訳が必要なキーと原文だけを列挙する。見積もり・翻訳・再検査はこれを使う。
+        public IEnumerable<KeyValuePair<string, string>> TranslationTargets()
+        {
+            foreach (var kv in Entries)
+                if (TranslateKeys.Contains(kv.Key)) yield return kv;
+        }
     }
 
     // 生成結果サマリ
@@ -37,9 +52,11 @@ public static class LangPackService
     {
         public int ModCount;              // 走査した jar 数
         public int NamespaceCount;        // 翻訳対象になった名前空間数
-        public int EntryCount;            // 翻訳対象の総エントリ数
+        public int EntryCount;            // 翻訳対象の総エントリ数(不足キーのみ)
         public int TranslatedChars;       // 実際に翻訳送信した文字数(キャッシュ未ヒット分)
-        public int SkippedJaExisting;     // ja_jp 既存で除外した名前空間数
+        public int PreservedEntries;      // MOD 同梱 ja_jp から引き継いだエントリ数
+        public int PartialNamespaces;     // 同梱 ja_jp があり不足分だけ補った名前空間数
+        public int SkippedJaExisting;     // 同梱 ja_jp が完備で除外した名前空間数
         public int SkippedBroken;         // 解析失敗でスキップした jar 数
         public int RestoreWarnings;       // プレースホルダ復元漏れ件数
         // 復元漏れした原文の一覧(どの文でトークンが戻せなかったか)。
@@ -50,17 +67,21 @@ public static class LangPackService
         public bool Canceled;
     }
 
-    // ===== 1) 抽出 + 除外 =====
-    // jar 群から、ja_jp を持たない名前空間の en_us エントリを集める。
+    // ===== 1) 抽出 + 差分判定 =====
+    // jar 群から en_us と ja_jp を両方読み、名前空間ごとに「翻訳が必要なキー」を確定する。
+    // fillMissingOnly=true: 同梱 ja_jp を尊重し、そこに無いキーと英語のまま残っているキー
+    //   だけを翻訳対象にする。同梱の訳は Existing に持ち、出力にもそのまま載せる。
+    //   これで「同梱の古い ja_jp が半端に当たって残りが英語」の状態を埋められる。
+    // fillMissingOnly=false: 同梱 ja_jp を無視し、en_us の全キーを翻訳対象にする。
     public static List<NamespaceLang> ExtractTargets(
         IEnumerable<string> jarPaths,
-        bool skipIfJaExists,
+        bool fillMissingOnly,
         LangPackResult result)
     {
-        // 名前空間 -> 統合データ
+        // 名前空間 -> 統合データ(en_us 側)
         var map = new Dictionary<string, NamespaceLang>();
-        // ja_jp を持つ名前空間(除外判定用)
-        var hasJa = new HashSet<string>();
+        // 名前空間 -> 同梱 ja_jp の内容(複数 jar にまたがる場合は後勝ちでマージ)
+        var jaMap = new Dictionary<string, Dictionary<string, string>>();
 
         foreach (var jar in jarPaths)
         {
@@ -80,13 +101,6 @@ public static class LangPackService
                     var kind = m.Groups[2].Value.ToLowerInvariant();  // en_us / ja_jp
                     var ext = m.Groups[3].Value.ToLowerInvariant();   // json / lang
 
-                    if (kind == "ja_jp")
-                    {
-                        hasJa.Add(ns);
-                        continue;
-                    }
-
-                    // en_us を読み込む
                     Dictionary<string, string> parsed;
                     try
                     {
@@ -96,6 +110,17 @@ public static class LangPackService
                     catch
                     {
                         result.SkippedBroken++;
+                        continue;
+                    }
+
+                    if (kind == "ja_jp")
+                    {
+                        if (!jaMap.TryGetValue(ns, out var jl))
+                        {
+                            jl = new Dictionary<string, string>();
+                            jaMap[ns] = jl;
+                        }
+                        foreach (var kv in parsed) jl[kv.Key] = kv.Value;
                         continue;
                     }
 
@@ -115,31 +140,77 @@ public static class LangPackService
             }
         }
 
-        // ja_jp を持つ名前空間を除外(トグル ON のとき)
         var targets = new List<NamespaceLang>();
         foreach (var kv in map)
         {
-            if (skipIfJaExists && hasJa.Contains(kv.Key))
+            var nl = kv.Value;
+            bool hasJa = jaMap.TryGetValue(nl.Namespace, out var ja) && ja != null && ja.Count > 0;
+
+            if (fillMissingOnly && hasJa)
             {
+                foreach (var je in ja!) nl.Existing[je.Key] = je.Value;
+
+                foreach (var en in nl.Entries)
+                {
+                    if (string.IsNullOrEmpty(en.Value)) continue; // 空文字は訳す必要がない
+                    if (!nl.Existing.TryGetValue(en.Key, out var jaVal))
+                    {
+                        nl.TranslateKeys.Add(en.Key); // 同梱 ja_jp に無いキー＝未訳
+                        continue;
+                    }
+                    // 値はあるが空白だけ、または英語のまま残っているキーも埋め直す。
+                    if (string.IsNullOrWhiteSpace(jaVal) || LooksUntranslated(en.Value, jaVal))
+                        nl.TranslateKeys.Add(en.Key);
+                }
+            }
+            else
+            {
+                foreach (var en in nl.Entries)
+                    if (!string.IsNullOrEmpty(en.Value)) nl.TranslateKeys.Add(en.Key);
+            }
+
+            if (nl.TranslateKeys.Count == 0)
+            {
+                // 不足なし＝同梱の日本語で完備。パックに載せる必要もない。
                 result.SkippedJaExisting++;
-                result.ExcludedNamespaces.Add(kv.Key);
+                result.ExcludedNamespaces.Add(nl.Namespace);
                 continue;
             }
-            targets.Add(kv.Value);
+            if (nl.Existing.Count > 0) result.PartialNamespaces++;
+            targets.Add(nl);
         }
 
         result.NamespaceCount = targets.Count;
-        result.EntryCount = targets.Sum(t => t.Entries.Count);
+        result.EntryCount = targets.Sum(t => t.TranslateKeys.Count);
+        result.PreservedEntries = targets.Sum(
+            t => t.Existing.Count(e => !t.TranslateKeys.Contains(e.Key)));
         return targets;
     }
 
-    // ===== 2) 文字数見積もり(除外後・重複排除後のユニーク原文) =====
+    // 同梱 ja_jp に値はあるが実質未訳(英語のまま)かを判定する。
+    // 条件は「原文と完全一致」かつ「仮名・漢字を含まない」かつ「英字が2文字以上続く」。
+    // "TNT" "OK" のように日英で同じ表記になる正当な訳を誤って翻訳対象にしないため、
+    // 3条件をすべて満たす場合だけ未訳とみなす。
+    private static bool LooksUntranslated(string src, string ja)
+    {
+        if (!string.Equals(src, ja, StringComparison.Ordinal)) return false;
+        foreach (var c in ja)
+        {
+            // ひらがな・カタカナ(0x3040-0x30FF)・CJK統合漢字(0x4E00-0x9FFF)を含めば訳済み。
+            if ((c >= 0x3040 && c <= 0x30FF) || (c >= 0x4E00 && c <= 0x9FFF)) return false;
+        }
+        return Regex.IsMatch(ja, "[A-Za-z]{2}");
+    }
+
+
+    // ===== 2) 文字数見積もり(不足キーのみ・重複排除後のユニーク原文) =====
+    // 同梱 ja_jp から引き継ぐ分は送信しないので、見積もりからも除く。
     public static int EstimateChars(IEnumerable<NamespaceLang> targets)
     {
         var unique = new HashSet<string>();
         foreach (var t in targets)
-            foreach (var v in t.Entries.Values)
-                if (!string.IsNullOrEmpty(v)) unique.Add(v);
+            foreach (var kv in t.TranslationTargets())
+                if (!string.IsNullOrEmpty(kv.Value)) unique.Add(kv.Value);
         return unique.Sum(s => s.Length);
     }
 
@@ -154,12 +225,12 @@ public static class LangPackService
     {
         TranslationCache.Load(engine);
 
-        // ユニーク原文を集める
+        // ユニーク原文を集める(翻訳が必要なキーの原文だけ)
         var unique = new List<string>();
         var seen = new HashSet<string>();
         foreach (var t in targets)
-            foreach (var v in t.Entries.Values)
-                if (!string.IsNullOrEmpty(v) && seen.Add(v)) unique.Add(v);
+            foreach (var kv in t.TranslationTargets())
+                if (!string.IsNullOrEmpty(kv.Value) && seen.Add(kv.Value)) unique.Add(kv.Value);
 
         var dict = new Dictionary<string, string>();
         // キャッシュ未ヒットだけを翻訳対象にする
@@ -230,12 +301,12 @@ public static class LangPackService
     {
         TranslationCache.Load(engine);
 
-        // 対象のユニーク原文を集める
+        // 対象のユニーク原文を集める(翻訳が必要なキーの原文だけ)
         var unique = new List<string>();
         var seen = new HashSet<string>();
         foreach (var t in targets)
-            foreach (var v in t.Entries.Values)
-                if (!string.IsNullOrEmpty(v) && seen.Add(v)) unique.Add(v);
+            foreach (var kv in t.TranslationTargets())
+                if (!string.IsNullOrEmpty(kv.Value) && seen.Add(kv.Value)) unique.Add(kv.Value);
 
         var brokenSources = new List<string>();
 
@@ -245,6 +316,8 @@ public static class LangPackService
             if (cachedTranslation == null) continue; // 未翻訳はここでは対象外
 
             // 原文に含まれるプレースホルダを実体(%s, {0}, §a 等)のまま数える。
+            // 用語辞書の退避は「原文の語 -> 別の訳語」に変わるため、この照合には掛けない。
+            // 用語が消えても表示は崩れないが、プレースホルダの欠落は表示を壊すので検査する。
             var srcPh = PlaceholderRegex.Matches(src);
             if (srcPh.Count == 0) continue; // プレースホルダが無ければ漏れは起きない
 
@@ -336,17 +409,30 @@ public static class LangPackService
                 new JsonSerializerOptions { WriteIndented = true }));
 
         // 各名前空間の ja_jp.json
+        // パックは MOD 同梱の ja_jp を丸ごと置き換えるため、同梱の訳もここに載せ直す。
+        // 載せ直さないと、今まで日本語だったキーが英語に戻ってしまう。
         foreach (var t in targets)
         {
             // 入力順を保つため、原文辞書の列挙順で組み立てる
             var outMap = new Dictionary<string, string>();
             foreach (var kv in t.Entries)
             {
+                // 翻訳対象外で同梱の訳があるキーは、その訳をそのまま維持する。
+                if (!t.TranslateKeys.Contains(kv.Key) &&
+                    t.Existing.TryGetValue(kv.Key, out var keep))
+                {
+                    outMap[kv.Key] = keep;
+                    continue;
+                }
                 var src = kv.Value;
                 outMap[kv.Key] =
                     (!string.IsNullOrEmpty(src) && translations.TryGetValue(src, out var tr))
                         ? tr : src;
             }
+
+            // en_us に無いキーが同梱 ja_jp にだけある場合も落とさない。
+            foreach (var kv in t.Existing)
+                if (!outMap.ContainsKey(kv.Key)) outMap[kv.Key] = kv.Value;
 
             var json = SerializeLangJson(outMap);
             WriteZipText(zip, $"assets/{t.Namespace}/lang/ja_jp.json", json);
@@ -460,8 +546,15 @@ public static class LangPackService
 
     // ===== XMLタグ方式(案1-B) =====
 
-    // プレースホルダ/色コードを <x id="n"/> タグに退避し、本文の < > & はエスケープする。
-    // 戻り値は(退避後テキスト, id -> 元の断片)。
+    // プレースホルダ/色コード/用語辞書の語を <x id="n"/> タグに退避し、
+    // 本文の < > & はエスケープする。戻り値は(退避後テキスト, id -> 復元する文字列)。
+    //
+    // プレースホルダは「元の断片」を、用語は「日本語の訳語」を復元値に入れる。
+    // どちらも DeepL からは同じ翻訳対象外タグに見えるため、用語は訳されずに位置だけ保たれ、
+    // 復元時に指定の訳語へ置き換わる。これで "Spring" が「春」になる取り違えを断てる。
+    //
+    // 退避範囲が重なるとタグが入れ子になって壊れるので、プレースホルダを先に確定し、
+    // それと重なる用語一致は捨てる。プレースホルダの保護を常に優先する。
     private static (string, Dictionary<string, string>) ProtectXml(string src)
     {
         var map = new Dictionary<string, string>();
@@ -469,19 +562,35 @@ public static class LangPackService
         int idx = 0;
         int pos = 0;
 
-        // プレースホルダ/色コードの位置を順に処理し、その間の本文はエスケープする。
+        // 退避する範囲を (開始, 長さ, 復元値) で集める。
+        var spans = new List<(int Start, int Length, string Restore)>();
+
+        // プレースホルダ/色コード。復元値は元の断片そのもの。
         foreach (System.Text.RegularExpressions.Match m in PlaceholderRegex.Matches(src))
+            spans.Add((m.Index, m.Length, m.Value));
+
+        // 用語辞書。復元値は日本語の訳語。
+        foreach (var g in GlossaryService.FindMatches(src))
+        {
+            int gEnd = g.Start + g.Length;
+            bool clash = spans.Any(s => g.Start < s.Start + s.Length && s.Start < gEnd);
+            if (clash) continue; // プレースホルダと重なる用語は退避しない
+            spans.Add((g.Start, g.Length, g.Target));
+        }
+
+        spans.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+        foreach (var sp in spans)
         {
             // 直前の本文(エスケープ対象)
-            if (m.Index > pos)
-                sb.Append(XmlEscape(src.Substring(pos, m.Index - pos)));
+            if (sp.Start > pos)
+                sb.Append(XmlEscape(src.Substring(pos, sp.Start - pos)));
 
-            // プレースホルダ/色コードをタグ化
             var id = idx.ToString();
-            map[id] = m.Value;
+            map[id] = sp.Restore;
             sb.Append($"<x id=\"{id}\"/>");
             idx++;
-            pos = m.Index + m.Length;
+            pos = sp.Start + sp.Length;
         }
         // 末尾の残り本文
         if (pos < src.Length)
@@ -556,7 +665,11 @@ public static class LangPackService
         var tmp = new NamespaceLang { Namespace = "__retranslate__" };
         int k = 0;
         foreach (var src in sourcesToRetranslate)
-            tmp.Entries[$"__k{k++}"] = src;
+        {
+            var key = $"__k{k++}";
+            tmp.Entries[key] = src;
+            tmp.TranslateKeys.Add(key); // TranslateAsync は翻訳対象キーだけを見るため必須
+        }
 
         await TranslateAsync(new[] { tmp }, engine, result, progress, ct);
         return removed;

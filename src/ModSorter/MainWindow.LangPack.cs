@@ -33,6 +33,10 @@ public partial class MainWindow : Window
         }
         DeepLClient.Init(deepLKey);
 
+        // 用語辞書を読み込む。初回はファイルが無いので既定辞書が書き出される。
+        // 生成のたびに読み直すことで、アプリを再起動しなくても編集内容が反映される。
+        GlossaryService.Load(force: true);
+
         bool skipIfJa = LangPackSkipJaCheck.IsChecked == true;
         const string engine = "deepl";
 
@@ -46,10 +50,10 @@ public partial class MainWindow : Window
 
         if (targets.Count == 0)
         {
-            LangPackStatus.Text = "翻訳対象なし(全て日本語化済み、または en_us なし)";
+            LangPackStatus.Text = "不足キーなし(同梱の日本語で完備、または en_us なし)";
             MessageBox.Show(
-                $"翻訳対象の名前空間がありませんでした。\n" +
-                $"除外(日本語化済み): {result.SkippedJaExisting} 件",
+                $"翻訳が必要なキーがありませんでした。\n" +
+                $"除外(同梱 ja_jp が完備): {result.SkippedJaExisting} 件",
                 "ModSorter", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -123,9 +127,12 @@ public partial class MainWindow : Window
             var summary =
                 $"生成完了\n" +
                 $"MOD: {result.ModCount} / 名前空間: {result.NamespaceCount} / " +
-                $"エントリ: {result.EntryCount}\n" +
+                $"翻訳したエントリ: {result.EntryCount}\n" +
+                $"同梱訳の引き継ぎ: {result.PreservedEntries} エントリ\n" +
+                $"部分補完した名前空間: {result.PartialNamespaces} 件\n" +
+                $"用語辞書: {GlossaryService.Count} 語を適用\n" +
                 $"翻訳文字数: {result.TranslatedChars:N0}\n" +
-                $"除外(日本語化済み): {result.SkippedJaExisting} 件\n" +
+                $"除外(同梱 ja_jp が完備): {result.SkippedJaExisting} 件\n" +
                 $"スキップ(解析失敗): {result.SkippedBroken} 件\n" +
                 $"復元漏れ警告: {result.RestoreWarnings} 件\n" +
                 $"出力先: {result.OutputPath}";
@@ -263,6 +270,10 @@ public partial class MainWindow : Window
         }
         DeepLClient.Init(deepLKey);
 
+        // 再翻訳も ProtectXml を通るので用語辞書が効く。生成と同じく読み直して、
+        // 同一セッション中に辞書を編集した場合も新しい訳語が当たるようにする。
+        GlossaryService.Load(force: true);
+
         bool skipIfJa = LangPackSkipJaCheck.IsChecked == true;
         const string engine = "deepl";
 
@@ -341,6 +352,100 @@ public partial class MainWindow : Window
             LangPackProgress.Visibility = Visibility.Collapsed;
             _langPackCts?.Dispose();
             _langPackCts = null;
+        }
+    }
+
+    // 訳文に指定語を含むキャッシュだけを削除する(部分クリア)。
+    // 「春」のような誤訳語を指定すれば、該当原文だけが次回再翻訳される。
+    private void LangPackCacheRemoveWord_Click(object sender, RoutedEventArgs e)
+    {
+        if (_langPackCts != null)
+        {
+            MessageBox.Show("生成/再翻訳の実行中は操作できません。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        const string engine = "deepl";
+        var word = LangPackCacheWordBox.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(word))
+        {
+            MessageBox.Show("削除したい訳語(例: 春)を入力してください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        int hit = TranslationCache.CountWhereTranslatedContains(engine, word);
+        if (hit == 0)
+        {
+            LangPackStatus.Text = $"「{word}」を含む訳はキャッシュにありません";
+            return;
+        }
+
+        var ok = MessageBox.Show(
+            $"訳文に「{word}」を含むキャッシュ {hit:N0} 件を削除します。\n" +
+            "次回の生成で、この分だけ翻訳し直されます(DeepL 枠を消費)。\n" +
+            "続行しますか?",
+            "翻訳キャッシュの部分削除", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (ok != MessageBoxResult.OK) return;
+
+        int removed = TranslationCache.RemoveWhereTranslatedContains(engine, word);
+        LangPackStatus.Text = $"キャッシュ削除: 「{word}」を含む {removed:N0} 件";
+        Log($"翻訳キャッシュ部分削除: 「{word}」 {removed} 件");
+        AddActivity($"翻訳キャッシュ部分削除: {removed} 件");
+    }
+
+    // 翻訳キャッシュを全削除する。次回生成で全件再翻訳になるため枠消費が大きい。
+    private void LangPackCacheClear_Click(object sender, RoutedEventArgs e)
+    {
+        if (_langPackCts != null)
+        {
+            MessageBox.Show("生成/再翻訳の実行中は操作できません。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        const string engine = "deepl";
+        TranslationCache.Load(engine);
+        int count = TranslationCache.Count;
+
+        var ok = MessageBox.Show(
+            $"翻訳キャッシュを全削除します({count:N0} 件)。\n" +
+            $"保存先: {TranslationCache.PathOf(engine)}\n\n" +
+            "次回の生成では全ての原文を翻訳し直すため、DeepL 枠を大きく消費します。\n" +
+            "続行しますか?",
+            "翻訳キャッシュの全削除", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+        if (ok != MessageBoxResult.OK) return;
+
+        int removed = TranslationCache.ClearAll(engine);
+        LangPackStatus.Text = $"翻訳キャッシュを全削除しました({removed:N0} 件)";
+        Log($"翻訳キャッシュ全削除: {removed} 件");
+        AddActivity($"翻訳キャッシュ全削除: {removed} 件");
+    }
+
+    // 「用語辞書を開く」ボタン。多義語の訳を固定するための辞書を既定エディタで開く。
+    // 例: "Spring" を「バネ」に固定する。ファイルが無ければ既定辞書を作ってから開く。
+    // 編集後は保存するだけでよく、次回の生成時に読み直される。
+    // 用語を変えた語は、キャッシュを消さないと前回の訳が使われる点だけ添える。
+    private void LangPackGlossary_Click(object sender, RoutedEventArgs e)
+    {
+        GlossaryService.Load(force: true);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = GlossaryService.FilePath,
+                UseShellExecute = true
+            });
+            LangPackStatus.Text =
+                $"用語辞書を開きました（{GlossaryService.Count} 語）。" +
+                "訳を変えた語は「キャッシュを消去」後に再生成すると反映されます。";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"用語辞書を開けませんでした。\n{GlossaryService.FilePath}\n{ex.Message}",
+                "ModSorter", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
