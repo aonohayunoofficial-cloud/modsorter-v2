@@ -124,6 +124,15 @@ public partial class MainWindow : Window
             LangPackProgress.Value = 100;
             LangPackStatus.Text = "完了";
 
+            var failMsg = result.FailedEntries > 0
+                ? $"⚠ 送信失敗: {result.FailedEntries} 件({result.FailedBatches} バッチ)\n" +
+                  $"　原因: {result.LastApiError}\n" +
+                  (result.AbortedByApiError
+                      ? "　連続失敗のため翻訳を打ち切りました。失敗分はキャッシュに書いて\n" +
+                        "　いないので、原因解消後にもう一度生成すれば翻訳されます。\n"
+                      : "　失敗分はキャッシュに書いていないので、次回生成で再送信されます。\n")
+                : "";
+
             var summary =
                 $"生成完了\n" +
                 $"MOD: {result.ModCount} / 名前空間: {result.NamespaceCount} / " +
@@ -135,6 +144,7 @@ public partial class MainWindow : Window
                 $"除外(同梱 ja_jp が完備): {result.SkippedJaExisting} 件\n" +
                 $"スキップ(解析失敗): {result.SkippedBroken} 件\n" +
                 $"復元漏れ警告: {result.RestoreWarnings} 件\n" +
+                failMsg +
                 $"出力先: {result.OutputPath}";
             Log(summary);
             // 復元漏れした原文をログに一覧出力(枠消費なし、原因特定用)
@@ -421,6 +431,48 @@ public partial class MainWindow : Window
         LangPackStatus.Text = $"翻訳キャッシュを全削除しました({removed:N0} 件)";
         Log($"翻訳キャッシュ全削除: {removed} 件");
         AddActivity($"翻訳キャッシュ全削除: {removed} 件");
+    }
+
+    // 訳文＝原文で固定されたキャッシュを削除する(DeepL枠を使わない)。
+    // 送信失敗フォールバックで英語のまま固定された分を再翻訳可能に戻す。
+    private async void LangPackCachePurge_Click(object sender, RoutedEventArgs e)
+    {
+        if (_mods == null || _mods.Count == 0)
+        {
+            MessageBox.Show("先に MOD をスキャンしてください。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (_langPackCts != null)
+        {
+            MessageBox.Show("生成/再翻訳の実行中は操作できません。", "ModSorter",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        bool skipIfJa = LangPackSkipJaCheck.IsChecked == true;
+        const string engine = "deepl";
+
+        var result = new LangPackService.LangPackResult();
+        var jarPaths = _mods.Select(m => m.FilePath).ToList();
+
+        LangPackStatus.Text = "英語固定キャッシュを走査中(翻訳送信なし)...";
+
+        int removedCount = await Task.Run(() =>
+        {
+            var targets = LangPackService.ExtractTargets(jarPaths, skipIfJa, result);
+            return LangPackService.PurgeUntranslatedCache(targets, engine);
+        });
+
+        LangPackStatus.Text = $"英語固定を解除: {removedCount:N0} 件";
+        Log($"英語のまま固定されたキャッシュを削除: {removedCount} 件");
+        AddActivity($"英語固定キャッシュ削除: {removedCount} 件");
+
+        MessageBox.Show(
+            $"訳文が原文と同一だったキャッシュ {removedCount:N0} 件を削除しました。\n" +
+            "次回の生成でこの分が翻訳し直されます(DeepL 枠を消費)。\n" +
+            "printf系(%s %d 等)を含む原文は修復結果なので対象外です。",
+            "ModSorter", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     // 「用語辞書を開く」ボタン。多義語の訳を固定するための辞書を既定エディタで開く。

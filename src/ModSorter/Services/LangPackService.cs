@@ -65,6 +65,15 @@ public static class LangPackService
         public List<string> ExcludedNamespaces = new(); // 除外した名前空間一覧
         public string OutputPath = "";    // 出力した zip のパス
         public bool Canceled;
+
+        // DeepL 送信に失敗したバッチ数と、その巻き添えになったエントリ数。
+        // 失敗分はキャッシュに書かないため、次回生成で自動的に再送信される。
+        public int FailedBatches;
+        public int FailedEntries;
+        // 最後に発生した API エラー(HTTP コード等)。原因表示用。
+        public string LastApiError = "";
+        // 連続失敗で翻訳を打ち切ったか(枠切れ/キー不正等の恒久エラー想定)。
+        public bool AbortedByApiError;
     }
 
     // ===== 1) 抽出 + 差分判定 =====
@@ -245,6 +254,7 @@ public static class LangPackService
         int total = toTranslate.Count;
         int done = 0;
         const int batchSize = 50; // DeepL の1リクエスト上限
+        int consecutiveFailures = 0;
 
         for (int i = 0; i < toTranslate.Count; i += batchSize)
         {
@@ -262,24 +272,55 @@ public static class LangPackService
                 tokenMaps.Add(tokenMap);
             }
 
-            var translated = await DeepLClient.TranslateBatchXmlAsync(protectedTexts);
-
-            for (int j = 0; j < slice.Count; j++)
+            // 429(レート制限)や一時的な 5xx は待って再送すれば通る。
+            // 456(枠切れ)は待っても回復しないので即座に打ち切る。
+            List<string>? translated = null;
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                string outText;
-                if (translated == null || j >= translated.Count)
+                ct.ThrowIfCancellationRequested();
+                translated = await DeepLClient.TranslateBatchXmlAsync(protectedTexts);
+                if (translated != null && translated.Count >= slice.Count) break;
+
+                translated = null;
+                result.LastApiError = DeepLClient.LastError;
+                if (DeepLClient.LastError.Contains("456")) break;
+                if (attempt < 2) await Task.Delay(1000 * (attempt + 1), ct);
+            }
+
+            if (translated == null)
+            {
+                // 今回の出力だけ原文で埋める。キャッシュへは書かない。
+                // 原文をキャッシュへ書くと訳文＝原文で固定され、次回以降ヒットして
+                // 永久に英語のままになるため(この経路が英語固定の原因だった)。
+                result.FailedBatches++;
+                result.FailedEntries += slice.Count;
+                foreach (var src in slice) dict[src] = src;
+
+                consecutiveFailures++;
+                if (consecutiveFailures >= 3)
                 {
-                    // 失敗時は原文フォールバック(仕様書10章)
-                    outText = slice[j];
+                    // 恒久エラー(枠切れ・キー不正等)とみなして以降の送信を止める。
+                    // 残りは未キャッシュのままなので、原因解消後の再生成で翻訳される。
+                    result.AbortedByApiError = true;
+                    int restStart = i + slice.Count;
+                    result.FailedEntries += toTranslate.Count - restStart;
+                    foreach (var src in toTranslate.GetRange(
+                        restStart, toTranslate.Count - restStart))
+                        dict[src] = src;
+                    break;
                 }
-                else
+            }
+            else
+            {
+                consecutiveFailures = 0;
+                for (int j = 0; j < slice.Count; j++)
                 {
                     // XMLタグ方式で復元(原文 slice[j] を渡し、復元漏れ時に原文を記録)
-                    outText = RestoreXml(translated[j], tokenMaps[j], result, slice[j]);
+                    var outText = RestoreXml(translated[j], tokenMaps[j], result, slice[j]);
                     result.TranslatedChars += slice[j].Length;
+                    dict[slice[j]] = outText;
+                    TranslationCache.Put(slice[j], outText);
                 }
-                dict[slice[j]] = outText;
-                TranslationCache.Put(slice[j], outText);
             }
 
             done += slice.Count;
@@ -289,7 +330,6 @@ public static class LangPackService
         TranslationCache.Save();
         return dict;
     }
-
 
     // ===== 再検査) キャッシュ再検査(DeepL枠を使わない) =====
     // 既にキャッシュ済みの訳文を対象に、プレースホルダが正しく復元できるかを
@@ -370,6 +410,41 @@ public static class LangPackService
 
         TranslationCache.Save();
         return repaired;
+    }
+
+    // ===== 復旧) 英語のまま固定されたキャッシュを削除する(DeepL枠を使わない) =====
+    // 送信失敗時に原文をそのままキャッシュへ書いていた時期のデータを掃除する。
+    // 訳文＝原文で固定されたエントリは以後キャッシュヒットし続け、
+    // 何度生成しても英語のまま表示される。これを消して再翻訳可能に戻す。
+    // printf系を含む原文は RepairPrintfPlaceholders が意図的に原文へ揃えた
+    // 修復結果なので対象外にする(消すと表示崩れが再発するため)。
+    // 戻り値は削除件数。
+    public static int PurgeUntranslatedCache(
+        IEnumerable<NamespaceLang> targets,
+        string engine)
+    {
+        TranslationCache.Load(engine);
+        var printfRegex = new Regex(@"%(\d+\$)?[sd]", RegexOptions.Compiled);
+
+        var seen = new HashSet<string>();
+        int removed = 0;
+        foreach (var t in targets)
+        {
+            foreach (var kv in t.TranslationTargets())
+            {
+                var src = kv.Value;
+                if (string.IsNullOrEmpty(src) || !seen.Add(src)) continue;
+                if (printfRegex.IsMatch(src)) continue;
+
+                var cached = TranslationCache.Get(src);
+                if (cached == null) continue;
+                if (!string.Equals(cached, src, StringComparison.Ordinal)) continue;
+
+                if (TranslationCache.Remove(src)) removed++;
+            }
+        }
+        if (removed > 0) TranslationCache.Save();
+        return removed;
     }
 
     // ===== 4) パック生成 =====
