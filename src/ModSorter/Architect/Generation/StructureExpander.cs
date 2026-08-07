@@ -95,6 +95,13 @@ public static partial class StructureExpander
             // 床/壁/屋根/開口部・入口保証は一切通さない（出入口は船種ごとに自動配置）。
             return ShipExpander.Build(spec, w, d, h, allowedBlocks, fallback);
         }
+        if (structureType == "venue")
+        {
+            // 屋外会場は VenueExpander が観客席・フィールド・シェル・テントを確定的に作る。
+            // 高さ1の板も段状の客席も VenueExpander 側で直接置くので、
+            // Clamp(height,2,64) や平屋根の生成には一切かからない。
+            return VenueExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
