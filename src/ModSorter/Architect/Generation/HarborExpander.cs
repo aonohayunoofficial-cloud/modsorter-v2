@@ -16,6 +16,13 @@ namespace ModSorter.Architect.Generation;
 //                1.5〜2m。陸側とは幅 8m 前後の渡橋でつなぐ。背後の護岸は別中分類に委ねる。
 //   breakwater … 防波堤（混成堤）。基礎マウンド（捨石）の斜面は 1:2、堤体（ケーソン）幅は
 //                10m 前後、天端は上部コンクリートで押さえ、海側に消波ブロックを被覆する。
+//   drydock    … ドライドック（乾ドック）。中型で全長 200m 級・幅 30〜40m・深さ 10m 級。
+//                側壁は作業段（アルター）が段状に下り、盤木（キールブロック）が中心線上に
+//                1.2〜2m 間隔で並ぶ。海側の入口はケーソンゲートで閉じる。
+//                延長は 64 マス上限のため、実物の中央部を切り出す粒度にしてある。
+//   lighthouse … 灯台。塔高 20〜30m 級、塔身は下部直径 6〜8m から上へテーパーする。
+//                頂部に回廊（バルコニー）と灯室が載り、灯室はガラス張り。
+//                基礎の上に立つ独立塔で、水深・マウンドは使わない。
 //
 // 断面は「海側が z=0、陸側が z の増加方向」で組み、最後に Rotate で海の向きを回す。
 // 1マス=1m。捨石マウンドや消波ブロック・防舷材は z<0 へ張り出すが、Normalize で 0 起点へ寄る。
@@ -51,6 +58,10 @@ public static class HarborExpander
             case "jetty": return "pier";
             case "breakwater":
             case "mole": return "breakwater";
+            case "drydock":
+            case "dock": return "drydock";
+            case "lighthouse":
+            case "light": return "lighthouse";
             default: return "quay";
         }
     }
@@ -81,6 +92,8 @@ public static class HarborExpander
         {
             case "pier": BuildPier(cells, spec, p); break;
             case "breakwater": BuildBreakwater(cells, spec, p); break;
+            case "drydock": BuildDryDock(cells, spec, p); break;
+            case "lighthouse": BuildLighthouse(cells, spec, p); break;
             default: BuildQuay(cells, spec, p); break;
         }
 
@@ -264,6 +277,171 @@ public static class HarborExpander
             if (t < 1) break;
             Fill(cells, 0, len - 1, 0, t, -1 - j, -1 - j, p.Armor);
         }
+    }
+
+    // ===== ドライドック（乾ドック）=====
+    // 海側（z=0）にゲート、そこから陸側へ掘り込む。掘り込みの中は空洞のまま残し、
+    // 側壁・底版・作業段・盤木だけを置く。ドック外周の地表面も 1マス分だけ敷いて
+    // 縁を出すので、プレビューで掘り込みの深さが分かる。
+    private static void BuildDryDock(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        int len = Clamp(spec.Width, 16, 64);                 // ドックの長さ（x 方向）
+        int wide = Clamp(spec.HarborBody ?? 34, 10, 40);      // ドックの内幅
+        int deep = Clamp(spec.HarborDepth ?? 10, 4, 20);      // 掘り込みの深さ
+        int steps = Clamp(spec.HarborAltarSteps ?? 3, 0, 6);  // 作業段の段数
+        int kstep = Math.Max(0, spec.HarborKeelStep ?? 0);    // 盤木の間隔
+        int gate = Math.Max(0, spec.HarborGate ?? 0);         // ゲートの厚み
+        int wall = 3;                                        // 側壁の厚み
+
+        int floorY = 0;                  // 底版の上面
+        int topY = deep;                 // 地表面（ドック縁）の y
+        int z0 = gate;                   // 掘り込みの海側端（ゲートのぶん奥へ寄る）
+        int z1 = z0 + len - 1;           // 陸側端（ドック頭部）
+
+        // 底版。ドック内幅より側壁ぶん外へ広げて敷く。
+        Fill(cells, -wall, wide + wall - 1, floorY, floorY, z0, z1 + wall, p.Body);
+
+        // 側壁（左右）とドック頭部の壁。地表面まで立ち上げる。
+        Fill(cells, -wall, -1, floorY + 1, topY, z0, z1 + wall, p.Body);
+        Fill(cells, wide, wide + wall - 1, floorY + 1, topY, z0, z1 + wall, p.Body);
+        Fill(cells, -wall, wide + wall - 1, floorY + 1, topY, z1 + 1, z1 + wall, p.Body);
+
+        // 作業段（アルター）。側壁の内側を段状に下げ、上ほど内側へ張り出す。
+        // 段の高さは掘り込みを段数で割り、幅は 1 段 1マスずつ内側へ寄せる。
+        for (int s = 0; s < steps; s++)
+        {
+            int hStep = Math.Max(1, (deep - 1) / Math.Max(1, steps));
+            int y0 = floorY + 1 + s * hStep;
+            int y1 = Math.Min(topY, y0 + hStep - 1);
+            int inset = steps - s;                       // 上の段ほど内側へ出ない
+            if (y0 > topY) break;
+            Fill(cells, 0, inset - 1, y0, y1, z0, z1, p.Body);
+            Fill(cells, wide - inset, wide - 1, y0, y1, z0, z1, p.Body);
+        }
+
+        // 盤木（キールブロック）。中心線上に等間隔で並ぶ、底版から 2マスの台。
+        if (kstep >= 2)
+        {
+            int cx = wide / 2;
+            for (int z = z0 + kstep; z <= z1 - 2; z += kstep)
+            {
+                cells[(cx, floorY + 1, z)] = p.Rubble;
+                cells[(cx, floorY + 2, z)] = p.Trim;
+            }
+        }
+
+        // ケーソンゲート。海側の入口を塞ぐ扉体。底版から地表面まで通す。
+        for (int g = 0; g < gate; g++)
+            Fill(cells, -wall, wide + wall - 1, floorY, topY, g, g, p.Trim);
+
+        // ドック縁の舗装。周囲 4マス分を地表面の高さに敷き、縁石を回す。
+        int apron = 4;
+        Fill(cells, -wall - apron, wide + wall + apron - 1, topY, topY,
+             z0 - apron, z1 + wall + apron, p.Pave);
+        // 掘り込みの内側は舗装を抜き、縁だけ縁石にする。
+        for (int x = 0; x < wide; x++)
+            for (int z = z0; z <= z1; z++) cells.Remove((x, topY, z));
+        for (int z = z0 - 1; z <= z1 + 1; z++)
+        {
+            cells[(-1, topY, z)] = p.Trim;
+            cells[(wide, topY, z)] = p.Trim;
+        }
+        for (int x = -1; x <= wide; x++) cells[(x, topY, z1 + 1)] = p.Trim;
+
+        // 係船柱。ドック縁の両側に並べる。
+        int bstep = Math.Max(0, spec.HarborBollardStep ?? 0);
+        if (bstep >= 5)
+            for (int z = z0 + bstep / 2; z <= z1; z += bstep)
+            {
+                cells[(-2, topY + 1, z)] = p.Fitting;
+                cells[(wide + 1, topY + 1, z)] = p.Fitting;
+            }
+    }
+
+    // ===== 灯台 =====
+    // 円形テーパーの塔身の上に回廊と灯室を載せる。水深・マウンドは使わず、
+    // 基礎の上に立つ独立塔として組む。
+    private static void BuildLighthouse(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        int shaft = Clamp(spec.HarborShaft ?? 7, 3, 21);       // 下部直径
+        int h = Clamp(spec.HarborCrown ?? 24, 6, 60);          // 塔身の高さ
+        int taper = Math.Max(0, spec.HarborTaper ?? 8);        // 何マスで直径 1 絞るか
+        int gallery = Clamp(spec.HarborGallery ?? 1, 0, 3);    // 回廊の張り出し
+        int lantern = Clamp(spec.HarborLantern ?? 4, 0, 10);   // 灯室の高さ
+        int baseH = Clamp(spec.HarborMound ?? 2, 0, 8);        // 基礎の高さ
+
+        // 中心は下部直径の中央。上で絞っても中心は動かさない。
+        double c = (shaft - 1) / 2.0;
+        int y = 0;
+
+        // 基礎。塔身より 2マス外へ広い円盤。
+        for (; y < baseH; y++) Disc(cells, c, shaft + 4, y, p.Body, filled: true);
+
+        // 塔身。テーパーで直径を絞りながら、外周 1マス厚のリングを積む。
+        // 内部は空洞にして階段室に見せる。窓は各層に 1つ、海側へ向けて抜く。
+        int dia = shaft;
+        int shaftTop = y + h - 1;
+        for (int i = 0; y <= shaftTop; y++, i++)
+        {
+            if (taper > 0 && i > 0 && i % taper == 0 && dia > 3) dia -= 2;
+            Disc(cells, c, dia, y, p.Body, filled: false);
+            if (i > 2 && i % 6 == 0) Window(cells, c, dia, y, p.Fitting);
+        }
+
+        // 回廊（バルコニー）。塔身の上端に張り出す床と、その外周の手すり。
+        int gdia = dia + 2 * gallery;
+        if (gallery > 0)
+        {
+            Disc(cells, c, gdia, y, p.Pave, filled: true);
+            Disc(cells, c, gdia, y + 1, p.Fitting, filled: false);
+            y += 2;
+        }
+
+        // 灯室。回廊の内側にガラス張りで立ち上げ、上を屋根で塞ぐ。
+        int ldia = Math.Max(3, dia - 2);
+        for (int k = 0; k < lantern; k++, y++) Disc(cells, c, ldia, y, p.Armor, filled: false);
+        if (lantern > 0)
+        {
+            Disc(cells, c, ldia, y, p.Parapet, filled: true);
+            Disc(cells, c, Math.Max(1, ldia - 2), y + 1, p.Parapet, filled: true);
+        }
+    }
+
+    // 中心 c・直径 dia の円を 1 段だけ置く。filled=false なら外周 1マス厚のリング。
+    private static void Disc(
+        Dictionary<(int x, int y, int z), string> cells,
+        double c, int dia, int y, string block, bool filled)
+    {
+        if (dia <= 0) return;
+        double r = dia / 2.0;
+        int lo = (int)Math.Floor(c - r), hi = (int)Math.Ceiling(c + r);
+
+        for (int x = lo; x <= hi; x++)
+            for (int z = lo; z <= hi; z++)
+            {
+                double dx = x - c, dz = z - c;
+                double dist = Math.Sqrt(dx * dx + dz * dz);
+                if (dist > r) continue;
+                if (!filled && dist < r - 1.0) continue;
+                cells[(x, y, z)] = block;
+            }
+    }
+
+    // 塔身の海側（z 最小の方向）に窓を 1マス抜き、ガラスを入れる。
+    private static void Window(
+        Dictionary<(int x, int y, int z), string> cells,
+        double c, int dia, int y, string glass)
+    {
+        int cx = (int)Math.Round(c);
+        int z = (int)Math.Round(c - dia / 2.0);
+        for (int dz = 0; dz < 2; dz++)
+            if (cells.ContainsKey((cx, y, z + dz)))
+            {
+                cells[(cx, y, z + dz)] = glass;
+                return;
+            }
     }
 
     // ===== 共通部品 =====

@@ -94,12 +94,12 @@ public static class ManualCatalog
         Impl("quay", "岸壁", () => new HarborParamsControl("quay"), "港湾"),
         Impl("pier", "桟橋", () => new HarborParamsControl("pier"), "港湾"),
         Impl("breakwater", "防波堤", () => new HarborParamsControl("breakwater"), "港湾"),
-        Todo("transit_shed", "上屋", "港湾"),
-        Todo("drydock", "ドライドック", "港湾"),
+        Impl("transit_shed", "上屋", () => new TransitShedParamsControl(), "港湾"),
+        Impl("drydock", "ドライドック", () => new DryDockParamsControl(), "港湾"),
         Todo("gantry_crane", "ガントリークレーン", "港湾"),
         Todo("bridge_crane", "橋形クレーン", "港湾"),
         Todo("bollard", "係船柱", "港湾"),
-        Todo("lighthouse", "灯台", "港湾"),
+        Impl("lighthouse", "灯台", () => new LighthouseParamsControl(), "港湾"),
 
         // 空港（国交省 空港土木/建築施設 分類準拠）
         Todo("control_tower", "管制塔", "空港"),

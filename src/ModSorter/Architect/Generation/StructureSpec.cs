@@ -193,6 +193,28 @@ public sealed class StructureSpec
     // 防舷材を前面に付けるか。既定 false。
     [JsonPropertyName("harbor_fender")] public bool HarborFender { get; set; }
 
+    // 作業段（アルター）の段数（ドライドック）。側壁を段状に下げる段の数。0 で垂直の側壁。
+    // 実物のドライドックは側壁が階段状に絞られ、盤木の据付と作業の足場を兼ねる。
+    [JsonPropertyName("harbor_altar_steps")] public int? HarborAltarSteps { get; set; }
+
+    // 盤木（キールブロック）の間隔（ドライドック）。0/未指定で盤木なし。実物は 1.2〜2m。
+    [JsonPropertyName("harbor_keel_step")] public int? HarborKeelStep { get; set; }
+
+    // ゲート（ケーソンゲート）の厚み（ドライドック）。0/未指定でゲートなし＝開口のまま。
+    [JsonPropertyName("harbor_gate")] public int? HarborGate { get; set; }
+
+    // 塔身の下部直径（灯台）。上へ向かって harbor_taper に従って絞る。
+    [JsonPropertyName("harbor_shaft")] public int? HarborShaft { get; set; }
+
+    // 塔身のテーパー（灯台）。何マス上がるごとに直径を 1 絞るか。0 で絞らない（円筒）。
+    [JsonPropertyName("harbor_taper")] public int? HarborTaper { get; set; }
+
+    // 回廊（バルコニー）の張り出し（灯台）。0 で回廊なし。
+    [JsonPropertyName("harbor_gallery")] public int? HarborGallery { get; set; }
+
+    // 灯室の高さ（灯台）。回廊の上に載るガラス張りの部分。0 で灯室なし。
+    [JsonPropertyName("harbor_lantern")] public int? HarborLantern { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。
