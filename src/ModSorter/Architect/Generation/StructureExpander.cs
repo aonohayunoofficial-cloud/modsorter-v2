@@ -102,6 +102,13 @@ public static partial class StructureExpander
             // Clamp(height,2,64) や平屋根の生成には一切かからない。
             return VenueExpander.Build(spec, allowedBlocks, fallback);
         }
+        if (PublicFacilityExpander.Handles(structureType))
+        {
+            // 公共施設（"civic:" 接頭辞）は PublicFacilityExpander が体育館・病院・消防署・
+            // 市庁舎を確定的に作る。競技面や病棟の内部間仕切りまで専用ビルダー側で置くので、
+            // 通常の床/壁/屋根/開口部・入口保証は一切通さない。
+            return PublicFacilityExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);

@@ -88,7 +88,7 @@ public static class ManualCatalog
         Impl("tower", "塔", () => new TowerParamsControl(), "建物"),
         Impl("monument", "記念建築", () => new MonumentParamsControl(), "建物"),
         Impl("event_venue", "屋外イベント会場", () => new EventVenueParamsControl(), "建物"),
-        Todo("public_facility", "公共施設", "建物"),
+        Impl("public_facility", "公共施設", () => new PublicFacilityParamsControl(), "建物"),
 
         // 港湾（国交省 港湾空港部 分類準拠）
         Todo("quay", "岸壁", "港湾"),

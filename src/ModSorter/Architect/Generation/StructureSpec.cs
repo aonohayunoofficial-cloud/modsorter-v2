@@ -145,6 +145,8 @@ public sealed class StructureSpec
     // "building"（既定） | "ramp"（スロープ） | "bridge"（橋） | "ship"（船） | "venue"（屋外会場）。
     // "ship" のときは ShipExpander が船体・甲板・上部構造物・出入口を確定的に作る。
     // "venue" のときは VenueExpander が観客席・フィールド・シェル・テントを確定的に作る。
+    // "civic:" で始まるときは PublicFacilityExpander が公共施設（体育館・病院・消防署・
+    // 市庁舎）を確定的に作る。接頭辞の後ろの語で施設種別を分岐する。
     // 通常の開口部/入口保証は通さない（出入口はそれぞれのビルダーが自動配置する）。
     [JsonPropertyName("structure_type")] public string? StructureType { get; set; }
 
