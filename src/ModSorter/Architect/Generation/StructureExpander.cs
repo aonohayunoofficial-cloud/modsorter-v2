@@ -109,6 +109,13 @@ public static partial class StructureExpander
             // 通常の床/壁/屋根/開口部・入口保証は一切通さない。
             return PublicFacilityExpander.Build(spec, allowedBlocks, fallback);
         }
+        if (HarborExpander.Handles(structureType))
+        {
+            // 港湾の単体構造物（"harbor:" 接頭辞）は HarborExpander が岸壁・桟橋・防波堤を
+            // 確定的に作る。断面は harbor_* から組み、捨石マウンドや防舷材が z<0 へ張り出す
+            // ぶんも HarborExpander 側で 0 起点へ正規化するので、通常の展開は一切通さない。
+            return HarborExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);

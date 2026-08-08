@@ -147,8 +147,51 @@ public sealed class StructureSpec
     // "venue" のときは VenueExpander が観客席・フィールド・シェル・テントを確定的に作る。
     // "civic:" で始まるときは PublicFacilityExpander が公共施設（体育館・病院・消防署・
     // 市庁舎）を確定的に作る。接頭辞の後ろの語で施設種別を分岐する。
+    // "harbor:" で始まるときは HarborExpander が港湾の単体構造物（岸壁 "quay"・桟橋 "pier"・
+    // 防波堤 "breakwater"）を確定的に作る。断面は下の harbor_* から組むので width だけを
+    // 延長として使い、depth/height は参照しない。
     // 通常の開口部/入口保証は通さない（出入口はそれぞれのビルダーが自動配置する）。
     [JsonPropertyName("structure_type")] public string? StructureType { get; set; }
+
+    // ===== 港湾（structure_type="harbor:<種類>"）=====
+    // 断面は「海側が z=0、陸側が z の増加方向」で組み、facade_face が海側の向きを表す。
+    // 1マス=1m。水位は y=harbor_depth の面（それより下が水面下）。
+
+    // 計画水深（海底から水面まで）。未指定なら岸壁10・桟橋8・防波堤10。
+    [JsonPropertyName("harbor_depth")] public int? HarborDepth { get; set; }
+
+    // 天端高（水面から天端まで）。岸壁は朔望平均満潮位 +0.5〜1.5m 相当、防波堤は高め。
+    [JsonPropertyName("harbor_crown")] public int? HarborCrown { get; set; }
+
+    // 堤体幅。岸壁・防波堤ではケーソンの幅、桟橋では上部工の幅（z 方向）。
+    [JsonPropertyName("harbor_body")] public int? HarborBody { get; set; }
+
+    // エプロン幅（岸壁の背後の荷役面）。水深別に 10〜20m、コンテナ荷役では 30m 級。
+    [JsonPropertyName("harbor_apron")] public int? HarborApron { get; set; }
+
+    // 基礎マウンド（捨石）の高さ。斜面は 1:2 で外側へ広がる。0 でマウンドなし。
+    [JsonPropertyName("harbor_mound")] public int? HarborMound { get; set; }
+
+    // 消波ブロックの被覆幅（防波堤の海側）。0/未指定で消波工なし。
+    [JsonPropertyName("harbor_armor")] public int? HarborArmor { get; set; }
+
+    // 杭間隔（桟橋）。鋼管杭を格子に打つ間隔。実物は 4〜6m。
+    [JsonPropertyName("harbor_pile_step")] public int? HarborPileStep { get; set; }
+
+    // 上部工厚（桟橋）。受梁と床版を合わせた厚み。実物は 1.5〜2m。
+    [JsonPropertyName("harbor_slab")] public int? HarborSlab { get; set; }
+
+    // 渡橋の長さ（桟橋を陸側へつなぐ取付部）。0/未指定で渡橋なし。幅は 8m 前後で自動。
+    [JsonPropertyName("harbor_approach")] public int? HarborApproach { get; set; }
+
+    // クレーンレールの軌間（岸壁）。0/未指定でレールなし。30 でおよそ 100ft（30.48m）。
+    [JsonPropertyName("harbor_gauge")] public int? HarborGauge { get; set; }
+
+    // 係船柱の間隔。0/未指定で係船柱なし。曲柱の最大間隔は船型別に 10〜45m。
+    [JsonPropertyName("harbor_bollard_step")] public int? HarborBollardStep { get; set; }
+
+    // 防舷材を前面に付けるか。既定 false。
+    [JsonPropertyName("harbor_fender")] public bool HarborFender { get; set; }
 
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |

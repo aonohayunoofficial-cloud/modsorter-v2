@@ -91,9 +91,9 @@ public static class ManualCatalog
         Impl("public_facility", "公共施設", () => new PublicFacilityParamsControl(), "建物"),
 
         // 港湾（国交省 港湾空港部 分類準拠）
-        Todo("quay", "岸壁", "港湾"),
-        Todo("pier", "桟橋", "港湾"),
-        Todo("breakwater", "防波堤", "港湾"),
+        Impl("quay", "岸壁", () => new HarborParamsControl("quay"), "港湾"),
+        Impl("pier", "桟橋", () => new HarborParamsControl("pier"), "港湾"),
+        Impl("breakwater", "防波堤", () => new HarborParamsControl("breakwater"), "港湾"),
         Todo("transit_shed", "上屋", "港湾"),
         Todo("drydock", "ドライドック", "港湾"),
         Todo("gantry_crane", "ガントリークレーン", "港湾"),
