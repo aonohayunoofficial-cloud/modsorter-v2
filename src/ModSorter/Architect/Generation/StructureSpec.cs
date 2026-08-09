@@ -215,6 +215,39 @@ public sealed class StructureSpec
     // 灯室の高さ（灯台）。回廊の上に載るガラス張りの部分。0 で灯室なし。
     [JsonPropertyName("harbor_lantern")] public int? HarborLantern { get; set; }
 
+    // 脚の高さ（クレーン）。レール面から横行桁の下端まで。実物のコンテナクレーンは
+    // 船を跨ぐため 30〜40m、荷役ヤードの橋形クレーンは 15〜18m。
+    [JsonPropertyName("harbor_leg_height")] public int? HarborLegHeight { get; set; }
+
+    // 脚の太さ（クレーン）。門形の柱1本の一辺。実物は 2〜3m 角の箱断面。
+    [JsonPropertyName("harbor_leg_size")] public int? HarborLegSize { get; set; }
+
+    // 走行方向の脚間隔（クレーン）。海側脚と陸側脚それぞれの前後スパン。
+    [JsonPropertyName("harbor_leg_base")] public int? HarborLegBase { get; set; }
+
+    // アウトリーチ（クレーン）。海側レールから海側へ張り出す桁の長さ。
+    // コンテナクレーンは 38〜60m、橋形クレーンのカンチレバーは 5〜15m。
+    [JsonPropertyName("harbor_outreach")] public int? HarborOutreach { get; set; }
+
+    // バックリーチ（クレーン）。陸側レールから陸側へ張り出す桁の長さ。実物は 8〜28m。
+    [JsonPropertyName("harbor_backreach")] public int? HarborBackreach { get; set; }
+
+    // 機械室・運転室の有無（クレーン）。true で陸側脚の上に機械室、桁下に運転室を付ける。
+    [JsonPropertyName("harbor_machinery")] public bool HarborMachinery { get; set; }
+
+    // ブームの起伏（クレーン）。0 で水平、1 以上で海側の桁を跳ね上げる（何マスにつき1上げるか）。
+    [JsonPropertyName("harbor_boom_raise")] public int? HarborBoomRaise { get; set; }
+
+    // 係船柱の形（"bollard"=直柱 / "bitt"=曲柱）。単体生成のときだけ使う。
+    [JsonPropertyName("harbor_bollard_type")] public string? HarborBollardType { get; set; }
+
+    // 係船柱の柱径と高さ（単体生成）。実物は径 0.3〜0.6m・高さ 0.5〜1m。
+    [JsonPropertyName("harbor_bollard_size")] public int? HarborBollardSize { get; set; }
+    [JsonPropertyName("harbor_bollard_height")] public int? HarborBollardHeight { get; set; }
+
+    // 台座の一辺（係船柱の単体生成）。0 で台座なし。
+    [JsonPropertyName("harbor_pedestal")] public int? HarborPedestal { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

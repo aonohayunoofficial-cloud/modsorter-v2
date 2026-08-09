@@ -23,6 +23,13 @@ namespace ModSorter.Architect.Generation;
 //   lighthouse … 灯台。塔高 20〜30m 級、塔身は下部直径 6〜8m から上へテーパーする。
 //                頂部に回廊（バルコニー）と灯室が載り、灯室はガラス張り。
 //                基礎の上に立つ独立塔で、水深・マウンドは使わない。
+//   crane      … ガントリークレーン。軌間 30.48m（100ft）、アウトリーチ 38〜60m、
+//                バックリーチ 8〜28m、全揚程 45m 級。門形の脚 2 組の上に横行桁が載り、
+//                海側のブームは起伏式で不使用時に跳ね上がる。
+//   bridgecrane… 橋形クレーン。荷役ヤードで使う門形で、スパン 23〜26m・揚程 15〜18m、
+//                両端に張り出し（カンチレバー）5〜15m。crane と同じ骨格を低く短く組む。
+//   bollard    … 係船柱の単体。曲柱（bitt）と直柱（bollard）があり、柱径 0.3〜0.6m・
+//                高さ 0.5〜1m。台座付きで岸壁の天端に据える金物。
 //
 // 断面は「海側が z=0、陸側が z の増加方向」で組み、最後に Rotate で海の向きを回す。
 // 1マス=1m。捨石マウンドや消波ブロック・防舷材は z<0 へ張り出すが、Normalize で 0 起点へ寄る。
@@ -62,6 +69,11 @@ public static class HarborExpander
             case "dock": return "drydock";
             case "lighthouse":
             case "light": return "lighthouse";
+            case "crane":
+            case "gantry": return "crane";
+            case "bridgecrane": return "bridgecrane";
+            case "bollard":
+            case "bitt": return "bollard";
             default: return "quay";
         }
     }
@@ -94,6 +106,9 @@ public static class HarborExpander
             case "breakwater": BuildBreakwater(cells, spec, p); break;
             case "drydock": BuildDryDock(cells, spec, p); break;
             case "lighthouse": BuildLighthouse(cells, spec, p); break;
+            case "crane": BuildCrane(cells, spec, p, tall: true); break;
+            case "bridgecrane": BuildCrane(cells, spec, p, tall: false); break;
+            case "bollard": BuildBollard(cells, spec, p); break;
             default: BuildQuay(cells, spec, p); break;
         }
 
@@ -442,6 +457,142 @@ public static class HarborExpander
                 cells[(cx, y, z + dz)] = glass;
                 return;
             }
+    }
+
+    // ===== クレーン（ガントリークレーン／橋形クレーン）=====
+    // 門形の脚 2 組（海側・陸側）の上に横行桁を渡し、海側へアウトリーチ、
+    // 陸側へバックリーチを張り出す。tall=true がコンテナクレーン（軌間 30m 級・
+    // 脚高 30m 級・ブーム起伏あり）、false が荷役ヤードの橋形クレーン。
+    // 走行方向を x、海陸方向を z にとる。z=0 が海側の桁先端。
+    private static void BuildCrane(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p, bool tall)
+    {
+        int gauge = Clamp(spec.HarborGauge ?? (tall ? 30 : 24), 6, 40);        // 軌間
+        int legH = Clamp(spec.HarborLegHeight ?? (tall ? 32 : 16), 6, 56);     // 脚の高さ
+        int legS = Clamp(spec.HarborLegSize ?? 2, 1, 5);                       // 脚の太さ
+        int legB = Clamp(spec.HarborLegBase ?? (tall ? 16 : 10), legS * 2, 40); // 走行方向の脚間隔
+        int outr = Clamp(spec.HarborOutreach ?? (tall ? 38 : 8), 0, 60);       // アウトリーチ
+        int back = Clamp(spec.HarborBackreach ?? (tall ? 14 : 8), 0, 30);      // バックリーチ
+        int raise = Clamp(spec.HarborBoomRaise ?? 0, 0, 4);                    // ブーム起伏
+        bool mach = spec.HarborMachinery;
+
+        int girder = 3;                       // 横行桁の厚み（上下弦材＋斜材ぶん）
+        int seaRail = outr;                   // 海側レールの z
+        int landRail = outr + gauge;          // 陸側レールの z
+        int zEnd = landRail + back;           // 陸側の桁先端
+        int topY = legH;                      // 横行桁の下端の y
+        int width = legB + legS;              // 走行方向の全幅（脚の外々）
+
+        // 走行装置（シルビーム）。脚の下端をレール方向へつなぐ台車。
+        foreach (int z in new[] { seaRail, landRail })
+        {
+            Fill(cells, 0, width - 1, 0, 0, z - legS / 2, z - legS / 2 + legS - 1, p.Trim);
+            Fill(cells, 0, width - 1, 1, 1, z - legS / 2, z - legS / 2 + legS - 1, p.Body);
+        }
+
+        // 門形の脚。走行方向の前後 2 本×海陸 2 組の計 4 本を立てる。
+        var legXs = new[] { 0, width - legS };
+        foreach (int lx in legXs)
+            foreach (int z in new[] { seaRail, landRail })
+                Fill(cells, lx, lx + legS - 1, 2, topY - 1, z - legS / 2, z - legS / 2 + legS - 1, p.Body);
+
+        // 脚の頭をつなぐ横梁（ポータルビーム）。海陸それぞれで走行方向に渡す。
+        foreach (int z in new[] { seaRail, landRail })
+            Fill(cells, 0, width - 1, topY - 2, topY - 1, z - legS / 2, z - legS / 2 + legS - 1, p.Trim);
+
+        // 横行桁。脚間から陸側先端までは水平。走行方向の両側に 1 本ずつ通す。
+        foreach (int lx in legXs)
+            Fill(cells, lx, lx + legS - 1, topY, topY + girder - 1, seaRail, zEnd, p.Trim);
+        // 桁の間を上弦でつなぎ、トロリの走る面を作る。
+        Fill(cells, 0, width - 1, topY + girder - 1, topY + girder - 1, seaRail, zEnd, p.Body);
+
+        // アウトリーチ（海側ブーム）。raise>0 なら先端へ向かって跳ね上げる。
+        for (int i = 0; i < outr; i++)
+        {
+            int z = seaRail - 1 - i;
+            int lift = raise > 0 ? (i + 1) / raise : 0;
+            foreach (int lx in legXs)
+                Fill(cells, lx, lx + legS - 1, topY + lift, topY + girder - 1 + lift, z, z, p.Trim);
+            for (int x = 0; x < width; x++) cells[(x, topY + girder - 1 + lift, z)] = p.Body;
+        }
+
+        // ブームを吊る支柱とタイバー。起伏式のブームは陸側脚の上の塔から引く。
+        if (tall)
+        {
+            int pylonY = topY + girder;
+            int pylonH = Math.Max(4, legH / 4);
+            int px = width / 2;
+            Fill(cells, px - legS / 2, px - legS / 2 + legS - 1, pylonY, pylonY + pylonH - 1,
+                 landRail - legS / 2, landRail - legS / 2 + legS - 1, p.Body);
+            // タイバー。塔の頂部から海側先端と陸側先端へ斜めに下る 1マス線。
+            int apex = pylonY + pylonH - 1;
+            TieBar(cells, px, apex, landRail, topY + girder, seaRail - outr, p.Trim);
+            TieBar(cells, px, apex, landRail, topY + girder, zEnd, p.Trim);
+        }
+
+        // 機械室と運転室。機械室は陸側桁の上、運転室は海側脚の内側の桁下に吊る。
+        if (mach)
+        {
+            int mz0 = landRail + 1, mz1 = Math.Min(zEnd, landRail + 6);
+            if (mz1 > mz0)
+                Box(cells, 1, width - 2, topY + girder, topY + girder + 3, mz0, mz1, p.Pave, p.Body);
+
+            int cx = width / 2;
+            int cz = seaRail - 2;
+            if (cz >= 0)
+                Box(cells, cx - 1, cx + 1, topY - 3, topY - 1, cz - 1, cz + 1, p.Fitting, p.Fitting);
+        }
+    }
+
+    // 2 点を結ぶ 1マス幅の斜材（タイバー・ステー）。x は固定、z-y 平面で引く。
+    private static void TieBar(
+        Dictionary<(int x, int y, int z), string> cells,
+        int x, int y0, int z0, int y1, int z1, string block)
+    {
+        int steps = Math.Max(Math.Abs(z1 - z0), Math.Abs(y1 - y0));
+        if (steps == 0) return;
+        for (int i = 0; i <= steps; i++)
+        {
+            int z = z0 + (int)Math.Round((double)(z1 - z0) * i / steps);
+            int y = y0 + (int)Math.Round((double)(y1 - y0) * i / steps);
+            if (!cells.ContainsKey((x, y, z))) cells[(x, y, z)] = block;
+        }
+    }
+
+    // ===== 係船柱（単体）=====
+    // 岸壁の天端に据える金物。曲柱（bitt）は頭部が張り出したキノコ形、
+    // 直柱（bollard）は上へ細くなる円柱。台座の上に載せる。
+    private static void BuildBollard(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        int dia = Clamp(spec.HarborBollardSize ?? 3, 1, 9);        // 柱径
+        int h = Clamp(spec.HarborBollardHeight ?? 4, 2, 16);       // 柱の高さ
+        int ped = Clamp(spec.HarborPedestal ?? (dia + 4), 0, 21);  // 台座の一辺
+        bool bitt = string.Equals(spec.HarborBollardType, "bitt", StringComparison.OrdinalIgnoreCase);
+
+        int span = Math.Max(ped, dia + 2);
+        double c = (span - 1) / 2.0;
+        int y = 0;
+
+        // 台座。天端に埋め込まれる四角い基礎。
+        if (ped > 0)
+        {
+            int lo = (int)Math.Round(c - (ped - 1) / 2.0);
+            Fill(cells, lo, lo + ped - 1, 0, 0, lo, lo + ped - 1, p.Pave);
+            y = 1;
+        }
+
+        // 柱身。直柱は上端で 2 マス細り、曲柱は太さを保つ。
+        int top = y + h - 1;
+        for (int k = 0; y <= top; y++, k++)
+        {
+            int d = (!bitt && h >= 4 && k >= h - 2 && dia > 1) ? dia - 2 : dia;
+            Disc(cells, c, d, y, p.Fitting, filled: true);
+        }
+
+        // 頭部。曲柱は 2 マス張り出したキノコ形、直柱は 1 マスの笠。
+        Disc(cells, c, dia + (bitt ? 2 : 1), y, p.Trim, filled: true);
+        if (bitt) Disc(cells, c, dia, y + 1, p.Fitting, filled: true);
     }
 
     // ===== 共通部品 =====
