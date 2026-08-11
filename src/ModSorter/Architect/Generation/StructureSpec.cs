@@ -273,6 +273,11 @@ public sealed class StructureSpec
     [JsonPropertyName("airport_spots")] public int? AirportSpots { get; set; }
     [JsonPropertyName("airport_spot_width")] public int? AirportSpotWidth { get; set; }
 
+    // 空港の平面土木施設で 1 マスが表す実寸(m)。既定 1（1マス=1m）。
+    // 標識の寸法は ICAO の規定どおり m で持ち、この値で割ってマスへ落とす。
+    // 10 にすると滑走路 2500m 級の全体像を 64 マスに収められる。
+    [JsonPropertyName("airport_scale")] public int? AirportScale { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

@@ -6,40 +6,75 @@ namespace ModSorter.Architect.Generation;
 
 // 空港の平面土木施設（structure_type="airport:<種類>"）の座標生成。
 // harbor と同じ早期リターン方式なので、ExpandCore の床・壁・屋根・開口部・
-// 入口保証・フットプリントマスクは一切通らない。既存の中分類には影響しない。
+// 入口保証・フットプリントマスクは一切通らない。既存の小分類には影響しない。
 //
-//   runway  … 滑走路。国内の主要空港は幅 45m（進入区分により 30m・60m もある）。
-//             舗装の外側にショルダーが付き、幅は誘導路で 9.5m 級。
-//             標識は中心線標識（長 30m・間隔 20m の破線）、進入端標識（縦縞 8 本を
-//             中心線対称に配置）、接地帯標識（進入端から 150m ごとの対の帯）、
-//             着陸目標点標識（進入端から 400m。滑走路長 2500m 級のとき）。
-//             縦縞の寸法は幅 30m 以上の滑走路とそれ未満で別に定められている。
-//   taxiway … 誘導路。幅は 23m 以上（大型機の就航する路線で 30m 級）。
-//             中心線標識は黄色の実線 1 本、両縁に誘導路縁標識の 2 本線が走る。
-//             固定障害物との間隔は 39m 以上で、その外側が整地区域になる。
-//   apron   … エプロン。スポット（駐機場）単位で区画され、各スポットに
-//             リードインライン（誘導線）とストップマークが引かれる。
-//             スポット間はブラスト間隔を取り、外周に走行路（タキシレーン）が回る。
+// ===== 寸法の扱い（再現性の要）=====
+// 標識・灯火の寸法は ICAO Annex 14 Vol.I 第5章と国交省の設計基準で m 単位に決まっている。
+// そこでこのクラスは実寸(m)を定数で持ち、Scale（1マス=何m）で割ってマスへ落とす。
+// マス数を直接書かないので、縮尺を変えても比率は実物のまま崩れない。
+//   Scale=1  … 1マス=1m。滑走路の進入端まわりを切り出す見せ方。延長64マス=64mなので
+//              150m 地点の接地帯標識は範囲外＝自動的に描かれない（実寸どおりの判定）。
+//   Scale=10 … 1マス=10m。滑走路 2500m 級の全体像を 64 マスに収める見せ方。
+//              このとき幅45mは5マスに落ちるが、標識の本数は実寸の幅から決まる。
 //
-// 平面なので断面は「進入端側が z=0、逆側が z の増加方向」で組み、
-// 最後に Rotate で向きを回す。1マス=1m。舗装は y=0 の 1 層だけで、
-// 標識は同じ y=0 の塗り分け（別ブロック）で表現する。灯火だけ y=1 に載る。
+// ===== 実寸の出典 =====
+//   滑走路幅         … Code E で 45m（Code C 30m / Code F 60m）
+//   滑走路ショルダー … Code D/E は舗装総幅 60m ＝ 片側 7.5m
+//   進入端標識       … 進入端から 6m の位置から始まる縦縞。長さ 30m 以上、幅 1.8m、
+//                      間隔 1.8m。本数は幅で決まる（18m:4 / 23m:6 / 30m:8 / 45m:12 / 60m:16）。
+//                      横は舗装縁から 3m 以内、または中心線から 27m 以内の小さい方まで。
+//   中心線標識       … 実線 30m ＋ 間隔 20m の破線（1周期 50m 以上）。幅は精密進入で 0.90m。
+//   着陸目標点標識   … 進入端から 400m（滑走路長 2400m 以上のとき）、長さ 45〜60m。
+//   接地帯標識       … 進入端から 150m ごとの対。帯の長さ 22.5m。
+//   滑走路縁灯       … 間隔 60m 以下。
+//   誘導路幅         … Code E で 23m 以上。ショルダーは片側 5.5m（舗装総幅 34m）。
+//   誘導路中心線標識 … 黄の実線 1 本、幅 0.15m。縁標識は 2 本の連続線。
+//   エプロン         … スポット幅は「翼幅＋翼端間隔」。Code C（A320 翼幅 35.8m）で
+//                      間隔 4.5m ＝約 40m、Code E（B777 翼幅 64.8m）で 7.5m ＝約 72m。
+//
+// 滑走路指示標識（進入端の数字）は文字なので、このクラスでは生成しない。
+//
+// 平面なので断面は「進入端側が z=0、逆側が z の増加方向」で組み、最後に Rotate で向きを回す。
+// 舗装は y=0 の 1 層で、標識は同じ層の塗り分け、灯火だけ y=1 に載る。
+// ショルダーが負座標へ張り出すぶんも Normalize で 0 起点へ寄る。
 //
 // StructureSpec との対応。
-//   width          … 幅（x 方向）。滑走路 45 / 誘導路 23 / エプロンは区画幅
-//   depth          … 長さ（z 方向）。64 マス上限のため実物の一部を切り出す粒度
-//   airport_shoulder … ショルダー幅（片側）、airport_marking … 標識の有無
-//   airport_center_step … 中心線標識の周期（0 で実線）
-//   airport_threshold … 進入端標識の縦縞の本数（0 で無し）
-//   airport_touchdown … 接地帯標識の対の数（0 で無し）
-//   airport_edge_light … 縁灯の間隔（0 で灯火なし）
-//   airport_spots  … エプロンのスポット数、airport_spot_width … スポットの幅
-//   facade_face    … 進入端・接続側の向き（既定 south）
-//   floor_block=舗装 / accent_block=標識（白・黄）/ base_block=ショルダー
+//   width … 幅（x 方向・マス） / depth … 延長（z 方向・マス）
+//   airport_scale       … 1マスあたりの実寸(m)。既定 1
+//   airport_shoulder    … ショルダー幅（片側・マス）。0 でなし
+//   airport_marking     … 標識の有無
+//   airport_center_step … 中心線標識の周期(m)。0 で実線。既定 50m
+//   airport_threshold   … 進入端標識の本数。null で幅から自動決定、0 で無し
+//   airport_touchdown   … 接地帯標識の対の上限数。0 で無し
+//   airport_edge_light  … 縁灯の間隔(m)。0 で灯火なし。既定 60m
+//   airport_spots       … エプロンのスポット数 / airport_spot_width … スポットの幅（マス）
+//   facade_face … 進入端・接続側の向き（既定 south）
+//   floor_block=舗装 / accent_block=標識 / base_block=ショルダー
 //   seat_block=縁灯 / wall_block=区画線・ストップマーク
 public static class AirportExpander
 {
     public const string Prefix = "airport:";
+
+    // ===== 実寸（m）。マス数はすべてここから Scale で割って導く =====
+    private const double ThresholdOffsetM = 6.0;     // 進入端から縦縞の始まりまで
+    private const double ThresholdStripeLenM = 30.0; // 縦縞の長さ（最小30m）
+    private const double StripeWidthM = 1.8;         // 縦縞の幅
+    private const double EdgeClearM = 3.0;           // 舗装縁から縦縞までの空き
+    private const double CenterOnM = 30.0;           // 中心線標識の実線長
+    private const double CenterOffM = 20.0;          // 中心線標識の間隔
+    private const double CenterWidthM = 0.90;        // 中心線標識の幅（精密進入）
+    private const double AimPointM = 400.0;          // 着陸目標点標識の位置
+    private const double AimLenM = 45.0;             // 着陸目標点標識の長さ
+    private const double AimWidthM = 6.0;            // 着陸目標点標識の幅
+    private const double TdzFirstM = 150.0;          // 接地帯標識の1組目
+    private const double TdzStepM = 150.0;           // 接地帯標識の間隔
+    private const double TdzLenM = 22.5;             // 接地帯標識の帯の長さ
+    private const double TdzWidthM = 3.0;            // 接地帯標識の帯の幅
+    private const double SideOffsetM = 18.0;         // 中心線から接地帯・目標点までの横距離
+    private const double EdgeLightM = 60.0;          // 縁灯の間隔
+    private const double TaxiCenterWidthM = 0.15;    // 誘導路中心線標識の幅
+    private const double RunwayShoulderM = 7.5;      // 滑走路ショルダー（片側）
+    private const double TaxiShoulderM = 5.5;        // 誘導路ショルダー（片側）
 
     // StructureExpander から呼ぶ判定。"airport:" で始まる structure_type だけを受け持つ。
     public static bool Handles(string? structureType)
@@ -91,19 +126,15 @@ public static class AirportExpander
     }
 
     // ===== 滑走路 =====
-    // 幅 45m を既定にし、舗装面の上に中心線・進入端・接地帯・着陸目標点の各標識を置く。
-    // 実物の標識は m 単位で決まっているが、延長が 64 マス上限なので周期を保った縮約にする。
     private static void BuildRunway(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
     {
-        int w = Clamp(spec.Width, 12, 64);                       // 幅（実物 45m 級）
-        int len = Clamp(spec.Depth, 16, 64);                     // 延長
-        int shoulder = Clamp(spec.AirportShoulder ?? 7, 0, 12);  // ショルダー（片側）
-        int cstep = Clamp(spec.AirportCenterStep ?? 5, 0, 12);   // 中心線の周期
-        int thr = Clamp(spec.AirportThreshold ?? 8, 0, 16);      // 進入端の縦縞の本数
-        int tdz = Clamp(spec.AirportTouchdown ?? 3, 0, 6);       // 接地帯標識の対の数
-        int elight = Clamp(spec.AirportEdgeLight ?? 6, 0, 16);   // 縁灯の間隔
-        bool marking = spec.AirportMarking;
+        double scale = Math.Max(1, spec.AirportScale ?? 1);
+        int w = Clamp(spec.Width, 6, 64);        // 幅（マス）
+        int len = Clamp(spec.Depth, 8, 64);      // 延長（マス）
+        double widthM = w * scale;               // 幅の実寸。標識の本数はこれで決まる
+
+        int shoulder = Clamp(spec.AirportShoulder ?? M0(RunwayShoulderM, scale), 0, 16);
 
         // ショルダー。舗装の外側へ左右に張り出す（負座標は Normalize で寄る）。
         if (shoulder > 0)
@@ -115,74 +146,96 @@ public static class AirportExpander
         // 舗装面。
         Fill(cells, 0, w - 1, 0, 0, 0, len - 1, p.Pave);
 
-        if (marking)
-        {
-            int cx = (w - 1) / 2;
+        int cx = (w - 1) / 2;
+        int cw = M(CenterWidthM, scale);         // 中心線標識の幅
+        int cx0 = cx - (cw - 1) / 2;
+        int cx1 = cx0 + cw - 1;
 
-            // 中心線標識。実物は長 30m・間隔 20m の破線なので、描く方を長く取る。
-            if (cstep > 0)
+        if (spec.AirportMarking)
+        {
+            // ===== 中心線標識 =====
+            // 実線30m＋間隔20mの破線。周期に 0 を指定すると実線になる。
+            double periodM = spec.AirportCenterStep ?? (CenterOnM + CenterOffM);
+            if (periodM <= 0)
             {
-                int on = Math.Max(2, cstep * 3 / 5);
-                for (int z = 0; z < len; z++)
-                    if (z % cstep < on) cells[(cx, 0, z)] = p.Mark;
+                Fill(cells, cx0, cx1, 0, 0, 0, len - 1, p.Mark);
             }
             else
             {
-                for (int z = 0; z < len; z++) cells[(cx, 0, z)] = p.Mark;
+                int period = M(periodM, scale);
+                int on = Math.Max(1, (int)Math.Round(period * CenterOnM / (CenterOnM + CenterOffM)));
+                for (int z = 0; z < len; z++)
+                    if (z % period < on) Fill(cells, cx0, cx1, 0, 0, z, z, p.Mark);
             }
 
-            // 進入端標識。中心線を挟んで対称に並ぶ縦縞。実物は 8 本（幅 45m のとき）。
-            if (thr > 0)
+            // ===== 進入端標識 =====
+            // 本数は幅から決まる（45m なら 12 本）。指定があればそれを優先する。
+            int stripes = Clamp(spec.AirportThreshold ?? ThresholdStripes(widthM), 0, 20);
+            if (stripes >= 2)
             {
-                int half = thr / 2;
-                int barLen = Math.Max(3, len / 8);
-                for (int i = 0; i < half; i++)
+                int half = stripes / 2;
+                int sw = M(StripeWidthM, scale);              // 縞の幅
+                int z0 = M0(ThresholdOffsetM, scale);         // 進入端からの空き
+                int z1 = Math.Min(len - 1, z0 + M(ThresholdStripeLenM, scale) - 1);
+
+                // 片側に使える幅。中心線標識の外側から、舗装縁の 3m 手前まで。
+                int inner = cx1 + 1;
+                int outer = w - 1 - M0(EdgeClearM, scale);
+                int span = outer - inner + 1;
+
+                if (z1 >= z0 && span >= sw)
                 {
-                    int off = 2 + i * 2;
-                    foreach (int x in new[] { cx - off, cx + off })
-                        if (x >= 0 && x < w)
-                            Fill(cells, x, x, 0, 0, 2, 2 + barLen - 1, p.Mark);
+                    // 最外の縞の外端がちょうど outer に来るよう等間隔に割る。
+                    // 縞の幅は実寸を守り、間隔で辻褄を合わせる（縁からの空きが実物どおりになる）。
+                    double pitch = (half <= 1) ? 0 : (double)(span - sw) / (half - 1);
+                    for (int i = 0; i < half; i++)
+                    {
+                        int a = inner + (int)Math.Round(i * pitch);
+                        int b = Math.Min(outer, a + sw - 1);
+                        if (a > outer) break;
+
+                        // 中心線を挟んで対称に置く。
+                        Fill(cells, a, b, 0, 0, z0, z1, p.Mark);
+                        Fill(cells, Math.Max(0, cx - (b - cx)), Math.Max(0, cx - (a - cx)),
+                             0, 0, z0, z1, p.Mark);
+                    }
                 }
             }
 
-            // 接地帯標識。進入端から一定間隔で、中心線の左右に対で並ぶ帯。
-            if (tdz > 0)
+            // ===== 着陸目標点標識 =====
+            // 進入端から 400m。延長が足りなければ描かれない（実寸どおりの判定）。
+            int aimZ = M0(AimPointM, scale);
+            int aimLen = M(AimLenM, scale);
+            bool hasAim = aimZ + aimLen <= len;
+            if (hasAim)
+                PairBand(cells, cx, w, SideOffsetM, AimWidthM, aimZ, aimZ + aimLen - 1, scale, p.Mark);
+
+            // ===== 接地帯標識 =====
+            // 進入端から 150m ごとの対。着陸目標点と重なる組は置かない。
+            int tdzMax = Clamp(spec.AirportTouchdown ?? 6, 0, 8);
+            int tdzLen = M(TdzLenM, scale);
+            for (int i = 0; i < tdzMax; i++)
             {
-                int start = 2 + Math.Max(3, len / 8) + 3;
-                int step = Math.Max(4, (len - start) / Math.Max(1, tdz));
-                int barLen = Math.Max(2, step / 3);
-                for (int i = 0; i < tdz; i++)
-                {
-                    int z0 = start + i * step;
-                    if (z0 + barLen > len) break;
-                    foreach (int x in new[] { cx - 4, cx + 4 })
-                        if (x >= 0 && x < w)
-                            Fill(cells, x, x, 0, 0, z0, z0 + barLen - 1, p.Mark);
-                }
+                int tz = M0(TdzFirstM + i * TdzStepM, scale);
+                if (tz + tdzLen > len) break;
+                if (hasAim && tz < aimZ + aimLen && tz + tdzLen > aimZ) continue;
+                PairBand(cells, cx, w, SideOffsetM, TdzWidthM, tz, tz + tdzLen - 1, scale, p.Mark);
             }
         }
 
-        // 滑走路縁灯。舗装の両縁に沿って一定間隔で灯火を置く。
-        if (elight > 0)
-        {
-            for (int z = elight / 2; z < len; z += elight)
-            {
-                cells[(0, 1, z)] = p.Light;
-                cells[(w - 1, 1, z)] = p.Light;
-            }
-        }
+        // ===== 滑走路縁灯 =====
+        EdgeLights(cells, p, w, len, spec.AirportEdgeLight ?? (int)EdgeLightM, scale);
     }
 
     // ===== 誘導路 =====
-    // 幅 23m 以上が基準。中心線は黄の実線 1 本、両縁に縁標識の線が走る。
+    // 幅 23m 以上が基準。中心線は黄の実線 1 本、両縁に縁標識の 2 本線が走る。
     private static void BuildTaxiway(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
     {
-        int w = Clamp(spec.Width, 8, 48);                        // 幅（実物 23m 以上）
-        int len = Clamp(spec.Depth, 8, 64);                      // 延長
-        int shoulder = Clamp(spec.AirportShoulder ?? 9, 0, 16);  // ショルダー（実物 9.5m 級）
-        int elight = Clamp(spec.AirportEdgeLight ?? 8, 0, 16);   // 縁灯の間隔
-        bool marking = spec.AirportMarking;
+        double scale = Math.Max(1, spec.AirportScale ?? 1);
+        int w = Clamp(spec.Width, 4, 48);
+        int len = Clamp(spec.Depth, 8, 64);
+        int shoulder = Clamp(spec.AirportShoulder ?? M0(TaxiShoulderM, scale), 0, 16);
 
         if (shoulder > 0)
         {
@@ -192,73 +245,127 @@ public static class AirportExpander
 
         Fill(cells, 0, w - 1, 0, 0, 0, len - 1, p.Pave);
 
-        if (marking)
+        if (spec.AirportMarking)
         {
             // 中心線標識。誘導路は実線。
             int cx = (w - 1) / 2;
-            Fill(cells, cx, cx, 0, 0, 0, len - 1, p.Mark);
+            int cw = M(TaxiCenterWidthM, scale);
+            Fill(cells, cx, cx + cw - 1, 0, 0, 0, len - 1, p.Mark);
 
-            // 誘導路縁標識。舗装の縁から 1 マス内側に 2 本線で走る。
+            // 誘導路縁標識。舗装の縁から 1 マス内側に走る連続線。
             foreach (int x in new[] { 1, w - 2 })
-                if (x > 0 && x < w - 1)
+                if (x > 0 && x < w - 1 && (x < cx || x > cx + cw - 1))
                     Fill(cells, x, x, 0, 0, 0, len - 1, p.Line);
         }
 
-        if (elight > 0)
-            for (int z = elight / 2; z < len; z += elight)
-            {
-                cells[(0, 1, z)] = p.Light;
-                cells[(w - 1, 1, z)] = p.Light;
-            }
+        EdgeLights(cells, p, w, len, spec.AirportEdgeLight ?? (int)EdgeLightM, scale);
     }
 
     // ===== エプロン =====
-    // スポット（駐機場）単位で区画し、各スポットにリードインラインとストップマークを引く。
-    // 外周には走行路（タキシレーン）が回るので、奥側に 1 本ぶんの帯を空ける。
+    // スポット（駐機場）1 つの寸法は「翼幅＋両側のクリアランス」で決まる。
+    // クリアランスは Annex 14 でコード A/B が 3.0m、C が 4.5m、D/E/F が 7.5m。
+    // ここでは幅を入力として受けず、UI が機体サイズから決めた 1 スポットぶんの幅を
+    // airport_spot_width で受け取り、スポット数ぶん横に並べる。全幅の頭打ちはしない。
+    // 頭打ちすると端のスポットだけ切れて左右非対称になるため。
+    // スポット幅は奇数に丸め、リードインラインを厳密な中央に載せる。
+    // 区画線は各スポットが自分の枠の両端に引くので、並べても対称のまま。
     private static void BuildApron(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
     {
-        int spots = Clamp(spec.AirportSpots ?? 3, 1, 8);          // スポット数
-        int sw = Clamp(spec.AirportSpotWidth ?? 18, 6, 40);       // スポットの幅
-        int len = Clamp(spec.Depth, 12, 64);                      // 奥行き（駐機＋走行路）
-        int lane = Clamp(spec.AirportShoulder ?? 10, 0, 24);      // 走行路の幅
+        int spots = Clamp(spec.AirportSpots ?? 3, 1, 12);        // スポット数
+        int sw = Clamp(spec.AirportSpotWidth ?? 45, 5, 96);      // 1 スポットの幅
+        if (sw % 2 == 0) sw++;                                   // 中央 1 マスを確保
+        int lane = Clamp(spec.AirportShoulder ?? 0, 0, 32);      // 走行路（タキシレーン）
+        int len = Clamp(spec.Depth, 6, 192);                     // 駐機区画＋走行路
         bool marking = spec.AirportMarking;
 
-        int w = Math.Min(64, spots * sw);
-        int stand = Math.Max(4, len - lane);                      // 駐機区画の奥行き
+        int w = spots * sw;                                      // 全幅は従属値
+        int stand = Math.Max(4, len - lane);                     // 駐機区画の奥行き
+        int total = stand + lane;
 
         // 舗装面。駐機区画と走行路をまとめて 1 面で敷く。
-        Fill(cells, 0, w - 1, 0, 0, 0, len - 1, p.Pave);
+        Fill(cells, 0, w - 1, 0, 0, 0, total - 1, p.Pave);
 
         if (!marking) return;
+
+        int barHalf = Math.Max(1, sw / 6);                       // ストップマークの半幅
+        int stopZ = Math.Max(2, stand / 5);                      // 機首の停止位置
 
         for (int i = 0; i < spots; i++)
         {
             int x0 = i * sw;
-            int x1 = Math.Min(w - 1, x0 + sw - 1);
-            if (x0 >= w) break;
-            int cx = (x0 + x1) / 2;
+            int x1 = x0 + sw - 1;
+            int cx = x0 + sw / 2;                                // 奇数幅なので厳密な中央
 
-            // 区画線。スポットとスポットの境界。手前（駐機区画）だけに引く。
-            if (i > 0) Fill(cells, x0, x0, 0, 0, 0, stand - 1, p.Line);
+            // 区画線。自分の枠の両端に引くので、隣り合うスポットの境界は 2 本線になる。
+            Fill(cells, x0, x0, 0, 0, 0, stand - 1, p.Line);
+            Fill(cells, x1, x1, 0, 0, 0, stand - 1, p.Line);
 
-            // リードインライン。走行路から駐機位置へ導く誘導線。
-            Fill(cells, cx, cx, 0, 0, 0, stand - 1, p.Mark);
+            // リードインライン。走行路側から停止位置まで。
+            Fill(cells, cx, cx, 0, 0, stopZ, stand - 1, p.Mark);
 
-            // ストップマーク。機首の停止位置を示す横棒。
-            int sz = Math.Max(1, stand / 4);
-            Fill(cells, cx - 2, cx + 2, 0, 0, sz, sz, p.Mark);
+            // ストップマーク。機首の停止位置を示す横棒。中心から左右等幅。
+            Fill(cells, cx - barHalf, cx + barHalf, 0, 0, stopZ, stopZ, p.Mark);
         }
 
         // 走行路の中心線。駐機区画の奥を横切る。
         if (lane > 0)
         {
-            int lz = stand + lane / 2;
-            if (lz < len) Fill(cells, 0, w - 1, 0, 0, lz, lz, p.Mark);
+            int lz = stand + (lane - 1) / 2;
+            Fill(cells, 0, w - 1, 0, 0, lz, lz, p.Mark);
         }
     }
 
     // ===== 共通ヘルパー =====
+
+    // 実寸(m) → マス数。最低 1 マス（塗る対象が消えないように）。
+    private static int M(double meters, double scale)
+        => Math.Max(1, (int)Math.Round(meters / scale));
+
+    // 実寸(m) → マス数。0 を許す（間隔・空きで「無し」を表せるように）。
+    private static int M0(double meters, double scale)
+        => Math.Max(0, (int)Math.Round(meters / scale));
+
+    // 進入端標識の本数（ICAO Annex 14 Vol.I の表）。幅は実寸(m)。
+    private static int ThresholdStripes(double widthM)
+    {
+        if (widthM < 20.5) return 4;    // 18m 級
+        if (widthM < 26.5) return 6;    // 23m 級
+        if (widthM < 37.5) return 8;    // 30m 級
+        if (widthM < 52.5) return 12;   // 45m 級
+        return 16;                       // 60m 級
+    }
+
+    // 中心線から左右対称に、指定の横距離・幅で帯を置く。接地帯標識と着陸目標点標識に使う。
+    private static void PairBand(
+        Dictionary<(int x, int y, int z), string> cells,
+        int cx, int w, double offM, double bandM, int z0, int z1, double scale, string block)
+    {
+        int off = M(offM, scale);
+        int bw = M(bandM, scale);
+
+        int ra = cx + off, rb = ra + bw - 1;
+        int lb = cx - off, la = lb - bw + 1;
+
+        if (ra < w) Fill(cells, Math.Max(0, ra), Math.Min(w - 1, rb), 0, 0, z0, z1, block);
+        if (lb >= 0) Fill(cells, Math.Max(0, la), Math.Min(w - 1, lb), 0, 0, z0, z1, block);
+    }
+
+    // 舗装の両縁に沿って一定間隔で灯火を置く。間隔は実寸(m)。
+    private static void EdgeLights(
+        Dictionary<(int x, int y, int z), string> cells, Palette p,
+        int w, int len, int intervalM, double scale)
+    {
+        if (intervalM <= 0) return;
+        int step = M0(intervalM, scale);
+        if (step <= 0) return;
+
+        for (int z = step / 2; z < len; z += step)
+        {
+            cells[(0, 1, z)] = p.Light;
+            cells[(w - 1, 1, z)] = p.Light;
+        }
+    }
 
     private static void Fill(
         Dictionary<(int x, int y, int z), string> cells,
