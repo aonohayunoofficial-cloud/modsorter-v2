@@ -1119,10 +1119,10 @@
                                        TextWrapping="Wrap" Margin="0,8,0,12"
                                        Text="スライダーを動かすと右のプレビューが自動追従します。AI(LLM)は使いません。"/>
 
-                                <!-- ===== 大分類 → 中分類 セレクタ(フェーズ4: マスター表駆動) ===== -->
+                                <!-- ===== 大分類 → 中分類 → 小分類 セレクタ(マスター表駆動) ===== -->
                                 <!-- 項目は ManualCatalog（コード側の単一の正）から
-                                     ItemsSource で流し込む。XAML に項目は書かない。
-                                     未実装の中分類も網羅登録され「（未実装）」付きで並ぶ。 -->
+                                 ItemsSource で流し込む。XAML に項目は書かない。
+                                 未実装の小分類も網羅登録され「（未実装）」付きで並ぶ。 -->
                                 <TextBlock Text="大分類"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
@@ -1135,6 +1135,18 @@
                                       SelectionChanged="ManualCategory_SelectionChanged"/>
 
                                 <TextBlock Text="中分類"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                                <ComboBox x:Name="ManualMiddleCategoryCombo"
+                                      Style="{StaticResource McComboBox}"
+                                      ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                      DisplayMemberPath="Label"
+                                      MaxDropDownHeight="420"
+                                      Width="320" HorizontalAlignment="Left"
+                                      Margin="0,4,0,8"
+                                      SelectionChanged="ManualMiddleCategory_SelectionChanged"/>
+
+                                <TextBlock Text="小分類"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
                                 <ComboBox x:Name="ManualSubCategoryCombo"

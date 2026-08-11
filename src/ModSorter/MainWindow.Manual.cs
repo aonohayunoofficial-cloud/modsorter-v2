@@ -442,16 +442,20 @@ public partial class MainWindow
         }
     }
 
-    // ===== 大分類 → 中分類 セレクタ(フェーズ1.5 → フェーズ4でマスター表駆動へ) =====
-    // 中分類の一覧・表示名・UI生成関数は ManualCatalog が単一の正。
-    // 中分類を実装するときは ManualCatalog の該当行に factory を渡すだけでよい。
+    // ===== 大分類 → 中分類 → 小分類 セレクタ(マスター表駆動) =====
+    // 小分類の一覧・表示名・UI生成関数は ManualCatalog が単一の正。
+    // 小分類を実装するときは ManualCatalog の該当行に factory を渡すだけでよい。
+    //
+    // 中分類(港湾・空港など)で一段絞ってから小分類を出す。1つのプルダウンに
+    // 数十件が並ばなくなるので、目的の項目までスクロールする手間がなくなる。
 
     // 初回だけ大分類 ComboBox にマスター表を流し込む。
-    // 大分類の選択が中分類 ComboBox を連鎖更新し、そこで初期UIが載る。
+    // 大分類 → 中分類 → 小分類 と連鎖更新し、最後に初期UIが載る。
     private void ManualEnsureCatalogLoaded()
     {
         if (_manualCatalogLoaded) return;
-        if (ManualCategoryCombo == null || ManualSubCategoryCombo == null) return;
+        if (ManualCategoryCombo == null || ManualMiddleCategoryCombo == null
+            || ManualSubCategoryCombo == null) return;
 
         _manualSuppressSelector = true;
         try
@@ -462,18 +466,45 @@ public partial class MainWindow
         finally { _manualSuppressSelector = false; }
 
         _manualCatalogLoaded = true;
-        ManualReloadSubCategories();
+        ManualReloadMiddleCategories();
     }
 
     // 選択中の大分類に属する中分類を中分類 ComboBox へ流し込む。
-    // 既定選択は最初の実装済み中分類（無ければ先頭）。
+    // 既定選択は最初の「実装済みを含む」中分類（無ければ先頭）。
+    private void ManualReloadMiddleCategories()
+    {
+        if (ManualMiddleCategoryCombo == null) return;
+
+        var category = ManualCategoryCombo?.SelectedItem as ManualCatalog.Category;
+        IReadOnlyList<ManualCatalog.MiddleCategory> middles =
+            category?.Middles ?? new List<ManualCatalog.MiddleCategory>();
+
+        int initial = 0;
+        for (int i = 0; i < middles.Count; i++)
+        {
+            if (middles[i].HasImplemented) { initial = i; break; }
+        }
+
+        _manualSuppressSelector = true;
+        try
+        {
+            ManualMiddleCategoryCombo.ItemsSource = middles;
+            ManualMiddleCategoryCombo.SelectedIndex = middles.Count > 0 ? initial : -1;
+        }
+        finally { _manualSuppressSelector = false; }
+
+        ManualReloadSubCategories();
+    }
+
+    // 選択中の中分類に属する小分類を小分類 ComboBox へ流し込む。
+    // 既定選択は最初の実装済み小分類（無ければ先頭）。
     private void ManualReloadSubCategories()
     {
         if (ManualSubCategoryCombo == null) return;
 
-        var category = ManualCategoryCombo?.SelectedItem as ManualCatalog.Category;
+        var middle = ManualMiddleCategoryCombo?.SelectedItem as ManualCatalog.MiddleCategory;
         IReadOnlyList<ManualCatalog.SubCategory> subs =
-            category?.Subs ?? new List<ManualCatalog.SubCategory>();
+            middle?.Subs ?? new List<ManualCatalog.SubCategory>();
 
         int initial = 0;
         for (int i = 0; i < subs.Count; i++)
@@ -492,7 +523,7 @@ public partial class MainWindow
         ManualApplySubCategory();
     }
 
-    // 選択中の中分類に応じて ManualParamHost.Content を差し替える。
+    // 選択中の小分類に応じて ManualParamHost.Content を差し替える。
     // 未実装なら案内テキストを載せる（IManualParamControl ではないので描画は空になる）。
     private void ManualApplySubCategory()
     {
@@ -512,8 +543,8 @@ public partial class MainWindow
             ManualParamHost.Content = new TextBlock
             {
                 Text = sub == null
-                    ? "中分類を選択してください。"
-                    : $"「{sub.DisplayName}」は未実装です。実装済みの中分類を選んでください。",
+                    ? "小分類を選択してください。"
+                    : $"「{sub.DisplayName}」は未実装です。実装済みの小分類を選んでください。",
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (System.Windows.Media.Brush)FindResource("TextDim"),
                 FontFamily = (System.Windows.Media.FontFamily)FindResource("PixelFont"),
@@ -526,6 +557,13 @@ public partial class MainWindow
     }
 
     private void ManualCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_manualSuppressSelector) return;
+        ManualReloadMiddleCategories();
+        ManualScheduleRender();
+    }
+
+    private void ManualMiddleCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_manualSuppressSelector) return;
         ManualReloadSubCategories();

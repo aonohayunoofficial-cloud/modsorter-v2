@@ -248,6 +248,31 @@ public sealed class StructureSpec
     // 台座の一辺（係船柱の単体生成）。0 で台座なし。
     [JsonPropertyName("harbor_pedestal")] public int? HarborPedestal { get; set; }
 
+    // ===== 空港の平面土木施設（structure_type="airport:"）=====
+    // ショルダー幅（片側）。滑走路・誘導路の舗装の外側に付く路肩。
+    // 誘導路のショルダーは実物で 9.5m 級。エプロンでは走行路（タキシレーン）の幅として使う。
+    [JsonPropertyName("airport_shoulder")] public int? AirportShoulder { get; set; }
+
+    // 標識（マーキング）を描くか。false で舗装面だけになる。
+    [JsonPropertyName("airport_marking")] public bool AirportMarking { get; set; }
+
+    // 中心線標識の周期（滑走路）。0 で実線。実物は長 30m・間隔 20m の破線。
+    [JsonPropertyName("airport_center_step")] public int? AirportCenterStep { get; set; }
+
+    // 進入端標識の縦縞の本数。0 で無し。実物は幅 45m の滑走路で 8 本。
+    // 縦縞の寸法は幅 30m 以上の滑走路とそれ未満とで別に定められている。
+    [JsonPropertyName("airport_threshold")] public int? AirportThreshold { get; set; }
+
+    // 接地帯標識の対の数。0 で無し。実物は進入端から一定間隔で並ぶ。
+    [JsonPropertyName("airport_touchdown")] public int? AirportTouchdown { get; set; }
+
+    // 縁灯の間隔。0 で灯火なし。舗装の両縁に沿って y=1 に並ぶ。
+    [JsonPropertyName("airport_edge_light")] public int? AirportEdgeLight { get; set; }
+
+    // エプロンのスポット（駐機場）数と 1 スポットの幅。
+    [JsonPropertyName("airport_spots")] public int? AirportSpots { get; set; }
+    [JsonPropertyName("airport_spot_width")] public int? AirportSpotWidth { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

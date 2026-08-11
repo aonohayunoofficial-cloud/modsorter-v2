@@ -116,6 +116,14 @@ public static partial class StructureExpander
             // ぶんも HarborExpander 側で 0 起点へ正規化するので、通常の展開は一切通さない。
             return HarborExpander.Build(spec, allowedBlocks, fallback);
         }
+        if (AirportExpander.Handles(structureType))
+        {
+            // 空港の平面土木施設（"airport:" 接頭辞）は AirportExpander が滑走路・誘導路・
+            // エプロンを確定的に作る。舗装は y=0 の 1 層で、標識は同じ層の塗り分け、
+            // 縁灯だけ y=1 に載る。ショルダーが負座標へ張り出すぶんも AirportExpander 側で
+            // 0 起点へ正規化するので、通常の床/壁/屋根の展開は一切通さない。
+            return AirportExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
