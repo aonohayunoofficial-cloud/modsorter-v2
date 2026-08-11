@@ -15,6 +15,8 @@ namespace ModSorter.Architect.Manual;
 //   ガントリークレーン … 軌間 30.48m（100ft）が標準。アウトリーチ 38〜60m、
 //     バックリーチ 8〜28m、全揚程 45m 級。海側のブームは起伏式で不使用時に跳ね上がる。
 //     脚は 2〜3m 角の箱断面で、走行方向の脚間隔は 16m 前後。
+//     ブーム起伏角は 0〜84 度が実機の範囲で、荷役中は 0 度（水平）、格納時は
+//     ラチスブームの実用上限にあたる 70〜80 度まで立てる。
 //   橋形クレーン … 荷役ヤードで使う門形。スパン 23〜26m・揚程 15〜18m、
 //     両端の張り出し（カンチレバー）は 5〜15m。ブームの起伏は持たない。
 public sealed class CraneParamsControl : UserControl, IManualParamControl
@@ -49,7 +51,7 @@ public sealed class CraneParamsControl : UserControl, IManualParamControl
                .Note("アウトリーチは船幅を跨ぐ長さ。バックリーチは陸側の荷置き場ぶん。")
                .IntSlider("outr", "アウトリーチ", 0, 60, 38)
                .IntSlider("back", "バックリーチ", 0, 30, 14)
-               .IntSlider("raise", "ブームの起伏", 0, 4, 0, "0で水平。1で急に跳ね上げる");
+               .IntSlider("raise", "ブーム起伏角", 0, 84, 0, "度。0が荷役中の水平、80前後が格納姿勢");
 
             _ui.Heading("付属")
                .Toggle("mach", "機械室・運転室あり", "骨格のみ", true);
@@ -97,13 +99,16 @@ public sealed class CraneParamsControl : UserControl, IManualParamControl
         allowed = _ui.BlockIds();
         if (allowed.Count == 0) allowed.Add(body);
 
+        // 跳ね上げた先端の高さぶんを参考値の Height に足しておく。
+        int tipLift = (int)Math.Round(Math.Tan(raise * Math.PI / 180.0) * outr);
+
         var spec = new StructureSpec
         {
             StructureType = _tall ? "harbor:crane" : "harbor:bridgecrane",
             FacadeFace = _ui.GetChoice("sea", "south"),
-            Width = legB + legS,                 // 参考値。骨格は harbor_* から組む
-            Depth = outr + gauge + back,         // 参考値
-            Height = legH + 8,                   // 参考値
+            Width = legB + legS,                      // 参考値。骨格は harbor_* から組む
+            Depth = outr + gauge + back,              // 参考値
+            Height = legH + 8 + tipLift,              // 参考値
             HarborGauge = gauge,
             HarborLegHeight = legH,
             HarborLegSize = legS,
@@ -119,7 +124,7 @@ public sealed class CraneParamsControl : UserControl, IManualParamControl
         };
 
         string name = _tall ? "ガントリークレーン" : "橋形クレーン";
-        string boomNote = _tall ? (raise > 0 ? $"ブーム起伏{raise}" : "ブーム水平") : "カンチレバー";
+        string boomNote = _tall ? (raise > 0 ? $"ブーム起伏{raise}度" : "ブーム水平（荷役中）") : "カンチレバー";
         string machNote = mach ? "機械室・運転室あり" : "骨格のみ";
         summary = $"{name} 軌間{gauge}・脚高{legH} / 海側{outr}＋陸側{back} / {boomNote} / {machNote}";
         return spec;

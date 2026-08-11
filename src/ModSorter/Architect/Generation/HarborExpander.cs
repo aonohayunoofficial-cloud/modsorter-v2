@@ -464,6 +464,11 @@ public static class HarborExpander
     // 陸側へバックリーチを張り出す。tall=true がコンテナクレーン（軌間 30m 級・
     // 脚高 30m 級・ブーム起伏あり）、false が荷役ヤードの橋形クレーン。
     // 走行方向を x、海陸方向を z にとる。z=0 が海側の桁先端。
+    //
+    // ブームの起伏角は実物に合わせて 0〜84 度（港湾クレーンの諸元表の範囲）。
+    // ラチスブームの実用上限は 70〜80 度で、STS の格納姿勢がその上端にあたる。
+    // 起伏の支点は海側脚の直上（seaRail）で、そこから先端までを円弧ではなく
+    // 直線の傾斜として組む。桁と同じ厚み・同じ幅を保ったまま持ち上げる。
     private static void BuildCrane(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p, bool tall)
     {
@@ -473,7 +478,7 @@ public static class HarborExpander
         int legB = Clamp(spec.HarborLegBase ?? (tall ? 16 : 10), legS * 2, 40); // 走行方向の脚間隔
         int outr = Clamp(spec.HarborOutreach ?? (tall ? 38 : 8), 0, 60);       // アウトリーチ
         int back = Clamp(spec.HarborBackreach ?? (tall ? 14 : 8), 0, 30);      // バックリーチ
-        int raise = Clamp(spec.HarborBoomRaise ?? 0, 0, 4);                    // ブーム起伏
+        int raise = tall ? Clamp(spec.HarborBoomRaise ?? 0, 0, 84) : 0;        // ブーム起伏角（度）
         bool mach = spec.HarborMachinery;
 
         int girder = 3;                       // 横行桁の厚み（上下弦材＋斜材ぶん）
@@ -490,7 +495,7 @@ public static class HarborExpander
             Fill(cells, 0, width - 1, 1, 1, z - legS / 2, z - legS / 2 + legS - 1, p.Body);
         }
 
-        // 門形の脚。走行方向の前後 2 本×海陸 2 組の計 4 本を立てる。
+        // 門形の脚。走行方向の前後 2 本×海陸 2 組の計 4 本を立てている。
         var legXs = new[] { 0, width - legS };
         foreach (int lx in legXs)
             foreach (int z in new[] { seaRail, landRail })
@@ -500,23 +505,33 @@ public static class HarborExpander
         foreach (int z in new[] { seaRail, landRail })
             Fill(cells, 0, width - 1, topY - 2, topY - 1, z - legS / 2, z - legS / 2 + legS - 1, p.Trim);
 
-        // 横行桁。脚間から陸側先端までは水平。走行方向の両側に 1 本ずつ通す。
-        foreach (int lx in legXs)
-            Fill(cells, lx, lx + legS - 1, topY, topY + girder - 1, seaRail, zEnd, p.Trim);
-        // 桁の間を上弦でつなぎ、トロリの走る面を作る。
-        Fill(cells, 0, width - 1, topY + girder - 1, topY + girder - 1, seaRail, zEnd, p.Body);
+        // 脚間の横行桁とバックリーチ。桁は下弦・腹・上弦の 3 層で、走行方向は全幅ぶん。
+        // 下弦と上弦を面で張り、その間の腹は走行方向の両端だけを閉じた箱桁にする。
+        GirderSpan(cells, p, 0, width - 1, topY, girder, seaRail, zEnd, 0, 0);
 
-        // アウトリーチ（海側ブーム）。raise>0 なら先端へ向かって跳ね上げる。
-        for (int i = 0; i < outr; i++)
+        // アウトリーチ（海側ブーム）。支点は海側レールで、そこから先端へ raise 度で上がる。
+        // 1 マス進むごとの上がり幅を tan(raise) から出し、桁と同じ断面のまま傾ける。
+        if (outr > 0)
         {
-            int z = seaRail - 1 - i;
-            int lift = raise > 0 ? (i + 1) / raise : 0;
-            foreach (int lx in legXs)
-                Fill(cells, lx, lx + legS - 1, topY + lift, topY + girder - 1 + lift, z, z, p.Trim);
-            for (int x = 0; x < width; x++) cells[(x, topY + girder - 1 + lift, z)] = p.Body;
+            double slope = Math.Tan(raise * Math.PI / 180.0);
+            int tipLift = 0;
+            for (int i = 1; i <= outr; i++)
+            {
+                int z = seaRail - i;
+                int lift = (int)Math.Round(slope * i);
+                tipLift = lift;
+                // 前の断面との段差を垂直材で埋め、斜路が途切れないようにする。
+                int prevLift = (int)Math.Round(slope * (i - 1));
+                GirderSpan(cells, p, 0, width - 1, topY + lift, girder, z, z, prevLift - lift, 0);
+            }
+
+            // ブーム先端の妻面。トロリの行き止まりになる面を閉じる。
+            Fill(cells, 0, width - 1, topY + tipLift, topY + tipLift + girder - 1,
+                 seaRail - outr, seaRail - outr, p.Trim);
         }
 
-        // ブームを吊る支柱とタイバー。起伏式のブームは陸側脚の上の塔から引く。
+        // ブームを吊る支柱（Aフレーム）とタイバー。起伏式のブームは陸側脚の上の塔から引く。
+        // 跳ね上げたときの先端に追従させるため、タイバーの海側端は実際の先端高さへ結ぶ。
         if (tall)
         {
             int pylonY = topY + girder;
@@ -524,10 +539,15 @@ public static class HarborExpander
             int px = width / 2;
             Fill(cells, px - legS / 2, px - legS / 2 + legS - 1, pylonY, pylonY + pylonH - 1,
                  landRail - legS / 2, landRail - legS / 2 + legS - 1, p.Body);
-            // タイバー。塔の頂部から海側先端と陸側先端へ斜めに下る 1マス線。
+
             int apex = pylonY + pylonH - 1;
-            TieBar(cells, px, apex, landRail, topY + girder, seaRail - outr, p.Trim);
-            TieBar(cells, px, apex, landRail, topY + girder, zEnd, p.Trim);
+            if (outr > 0)
+            {
+                int tipY = topY + (int)Math.Round(Math.Tan(raise * Math.PI / 180.0) * outr) + girder;
+                TieBar(cells, px, apex, landRail, tipY, seaRail - outr, p.Trim);
+            }
+            if (back > 0)
+                TieBar(cells, px, apex, landRail, topY + girder, zEnd, p.Trim);
         }
 
         // 機械室と運転室。機械室は陸側桁の上、運転室は海側脚の内側の桁下に吊る。
@@ -542,6 +562,24 @@ public static class HarborExpander
             if (cz >= 0)
                 Box(cells, cx - 1, cx + 1, topY - 3, topY - 1, cz - 1, cz + 1, p.Fitting, p.Fitting);
         }
+    }
+
+    // 横行桁の 1 区間。下弦・上弦を面で張り、走行方向の両端に腹板を立てた箱桁にする。
+    // drop>0 のときは下弦をその分だけ下へ延ばし、傾斜区間の段差を垂直材で埋める。
+    private static void GirderSpan(
+        Dictionary<(int x, int y, int z), string> cells, Palette p,
+        int x0, int x1, int baseY, int girder, int z0, int z1, int drop, int rise)
+    {
+        int lowY = baseY - Math.Max(0, drop);
+        int topOfGirder = baseY + girder - 1 + Math.Max(0, rise);
+
+        // 下弦。傾斜で生じた段差ぶんだけ下へ伸ばす。
+        Fill(cells, x0, x1, lowY, baseY, z0, z1, p.Trim);
+        // 腹板。走行方向の両端だけを閉じ、内側は開けてトラスらしく見せる。
+        Fill(cells, x0, x0, baseY, topOfGirder, z0, z1, p.Trim);
+        Fill(cells, x1, x1, baseY, topOfGirder, z0, z1, p.Trim);
+        // 上弦。トロリの走る面。
+        Fill(cells, x0, x1, topOfGirder, topOfGirder, z0, z1, p.Body);
     }
 
     // 2 点を結ぶ 1マス幅の斜材（タイバー・ステー）。x は固定、z-y 平面で引く。
