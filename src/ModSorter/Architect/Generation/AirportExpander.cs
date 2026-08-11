@@ -27,11 +27,14 @@ namespace ModSorter.Architect.Generation;
 //   着陸目標点標識   … 進入端から 400m（滑走路長 2400m 以上のとき）、長さ 45〜60m。
 //   接地帯標識       … 進入端から 150m ごとの対。帯の長さ 22.5m。
 //   滑走路縁灯       … 間隔 60m 以下。
-//   誘導路幅         … Code E で 23m 以上。ショルダーは片側 5.5m（舗装総幅 34m）。
+//   誘導路幅         … Code B:10.5m / C:15m（主脚外側間隔 6m 未満）・18m（6〜9m）/
+//                      E:23m / F:25m。ショルダー込みの舗装総幅は C:25m / D:38m /
+//                      E:44m / F:60m なので、Code E なら片側 10.5m。
 //   誘導路中心線標識 … 黄の実線 1 本、幅 0.15m。縁標識は 2 本の連続線。
-//   エプロン         … スポット幅は「翼幅＋翼端間隔」。Code C（A320 翼幅 35.8m）で
-//                      間隔 4.5m ＝約 40m、Code E（B777 翼幅 64.8m）で 7.5m ＝約 72m。
-//
+//   エプロン         … スポット幅は「翼幅＋両側のクリアランス」。クリアランスは
+//                      Code A/B:3.0m、C:4.5m、D/E/F:7.5m。A320（翼幅 35.8m）で
+//                      約 45m、B777（翼幅 64.8m）で約 80m。
+
 // 滑走路指示標識（進入端の数字）は文字なので、このクラスでは生成しない。
 //
 // 平面なので断面は「進入端側が z=0、逆側が z の増加方向」で組み、最後に Rotate で向きを回す。
@@ -74,7 +77,7 @@ public static class AirportExpander
     private const double EdgeLightM = 60.0;          // 縁灯の間隔
     private const double TaxiCenterWidthM = 0.15;    // 誘導路中心線標識の幅
     private const double RunwayShoulderM = 7.5;      // 滑走路ショルダー（片側）
-    private const double TaxiShoulderM = 5.5;        // 誘導路ショルダー（片側）
+    private const double TaxiShoulderM = 10.5;       // 誘導路ショルダー（Code E・片側）
 
     // StructureExpander から呼ぶ判定。"airport:" で始まる structure_type だけを受け持つ。
     public static bool Handles(string? structureType)
