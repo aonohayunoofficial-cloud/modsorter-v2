@@ -433,6 +433,64 @@ public sealed class StructureSpec
     // 橋脚の間隔（マス）。ラーメン高架橋の柱スパンは 8〜10m 級。
     [JsonPropertyName("rail_pier_step")] public int? RailPierStep { get; set; }
 
+
+    // 屋根の形。上屋・跨線橋・車庫で共通。
+    // "gable"（切妻）| "shed"（片流れ）| "flat"（陸屋根）| "arch"（アーチ）。
+    [JsonPropertyName("rail_canopy_roof")] public string? RailCanopyRoof { get; set; }
+
+    // 軒の出（マス）。0 でホーム幅ちょうど。1 以上にすると軌道の上へ張り出すので、
+    // 建築限界（軌道中心±1.9m・高さ5.7m）を避けるため軒高を 6 以上へ引き上げる。
+    [JsonPropertyName("rail_eave")] public int? RailEave { get; set; }
+
+    // 柱の列数。1（中央1列・Y型）または 2（両側2列）。
+    [JsonPropertyName("rail_column_rows")] public int? RailColumnRows { get; set; }
+
+    // 柱の間隔（マス）。古レール上屋は約4.5m、現代は5m級。
+    [JsonPropertyName("rail_column_step")] public int? RailColumnStep { get; set; }
+
+    // 屋根勾配。何マス進んで1マス上がるか。3 ≒ 18度、4 ≒ 14度。
+    [JsonPropertyName("rail_roof_pitch")] public int? RailRoofPitch { get; set; }
+
+    // 雨といを付けるか。軒先の1マス下に通す。
+    [JsonPropertyName("rail_gutter")] public bool RailGutter { get; set; }
+
+    // 照明の間隔（マス）。0 で照明なし。
+    [JsonPropertyName("rail_light_step")] public int? RailLightStep { get; set; }
+
+    // 跨線橋が跨ぐ長さ（マス）。通路の走る方向の全長。
+    [JsonPropertyName("rail_span")] public int? RailSpan { get; set; }
+
+    // 階段の付き方。"both"（両端・既定）| "one"（片側だけ）| "none"（階段なし）。
+    [JsonPropertyName("rail_stair")] public string? RailStair { get; set; }
+
+    // 階段の幅（マス）。バリアフリー誘導基準は 140cm 以上。
+    [JsonPropertyName("rail_stair_width")] public int? RailStairWidth { get; set; }
+
+    // 階段の踏面（マス）。1マス上がるごとに何マス進むか。
+    // 2 ≒ 26.6度で、実物の蹴上げ0.16m・踏面0.30m（約28度）に最も近い。
+    [JsonPropertyName("rail_stair_run")] public int? RailStairRun { get; set; }
+
+    // 腰壁・手すりの高さ（マス）。
+    [JsonPropertyName("rail_wall_height")] public int? RailWallHeight { get; set; }
+
+    // 跨線橋に屋根を付けるか。
+    [JsonPropertyName("rail_covered")] public bool RailCovered { get; set; }
+
+    // 車庫の線数。
+    [JsonPropertyName("rail_tracks")] public int? RailTracks { get; set; }
+
+    // 検車ピットの深さ（マス）。0 でピットなし。実物は 1.2m 級。
+    [JsonPropertyName("rail_pit")] public int? RailPit { get; set; }
+
+    // 屋上点検ホームを付けるか。車両屋根上（およそ3.6m）の高さに通路を回す。
+    [JsonPropertyName("rail_roof_walk")] public bool RailRoofWalk { get; set; }
+
+    // 車庫の扉を閉めた状態で描くか。false なら開口のまま。
+    [JsonPropertyName("rail_shutter")] public bool RailShutter { get; set; }
+
+    // 事務所棟の奥行き（マス）。0 で事務所棟なし。
+    [JsonPropertyName("rail_annex")] public int? RailAnnex { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

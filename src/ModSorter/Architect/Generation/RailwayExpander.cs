@@ -42,10 +42,17 @@ namespace ModSorter.Architect.Generation;
 //   rail_track_pitch … 相対式の2線の軌道中心間隔 / rail_track_margin … 線路の延長
 //   rail_platform_door … ホームドアの高さ / rail_tactile … 点状ブロック
 //   rail_end_ramp … ホーム端の勾配 / rail_viaduct … 高架 / rail_pier_step … 橋脚の間隔
-//   floor_block=天端 / accent_block=縁端の白線 / base_block=躯体・橋脚
-//   wall_block=点状ブロック / tower_block=道床
-//   parapet_block=柵・ホームドア / roof_block=高架の床版
-public static class RailwayExpander
+//   floor_block=天端 / accent_block=縁端の白線 / base_block=躯体・柱・橋脚
+//   wall_block=点状ブロック・壁 / tower_block=道床 / seat_block=照明・小物
+//   veranda_block=採光帯・シャッター / parapet_block=柵・手すり・ホームドア
+//   roof_block=屋根・床版
+//
+// 部品は partial の別ファイルに分けてある。
+//   RailwayExpander.Roof.cs     屋根形状の共通ヘルパー（上屋・跨線橋・車庫で共用）
+//   RailwayExpander.Canopy.cs   ホーム上屋
+//   RailwayExpander.Overpass.cs 跨線橋
+//   RailwayExpander.Depot.cs    車庫
+public static partial class RailwayExpander
 {
     public const string Prefix = "railway:";
 
@@ -69,6 +76,12 @@ public static class RailwayExpander
         if (s.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) s = s.Substring(Prefix.Length);
         switch (s.Trim().ToLowerInvariant())
         {
+            case "platform_canopy":
+            case "canopy": return "platform_canopy";
+            case "overpass":
+            case "footbridge": return "overpass";
+            case "depot":
+            case "car_shed": return "depot";
             case "platform":
             default: return "platform";
         }
@@ -83,7 +96,7 @@ public static class RailwayExpander
 
     private sealed class Palette
     {
-        public readonly string Pave, Edge, Body, Tactile, Ballast, Fence, Girder;
+        public readonly string Pave, Edge, Body, Tactile, Ballast, Fence, Girder, Trim, Glass;
 
         public Palette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -94,6 +107,8 @@ public static class RailwayExpander
             Ballast = Pick(spec.TowerBlock, allowed, Body);
             Fence = Pick(spec.ParapetBlock, allowed, Edge);
             Girder = Pick(spec.RoofBlock, allowed, Body);
+            Trim = Pick(spec.SeatBlock, allowed, Edge);
+            Glass = Pick(spec.VerandaBlock, allowed, Edge);
         }
     }
 
@@ -103,9 +118,18 @@ public static class RailwayExpander
         var p = new Palette(spec, allowedBlocks, fallback);
         var cells = new Dictionary<(int x, int y, int z), string>();
 
-        // 現状はプラットフォームのみ。駅舎・上屋・跨線橋・車庫はここに case を足す。
+        // 駅舎はここに case を足す。
         switch (KindOf(spec.StructureType))
         {
+            case "platform_canopy":
+                BuildCanopy(cells, spec, p);
+                break;
+            case "overpass":
+                BuildOverpass(cells, spec, p);
+                break;
+            case "depot":
+                BuildDepot(cells, spec, p);
+                break;
             case "platform":
             default:
                 BuildPlatform(cells, spec, p);

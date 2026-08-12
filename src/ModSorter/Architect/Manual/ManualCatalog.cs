@@ -148,9 +148,9 @@ public static class ManualCatalog
         Mid("railway", "鉄道",
             Todo("station_building", "駅舎"),
             Impl("platform", "プラットフォーム", () => new PlatformParamsControl()),
-            Todo("platform_canopy", "ホーム上屋"),
-            Todo("overpass", "跨線橋"),
-            Todo("depot", "車庫")),
+            Impl("platform_canopy", "ホーム上屋", () => new PlatformCanopyParamsControl()),
+            Impl("overpass", "跨線橋", () => new OverpassParamsControl()),
+            Impl("depot", "車庫", () => new DepotParamsControl())),
 
         // 橋梁
         Mid("bridge", "橋梁",
