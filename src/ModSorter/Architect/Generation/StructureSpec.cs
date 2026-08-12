@@ -356,6 +356,25 @@ public sealed class StructureSpec
     // 事務所棟の桁行き（マス）。0 でなし。倉庫の妻側に付く2層の別棟。
     [JsonPropertyName("airport_office")] public int? AirportOffice { get; set; }
 
+    // ===== 格納庫（structure_type="airport:hangar"）=====
+    // 1マス=1m。width を扉の開口幅、depth を奥行き、height を庫内の有効高さとして使う。
+
+    // 扉の高さ（マス）。NFPA 409 は 28ft（8.5m）超で Group I 扱い。
+    // 2026 年の改訂でこの境が 35ft（10.7m）へ上がった。
+    [JsonPropertyName("airport_door_height")] public int? AirportDoorHeight { get; set; }
+
+    // 収める機体の数。扉の開口が機体数ぶん横に伸びる。
+    [JsonPropertyName("airport_bays")] public int? AirportBays { get; set; }
+
+    // 屋根の形。"arch"（既定・アーチトラス） | "flat"（陸屋根） | "shed"（片流れ）。
+    [JsonPropertyName("airport_hangar_roof")] public string? AirportHangarRoof { get; set; }
+
+    // 扉の形式。"slide"（既定・引き分け戸） | "fold"（折り戸） | "open"（扉なし）。
+    [JsonPropertyName("airport_door_type")] public string? AirportDoorType { get; set; }
+
+    // 側面に付く附属棟の奥行き（マス）。0 でなし。工場・部品庫・事務所が入る。
+    [JsonPropertyName("airport_annex")] public int? AirportAnnex { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

@@ -137,7 +137,7 @@ public static class ManualCatalog
             Impl("control_tower", "管制塔", () => new ControlTowerParamsControl()),
             Impl("passenger_terminal", "旅客ターミナル", () => new PassengerTerminalParamsControl()),
             Impl("cargo_terminal", "貨物ターミナル", () => new CargoTerminalParamsControl()),
-            Todo("hangar", "格納庫"),
+            Impl("hangar", "格納庫", () => new HangarParamsControl()),
             Impl("runway", "滑走路", () => new AirportPavementParamsControl("runway")),
             Impl("taxiway", "誘導路", () => new AirportPavementParamsControl("taxiway")),
             Impl("apron", "エプロン", () => new AirportPavementParamsControl("apron")),
