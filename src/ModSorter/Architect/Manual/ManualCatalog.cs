@@ -147,7 +147,7 @@ public static class ManualCatalog
         // 鉄道駅
         Mid("railway", "鉄道",
             Todo("station_building", "駅舎"),
-            Todo("platform", "プラットフォーム"),
+            Impl("platform", "プラットフォーム", () => new PlatformParamsControl()),
             Todo("platform_canopy", "ホーム上屋"),
             Todo("overpass", "跨線橋"),
             Todo("depot", "車庫")),

@@ -124,6 +124,13 @@ public static partial class StructureExpander
             // 0 起点へ正規化するので、通常の床/壁/屋根の展開は一切通さない。
             return AirportExpander.Build(spec, allowedBlocks, fallback);
         }
+        if (RailwayExpander.Handles(structureType))
+        {
+            // 鉄道（"railway:" 接頭辞）は RailwayExpander がプラットフォームなどを
+            // 確定的に作る。線路・道床・ホーム躯体が負座標へ張り出すぶんも
+            // RailwayExpander 側で 0 起点へ正規化するので、通常の展開は一切通さない。
+            return RailwayExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);

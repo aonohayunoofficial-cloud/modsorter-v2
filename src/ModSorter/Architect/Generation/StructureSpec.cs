@@ -401,6 +401,36 @@ public sealed class StructureSpec
 
     // 高架式にするときの高さ（マス）。0 で地上式。
     [JsonPropertyName("airport_heli_elevated")] public int? AirportHeliElevated { get; set; }
+    
+    // ===== 鉄道（structure_type="railway:<種類>"）=====
+    // 1マス=1m。空港の建物系と同じ縮尺なので並べても寸法が食い違わない。
+    // プラットフォームでは width=ホーム幅、depth=ホーム長、
+    // height=レール面からホーム天端までの高さとして使う。
+
+    // ホームの形式。"island"（島式1面2線・既定）| "side"（単式1面1線）|
+    // "opposed"（相対式2面2線）。
+    [JsonPropertyName("rail_platform_type")] public string? RailPlatformType { get; set; }
+
+    // 相対式のときの2線の軌道中心間隔（マス）。在来線 4.0m、新幹線 4.3m。
+    [JsonPropertyName("rail_track_pitch")] public int? RailTrackPitch { get; set; }
+
+    // ホーム端から先へ線路を伸ばす長さ（マス）。0 でホーム長ちょうど。
+    [JsonPropertyName("rail_track_margin")] public int? RailTrackMargin { get; set; }
+
+    // ホームドア（可動式ホーム柵）の高さ（マス）。0 でなし。腰高タイプは 1.3m 級。
+    [JsonPropertyName("rail_platform_door")] public int? RailPlatformDoor { get; set; }
+
+    // 縁端警告の点状ブロックを敷くか。縁端から 80cm 以上離す規定なので 1 マス内側に置く。
+    [JsonPropertyName("rail_tactile")] public bool RailTactile { get; set; }
+
+    // ホーム端を勾配で落とすか。実物のホーム端は斜路で下がる。
+    [JsonPropertyName("rail_end_ramp")] public bool RailEndRamp { get; set; }
+
+    // 高架の路盤面の高さ（マス）。0 で地上。3 以上で床版と橋脚が入る。
+    [JsonPropertyName("rail_viaduct")] public int? RailViaduct { get; set; }
+
+    // 橋脚の間隔（マス）。ラーメン高架橋の柱スパンは 8〜10m 級。
+    [JsonPropertyName("rail_pier_step")] public int? RailPierStep { get; set; }
 
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
