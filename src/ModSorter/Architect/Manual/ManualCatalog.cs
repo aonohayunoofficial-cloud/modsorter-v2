@@ -141,8 +141,8 @@ public static class ManualCatalog
             Impl("runway", "滑走路", () => new AirportPavementParamsControl("runway")),
             Impl("taxiway", "誘導路", () => new AirportPavementParamsControl("taxiway")),
             Impl("apron", "エプロン", () => new AirportPavementParamsControl("apron")),
-            Todo("approach_light", "進入灯"),
-            Todo("helipad", "ヘリポート")),
+            Impl("approach_light", "進入灯", () => new ApproachLightParamsControl()),
+            Impl("helipad", "ヘリポート", () => new HelipadParamsControl())),
 
         // 鉄道駅
         Mid("railway", "鉄道",

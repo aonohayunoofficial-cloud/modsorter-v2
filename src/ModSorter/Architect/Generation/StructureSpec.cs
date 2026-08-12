@@ -375,6 +375,33 @@ public sealed class StructureSpec
     // 側面に付く附属棟の奥行き（マス）。0 でなし。工場・部品庫・事務所が入る。
     [JsonPropertyName("airport_annex")] public int? AirportAnnex { get; set; }
 
+    // ===== 進入灯（structure_type="airport:approach_light"）=====
+    // 平面土木と同じく airport_scale で m からマスへ落とす。
+    // depth は進入端から手前へ伸ばす長さ（マス）。width は滑走路の幅。
+
+    // 灯火システムの種類。"cat1"（既定） | "cat2" | "simple"。
+    [JsonPropertyName("airport_als_type")] public string? AirportAlsType { get; set; }
+
+    // バレット（短い灯列）を使うか。true だとクロスバーが減る（Annex 14 の規定）。
+    [JsonPropertyName("airport_als_barrette")] public bool AirportAlsBarrette { get; set; }
+
+    // 進入灯橋（架台）の高さ（マス）。0 で地面置き。海上・傾斜地の進入灯に使う。
+    [JsonPropertyName("airport_als_trestle")] public int? AirportAlsTrestle { get; set; }
+
+    // 進入路指示灯（PAPI）を置くか。滑走路の左側、進入端から 300m の位置。
+    [JsonPropertyName("airport_papi")] public bool AirportPapi { get; set; }
+
+    // ===== ヘリポート（structure_type="airport:helipad"）=====
+
+    // D 値（設計ヘリコプターの全長）の実寸(m)。すべての寸法がここから決まる。
+    [JsonPropertyName("airport_heli_d")] public int? AirportHeliD { get; set; }
+
+    // 進入区域の識別のため FATO を 1D にするか。false だと 0.83D（限定用途）。
+    [JsonPropertyName("airport_heli_full_fato")] public bool AirportHeliFullFato { get; set; }
+
+    // 高架式にするときの高さ（マス）。0 で地上式。
+    [JsonPropertyName("airport_heli_elevated")] public int? AirportHeliElevated { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

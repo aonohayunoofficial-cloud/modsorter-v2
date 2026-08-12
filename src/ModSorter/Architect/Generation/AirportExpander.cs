@@ -34,6 +34,20 @@ namespace ModSorter.Architect.Generation;
 //   エプロン         … スポット幅は「翼幅＋両側のクリアランス」。クリアランスは
 //                      Code A/B:3.0m、C:4.5m、D/E/F:7.5m。A320（翼幅 35.8m）で
 //                      約 45m、B777（翼幅 64.8m）で約 80m。
+//   進入灯 CAT I     … 進入端から 900m のセンターライン（間隔 30m）＋
+//                      クロスバー 150/300/450/600/750m の5本。300m のものは長さ 30m、
+//                      他は外縁を結ぶ線が進入端の 300m 先で収束するよう調整する。
+//                      0〜300m は1灯、300〜600m は2灯、600〜900m は3灯。
+//   進入灯 CAT II/III… CAT I に加えて 270m まで伸びる赤の側方列（間隔 30m）。
+//   進入灯 簡易式    … 420m 以上のセンターライン（間隔 60m・30m まで詰めてよい）＋
+//                      300m の位置に長さ 18m か 30m のクロスバー1本。
+//   バレット         … 簡易式で 3m 以上、他で 4m 以上。使うときクロスバーは
+//                      CAT I で 300m の1本、CAT II/III で 150m と 300m の2本だけになる。
+//   ヘリポート       … すべて D 値（設計ヘリの全長）から決まる。FATO は 1D
+//                      （限定用途なら 0.83D）、TLOF は 0.83D、セーフティエリアは
+//                      FATO の外へ 3m か 0.25D の大きい方。TLOF 縁灯は緑・間隔 5m 以下。
+//                      進入方向指示の H は D<16m のとき高さ 3m。
+//                      TD/PM 円は内径 0.5D。
 
 // 滑走路指示標識（進入端の数字）は文字なので、このクラスでは生成しない。
 //
@@ -136,6 +150,10 @@ public static class AirportExpander
             case "cargo_terminal":
             case "cargo": return "cargo_terminal";
             case "hangar": return "hangar";
+            case "approach_light":
+            case "als": return "approach_light";
+            case "helipad":
+            case "heliport": return "helipad";
             default: return "runway";
         }
     }
@@ -174,6 +192,8 @@ public static class AirportExpander
             case "terminal": BuildTerminal(cells, spec, p); break;
             case "cargo_terminal": BuildCargoTerminal(cells, spec, p); break;
             case "hangar": BuildHangar(cells, spec, p); break;
+            case "approach_light": BuildApproachLight(cells, spec, p); break;
+            case "helipad": BuildHelipad(cells, spec, p); break;
             default: BuildRunway(cells, spec, p); break;
         }
 
@@ -1114,6 +1134,253 @@ public static class AirportExpander
     {
         string v = (s ?? "slide").Trim().ToLowerInvariant();
         return (v == "fold" || v == "open") ? v : "slide";
+    }
+
+
+    // ===== 進入灯 =====
+    // 平面土木なので滑走路と同じく実寸(m)を持ち、Scale で割ってマスへ落とす。
+    // 進入端が z=0 で、そこから手前（z の増加方向）へ伸びる。最後に Rotate で向きを回す。
+    //
+    // 実寸（ICAO Annex 14 Vol.I 第5章）。
+    //   CAT I      … センターライン 900m（間隔30m）＋クロスバー 150/300/450/600/750m。
+    //                300m のクロスバーは長さ30m、他は外縁を結ぶ線が進入端の300m先で
+    //                収束するよう調整する。0〜300m は1灯、300〜600m は2灯、
+    //                600〜900m は3灯（灯数で距離が読めるようにするため）。
+    //   CAT II/III … CAT I に加えて 270m まで伸びる赤の側方列（間隔30m）。
+    //   簡易式     … 420m 以上（間隔60m・30mまで詰めてよい）＋300m に長さ18mか30mの
+    //                クロスバー1本。
+    //   バレット   … 簡易式で3m以上、他で4m以上。使うときクロスバーは CAT I で 300m の
+    //                1本、CAT II/III で 150m と 300m の2本だけ。
+    //
+    // 900m は Scale=1 だと 900 マスになる。縮尺 5〜10 を選ぶ前提の小分類。
+    private const double AlsCat1LenM = 900.0;   // CAT I・CAT II/III のセンターライン長
+    private const double AlsSimpleLenM = 420.0; // 簡易式のセンターライン長
+    private const double AlsSpacingM = 30.0;    // センターラインの間隔
+    private const double AlsSimpleSpacingM = 60.0; // 簡易式の間隔
+    private const double AlsCrossbar300M = 30.0; // 300m のクロスバーの長さ
+    private const double AlsConvergeM = 300.0;   // 外縁を結ぶ線が収束する位置（進入端の先）
+    private const double AlsSideRowM = 270.0;    // CAT II/III の側方列の長さ
+    private const double AlsBarretteM = 4.0;     // バレットの長さ（簡易式は 3m）
+    private const double PapiOffsetM = 300.0;    // PAPI の位置（進入端から）
+    private const double PapiSideM = 15.0;       // PAPI の横距離（滑走路縁から）
+
+    private static void BuildApproachLight(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        double scale = Math.Max(1, spec.AirportScale ?? 1);
+        string type = AlsTypeOf(spec.AirportAlsType);
+        bool barrette = spec.AirportAlsBarrette;
+        int trestle = Clamp(spec.AirportAlsTrestle ?? 0, 0, 8);
+        bool simple = (type == "simple");
+
+        double lenM = simple ? AlsSimpleLenM : AlsCat1LenM;
+        int len = Clamp(spec.Depth, 8, M((int)lenM, scale));   // 実際に描く長さ（マス）
+        int rw = Odd(Clamp(spec.Width, 5, 63));                // 滑走路の幅（マス）
+        int cx = rw / 2;                                        // 中心線の x
+
+        double spacingM = simple ? AlsSimpleSpacingM : AlsSpacingM;
+        int step = Math.Max(1, M(spacingM, scale));
+        double barM = simple ? 3.0 : AlsBarretteM;
+        int barHalf = barrette ? Math.Max(0, M(barM, scale) / 2) : 0;
+
+        int ty = trestle;   // 灯火を載せる高さ
+
+        // ===== 進入端の帯 =====
+        // 滑走路の側を示す基準。ここから手前へ灯列が伸びる。
+        Fill(cells, 0, rw - 1, 0, 0, 0, 0, p.Pave);
+        Fill(cells, 0, rw - 1, ty + 1, ty + 1, 0, 0, p.Mark);
+
+        // ===== センターライン =====
+        for (int k = 1; k * step <= len; k++)
+        {
+            int z = k * step;
+            double distM = z * scale;   // 進入端からの実寸
+
+            // 灯数。0〜300m は1灯、300〜600m は2灯、600〜900m は3灯。
+            // 簡易式は距離によらず1灯。
+            int lamps = simple ? 1 : (distM <= 300.0 ? 1 : (distM <= 600.0 ? 2 : 3));
+            int half = barrette ? barHalf : (lamps - 1);
+
+            Trestle(cells, cx, z, ty, p);
+            Fill(cells, cx - half, cx + half, ty + 1, ty + 1, z, z, p.Light);
+        }
+
+        // ===== クロスバー =====
+        // バレットを使うときは本数が減る（CAT I は 300m のみ、CAT II/III は 150m と 300m）。
+        double[] bars = simple
+            ? new[] { 300.0 }
+            : (barrette
+                ? (type == "cat2" ? new[] { 150.0, 300.0 } : new[] { 300.0 })
+                : new[] { 150.0, 300.0, 450.0, 600.0, 750.0 });
+
+        foreach (double bm in bars)
+        {
+            int z = M(bm, scale);
+            if (z > len) continue;
+
+            // 300m のクロスバーは長さ 30m（簡易式は 18m か 30m のうち 30m を採る）。
+            // 他は外縁を結ぶ線が進入端の 300m 先で収束するように広げる。
+            double barLenM = (Math.Abs(bm - 300.0) < 0.5)
+                ? AlsCrossbar300M
+                : AlsCrossbar300M * (bm + AlsConvergeM) / (300.0 + AlsConvergeM);
+
+            int half = Math.Max(1, M(barLenM, scale) / 2);
+            for (int x = cx - half; x <= cx + half; x++)
+            {
+                if (Math.Abs(x - cx) <= barHalf) continue;   // 中心はセンターラインが占める
+                Trestle(cells, x, z, ty, p);
+                cells[(x, ty + 1, z)] = p.Light;
+            }
+        }
+
+        // ===== 側方列（CAT II/III のみ）=====
+        if (type == "cat2")
+        {
+            int rowLen = Math.Min(len, M(AlsSideRowM, scale));
+            int off = Math.Max(2, rw / 2);
+            for (int k = 1; k * step <= rowLen; k++)
+            {
+                int z = k * step;
+                foreach (int x in new[] { cx - off, cx + off })
+                {
+                    Trestle(cells, x, z, ty, p);
+                    cells[(x, ty + 1, z)] = p.Mark;   // 側方列は赤
+                }
+            }
+        }
+
+        // ===== PAPI =====
+        // 滑走路の左側、進入端から 300m の位置に 4 灯を横に並べる。
+        if (spec.AirportPapi)
+        {
+            int z = M(PapiOffsetM, scale);
+            if (z <= len)
+            {
+                int x0 = cx - Math.Max(2, rw / 2 + M(PapiSideM, scale));
+                for (int i = 0; i < 4; i++)
+                {
+                    int x = x0 - i * Math.Max(1, M(9.0, scale));
+                    Fill(cells, x, x, 0, 0, z, z, p.Pave);
+                    cells[(x, 1, z)] = p.Light;
+                }
+            }
+        }
+    }
+
+    // 進入灯橋の脚。trestle=0 なら地面に舗装だけ置く。
+    private static void Trestle(
+        Dictionary<(int x, int y, int z), string> cells, int x, int z, int ty, Palette p)
+    {
+        if (ty <= 0) { cells[(x, 0, z)] = p.Pave; return; }
+        Fill(cells, x, x, 0, ty, z, z, p.Shoulder);
+    }
+
+    private static string AlsTypeOf(string? s)
+    {
+        string v = (s ?? "cat1").Trim().ToLowerInvariant();
+        return (v == "cat2" || v == "simple") ? v : "cat1";
+    }
+
+    // ===== ヘリポート =====
+    // 平面土木なので Scale で m からマスへ落とす。断面は「進入方向が z=0 側」で組む。
+    //
+    // 実寸（ICAO Annex 14 Vol.II）。すべて D 値（設計ヘリの全長）から決まる。
+    //   FATO   … 1D。限定用途の地上式に限り 0.83D まで縮められる。
+    //   TLOF   … 0.83D。FATO の中に置く。
+    //   セーフティエリア … FATO の外へ 3m か 0.25D の大きい方。
+    //   TLOF 縁灯 … 緑。間隔 5m 以下（円形）。
+    //   TD/PM 円  … 内径 0.5D。
+    //   H マーキング … D<16m のとき高さ 3m。
+    private static void BuildHelipad(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        double scale = Math.Max(1, spec.AirportScale ?? 1);
+        double dM = Clamp(spec.AirportHeliD ?? 15, 6, 40);
+        bool marking = spec.AirportMarking;
+        int lift = Clamp(spec.AirportHeliElevated ?? 0, 0, 24);
+        bool fullFato = spec.AirportHeliFullFato;
+
+        double fatoM = dM * (fullFato ? 1.0 : 0.83);
+        double tlofM = dM * 0.83;
+        double safeM = Math.Max(3.0, dM * 0.25);
+
+        int fato = Odd(Math.Max(5, M(fatoM, scale)));
+        int tlof = Odd(Math.Max(3, Math.Min(fato, M(tlofM, scale))));
+        int safe = Math.Max(1, M(safeM, scale));
+
+        int total = fato + safe * 2;      // セーフティエリア込みの一辺
+        int c = total / 2;                // 中心
+        int y = lift;                     // 舗装面の高さ
+
+        // ===== 高架式の脚 =====
+        if (lift > 0)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                int px = (i % 2 == 0) ? c - fato / 3 : c + fato / 3;
+                int pz = (i < 2) ? c - fato / 3 : c + fato / 3;
+                Fill(cells, px, px, 0, lift - 1, pz, pz, p.Shoulder);
+            }
+        }
+
+        // ===== セーフティエリアと FATO =====
+        Fill(cells, 0, total - 1, y, y, 0, total - 1, p.Shoulder);
+
+        int f0 = safe, f1 = safe + fato - 1;
+        Fill(cells, f0, f1, y, y, f0, f1, p.Pave);
+
+        if (!marking) return;
+
+        // FATO の外周（TLOF ではないので細い線でよい）。
+        Fill(cells, f0, f1, y, y, f0, f0, p.Line);
+        Fill(cells, f0, f1, y, y, f1, f1, p.Line);
+        Fill(cells, f0, f0, y, y, f0, f1, p.Line);
+        Fill(cells, f1, f1, y, y, f0, f1, p.Line);
+
+        // ===== TLOF の外周 =====
+        int t0 = c - tlof / 2, t1 = c + tlof / 2;
+        Fill(cells, t0, t1, y, y, t0, t0, p.Mark);
+        Fill(cells, t0, t1, y, y, t1, t1, p.Mark);
+        Fill(cells, t0, t0, y, y, t0, t1, p.Mark);
+        Fill(cells, t1, t1, y, y, t0, t1, p.Mark);
+
+        // ===== TD/PM 円（内径 0.5D）=====
+        int r = Math.Max(2, M(dM * 0.5, scale) / 2);
+        for (int dx = -r - 1; dx <= r + 1; dx++)
+            for (int dz = -r - 1; dz <= r + 1; dz++)
+            {
+                double d2 = dx * dx + dz * dz;
+                if (d2 <= (r + 0.5) * (r + 0.5) && d2 >= (r - 0.5) * (r - 0.5))
+                    cells[(c + dx, y, c + dz)] = p.Mark;
+            }
+
+        // ===== H マーキング =====
+        // D<16m のとき高さ 3m。円の内側に収まる大きさにする。
+        double hHeightM = (dM < 16.0) ? 3.0 : dM * 0.2;
+        int hh = Math.Max(3, M(hHeightM, scale));
+        if (hh % 2 == 0) hh++;
+        int hw = Math.Max(2, hh * 2 / 3);
+        if (hw % 2 == 0) hw++;
+
+        int hz0 = c - hh / 2, hz1 = c + hh / 2;
+        int hx0 = c - hw / 2, hx1 = c + hw / 2;
+
+        Fill(cells, hx0, hx0, y, y, hz0, hz1, p.Line);   // 縦棒（左）
+        Fill(cells, hx1, hx1, y, y, hz0, hz1, p.Line);   // 縦棒（右）
+        Fill(cells, hx0, hx1, y, y, c, c, p.Line);       // 横棒
+
+        // ===== TLOF 縁灯（緑・間隔 5m 以下）=====
+        int ls = Math.Max(1, M(5.0, scale));
+        for (int x = t0; x <= t1; x += ls)
+        {
+            cells[(x, y + 1, t0)] = p.Light;
+            cells[(x, y + 1, t1)] = p.Light;
+        }
+        for (int z = t0; z <= t1; z += ls)
+        {
+            cells[(t0, y + 1, z)] = p.Light;
+            cells[(t1, y + 1, z)] = p.Light;
+        }
     }
 
     // ===== 共通ヘルパー =====
