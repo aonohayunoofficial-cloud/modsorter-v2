@@ -28,8 +28,10 @@ namespace ModSorter.Architect.Generation;
 //   建築限界     … 直流電化で高さ 5700mm、幅 3800mm（軌道中心から左右 1900mm）。
 //                  上屋・跨線橋はこの断面を侵さない位置に建てる（別の小分類で使う）。
 //   高架橋       … ラーメン高架橋の柱スパンは 8〜10m 級。
-//   軌間         … 1067mm / 1435mm。1マス=1m では 1 マス未満なので、軌道中心の
-//                  1 マスをレールとして表す（2 本のレールには分けられない）。
+//   軌間         … 1067mm / 1435mm。1マス=1m では 1 マス未満なので 2 本のレールには
+//                  分けられない。加えて minecraft:rail は隣接から shape が決まる機能
+//                  ブロックで、shape を書かない生成物では曲線状態を拾って斜めに描かれる。
+//                  よって軌道はレールを置かず道床だけで表す。敷設は実機側で行う。
 //
 // 断面は「線路が z 方向に走る」向きで組み、最後に Rotate で facade_face の向きへ回す。
 // 座標は負へ出るが Normalize が 0 起点へ寄せる。
@@ -41,7 +43,7 @@ namespace ModSorter.Architect.Generation;
 //   rail_platform_door … ホームドアの高さ / rail_tactile … 点状ブロック
 //   rail_end_ramp … ホーム端の勾配 / rail_viaduct … 高架 / rail_pier_step … 橋脚の間隔
 //   floor_block=天端 / accent_block=縁端の白線 / base_block=躯体・橋脚
-//   wall_block=点状ブロック / tower_block=道床 / seat_block=レール
+//   wall_block=点状ブロック / tower_block=道床
 //   parapet_block=柵・ホームドア / roof_block=高架の床版
 public static class RailwayExpander
 {
@@ -81,7 +83,7 @@ public static class RailwayExpander
 
     private sealed class Palette
     {
-        public readonly string Pave, Edge, Body, Tactile, Ballast, Rail, Fence, Girder;
+        public readonly string Pave, Edge, Body, Tactile, Ballast, Fence, Girder;
 
         public Palette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -90,7 +92,6 @@ public static class RailwayExpander
             Body = Pick(spec.BaseBlock, allowed, Pave);
             Tactile = Pick(spec.WallBlock, allowed, Edge);
             Ballast = Pick(spec.TowerBlock, allowed, Body);
-            Rail = Pick(spec.SeatBlock, allowed, Edge);
             Fence = Pick(spec.ParapetBlock, allowed, Edge);
             Girder = Pick(spec.RoofBlock, allowed, Body);
         }
@@ -189,11 +190,11 @@ public static class RailwayExpander
             }
         }
 
-        // ===== 道床とレール =====
+        // ===== 道床 =====
+        // レールは置かない。railY（レール面）はホーム天端の高さを決める基準としてだけ使う。
         foreach (int c in tracks)
         {
             Fill(cells, c - BallastHalf, c + BallastHalf, s, s, z0, z1, p.Ballast);
-            Fill(cells, c, c, railY, railY, z0, z1, p.Rail);
         }
 
         // 隣り合う線路の間にホームが無いときは道床をつなげる（線間の空きを埋める）。

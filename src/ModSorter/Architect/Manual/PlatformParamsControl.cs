@@ -56,7 +56,8 @@ public sealed class PlatformParamsControl : UserControl, IManualParamControl
            .IntSlider("width", "ホーム幅", 2, 24, 8, "下限は島式3.0m・相対式2.0m。通勤駅は5〜10m級")
            .IntSlider("height", "ホーム高さ", 1, 4, 1, "レール面上1100mm（電車専用）でおよそ1マス")
            .IntSlider("pitch", "軌道中心間隔（相対式の2線）", 4, 12, 4, "在来線4.0m・新幹線4.3m")
-           .IntSlider("margin", "ホーム端から先の線路", 0, 32, 8);
+           .IntSlider("margin", "ホーム端から先の道床", 0, 32, 8)
+           .Note("軌道は道床だけで表す。レールは隣接から形が決まる機能ブロックで斜めに描かれるため置かない。");
 
         _ui.Heading("ホーム上")
            .Toggle("tactile", "点状ブロックを敷く", "縁端から1マス内側（実物は80cm以上）", true)
@@ -73,7 +74,6 @@ public sealed class PlatformParamsControl : UserControl, IManualParamControl
            .BlockPick("body", "躯体・橋脚", "minecraft:stone_bricks")
            .BlockPick("tactile", "点状ブロック", "minecraft:yellow_terracotta")
            .BlockPick("ballast", "道床", "minecraft:gravel")
-           .BlockPick("rail", "レール", "minecraft:rail")
            .BlockPick("fence", "柵・ホームドア", "minecraft:iron_bars")
            .BlockPick("girder", "高架の床版", "minecraft:gray_concrete");
 
@@ -127,7 +127,6 @@ public sealed class PlatformParamsControl : UserControl, IManualParamControl
             BaseBlock = _ui.GetBlock("body", "minecraft:stone_bricks"),
             WallBlock = _ui.GetBlock("tactile", "minecraft:yellow_terracotta"),
             TowerBlock = _ui.GetBlock("ballast", "minecraft:gravel"),
-            SeatBlock = _ui.GetBlock("rail", "minecraft:rail"),
             ParapetBlock = _ui.GetBlock("fence", "minecraft:iron_bars"),
             RoofBlock = _ui.GetBlock("girder", "minecraft:gray_concrete")
         };

@@ -414,7 +414,8 @@ public sealed class StructureSpec
     // 相対式のときの2線の軌道中心間隔（マス）。在来線 4.0m、新幹線 4.3m。
     [JsonPropertyName("rail_track_pitch")] public int? RailTrackPitch { get; set; }
 
-    // ホーム端から先へ線路を伸ばす長さ（マス）。0 でホーム長ちょうど。
+    // ホーム端から先へ道床を伸ばす長さ（マス）。0 でホーム長ちょうど。
+    // レール（機能ブロック）は置かないので、伸びるのは道床だけ。
     [JsonPropertyName("rail_track_margin")] public int? RailTrackMargin { get; set; }
 
     // ホームドア（可動式ホーム柵）の高さ（マス）。0 でなし。腰高タイプは 1.3m 級。
