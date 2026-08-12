@@ -136,7 +136,7 @@ public static class ManualCatalog
         Mid("airport", "空港",
             Impl("control_tower", "管制塔", () => new ControlTowerParamsControl()),
             Impl("passenger_terminal", "旅客ターミナル", () => new PassengerTerminalParamsControl()),
-            Todo("cargo_terminal", "貨物ターミナル"),
+            Impl("cargo_terminal", "貨物ターミナル", () => new CargoTerminalParamsControl()),
             Todo("hangar", "格納庫"),
             Impl("runway", "滑走路", () => new AirportPavementParamsControl("runway")),
             Impl("taxiway", "誘導路", () => new AirportPavementParamsControl("taxiway")),

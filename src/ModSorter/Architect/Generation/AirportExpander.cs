@@ -74,6 +74,15 @@ namespace ModSorter.Architect.Generation;
 //   tower_block=躯体 / glazing_block=カーテンウォール / accent_block=方立・腰壁
 //   floor_block=床・搭乗橋の床 / roof_block=屋根 / parapet_block=パラペット
 //   seat_block=天井の照明
+//
+// 貨物ターミナルも 1マス=1m。桁行きはドック数×間隔の従属値。
+//   depth=建物の奥行き（エプロン側が z=0）/ height=庫内の有効高さ
+//   airport_docks・airport_dock_pitch … トラックドックの数と間隔
+//   airport_airside_doors・airport_door_width … エアサイドの大型扉
+//   airport_office … 事務所棟の桁行き / airport_canopy … ドック上屋
+//   tower_block=躯体 / glazing_block=高窓・トップライト / accent_block=まぐさ・帯
+//   floor_block=床・エプロン取付け / roof_block=屋根・上屋
+//   parapet_block=シャッター・パラペット / seat_block=庫内の照明
 public static class AirportExpander
 {
     public const string Prefix = "airport:";
@@ -117,6 +126,8 @@ public static class AirportExpander
             case "tower": return "control_tower";
             case "terminal":
             case "passenger_terminal": return "terminal";
+            case "cargo_terminal":
+            case "cargo": return "cargo_terminal";
             default: return "runway";
         }
     }
@@ -153,6 +164,7 @@ public static class AirportExpander
             case "apron": BuildApron(cells, spec, p); break;
             case "control_tower": BuildControlTower(cells, spec, p); break;
             case "terminal": BuildTerminal(cells, spec, p); break;
+            case "cargo_terminal": BuildCargoTerminal(cells, spec, p); break;
             default: BuildRunway(cells, spec, p); break;
         }
 
@@ -732,6 +744,176 @@ public static class AirportExpander
         }
     }
 
+    // ===== 貨物ターミナル =====
+    // 平面土木ではないが "airport:" 配下なのでここで作る。縮尺は持たず 1マス=1m。
+    //
+    // 実寸の出典（ACI 会員向け Air Cargo Facility Analysis / FAA）。
+    //   トラックドック … 建物床面積 1,000 sq ft あたり 0.6 台（以前は 0.3 台）＝約155㎡に1台。
+    //                    扉は幅 9ft（約2.7m）・高さ 10ft（約3m）。
+    //   ドック高さ     … 48 インチ（1.2m）が標準。庫内の床はその分だけ地面より高い。
+    //   庫内有効高さ   … 22ft（約7m）が従来標準だが今は不足。自動段積みを入れる棟は 40ft（約12m）。
+    //   トラック回転   … 建物の面から取付道路まで 150ft（約46m）を空ける。
+    //   事務所         … 倉庫面積の 10%。10万 sq ft 以上の棟では独立した事務所が好まれる。
+    //   エプロン       … 建物床面積の 4.5 倍。敷地は建物15%・ランドサイド25%・エアサイド60%。
+    //
+    // 桁行きは「ドック数 × 間隔」の従属値。頭打ちすると端のドックだけ切れるので、
+    // 収まらないときは幅を切らずにドック数を減らす。
+    // 断面は「エプロン側が z=0」で組み、最後に Rotate で向きを回す。
+    private const int CargoMaxLen = 256; // 桁行きの上限（マス）。超える分はドック数を減らす
+
+    private static void BuildCargoTerminal(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        int pitch = Clamp(spec.AirportDockPitch ?? 4, 3, 12);
+        int docks = Clamp(spec.AirportDocks ?? 12, 2, 48);
+        while (docks > 2 && docks * pitch > CargoMaxLen) docks--;
+
+        int len = docks * pitch;                          // 桁行き（x）
+        int depth = Clamp(spec.Depth, 16, 96);            // 奥行き（z）。z=0 がエアサイド
+        int clear = Clamp(spec.Height, 5, 20);            // 庫内の有効高さ
+        int doors = Clamp(spec.AirportAirsideDoors ?? 2, 0, 8);
+        int doorW = Odd(Clamp(spec.AirportDoorWidth ?? 7, 3, 31));
+        int canopy = Clamp(spec.AirportCanopy ?? 5, 0, 16);
+        int office = Clamp(spec.AirportOffice ?? 24, 0, 64);
+
+        int roofY = clear + 2;                            // 床 y=1 の上に有効高さ clear
+        int doorH = Math.Min(clear, 8);
+        int lastZ = depth - 1;
+
+        // ===== 地面と床 =====
+        // 床はドック高さ 1.2m ぶん地面より上げる（1マス）。
+        Fill(cells, 0, len - 1, 0, 1, 0, lastZ, p.Pave);
+
+        // ===== 外壁 =====
+        // 最上段の一つ下を高窓にする。倉庫の採光は高窓とトップライトが基本。
+        for (int y = 2; y < roofY; y++)
+        {
+            bool cl = (y == roofY - 2);
+            for (int x = 0; x < len; x++)
+            {
+                string b = (cl && x % 2 == 0) ? p.Glass : p.Body;
+                cells[(x, y, 0)] = b;
+                cells[(x, y, lastZ)] = b;
+            }
+            for (int z = 0; z < depth; z++)
+            {
+                string b = (cl && z % 2 == 0) ? p.Glass : p.Body;
+                cells[(0, y, z)] = b;
+                cells[(len - 1, y, z)] = b;
+            }
+        }
+
+        // ===== 庫内の柱と照明 =====
+        for (int x = 12; x < len - 1; x += 12)
+            for (int z = 12; z < depth - 1; z += 12)
+                Fill(cells, x, x, 2, roofY - 1, z, z, p.Body);
+
+        for (int x = 6; x < len - 1; x += 12)
+            for (int z = 6; z < depth - 1; z += 12)
+                cells[(x, roofY - 1, z)] = p.Light;
+
+        // ===== 屋根・トップライト・パラペット =====
+        Fill(cells, 0, len - 1, roofY, roofY, 0, lastZ, p.Roof);
+
+        for (int x = 4; x < len - 1; x += 8)
+            for (int z = 4; z < depth - 1; z += 8)
+                cells[(x, roofY, z)] = p.Glass;
+
+        for (int x = 0; x < len; x++)
+        {
+            cells[(x, roofY + 1, 0)] = p.Rail;
+            cells[(x, roofY + 1, lastZ)] = p.Rail;
+        }
+        for (int z = 0; z < depth; z++)
+        {
+            cells[(0, roofY + 1, z)] = p.Rail;
+            cells[(len - 1, roofY + 1, z)] = p.Rail;
+        }
+
+        // ===== トラックドック（ランドサイド）=====
+        for (int i = 0; i < docks; i++)
+        {
+            int cx = i * pitch + pitch / 2;
+            int x0 = Math.Max(1, cx - 1);
+            int x1 = Math.Min(len - 2, cx + 1);
+
+            Fill(cells, x0, x1, 2, 4, lastZ, lastZ, p.Rail);   // シャッター
+            Fill(cells, Math.Max(0, cx - 2), Math.Min(len - 1, cx + 2),
+                 5, 5, lastZ, lastZ, p.Mark);                  // まぐさ
+
+            // ドックバンパー。床と同じ高さに出す。
+            cells[(x0, 1, depth)] = p.Mark;
+            cells[(x1, 1, depth)] = p.Mark;
+        }
+
+        // ===== ドック上屋 =====
+        if (canopy > 0)
+        {
+            int cy = Math.Min(6, roofY - 1);
+            Fill(cells, 0, len - 1, cy, cy, depth, depth + canopy - 1, p.Roof);
+            for (int x = 4; x < len; x += 8)
+                Fill(cells, x, x, 1, cy - 1, depth + canopy - 1, depth + canopy - 1, p.Body);
+        }
+
+        // ===== エアサイドの大型扉 =====
+        for (int j = 0; j < doors; j++)
+        {
+            int cx = (2 * j + 1) * len / (2 * doors);
+            int x0 = Math.Max(1, cx - doorW / 2);
+            int x1 = Math.Min(len - 2, cx + doorW / 2);
+
+            Fill(cells, x0, x1, 2, doorH + 1, 0, 0, p.Rail);
+            Fill(cells, Math.Max(0, x0 - 1), Math.Min(len - 1, x1 + 1),
+                 doorH + 2, doorH + 2, 0, 0, p.Mark);
+
+            // エプロン側の取付け。床との段差 1m をここで摺り付ける。
+            Fill(cells, x0, x1, 0, 0, -4, -1, p.Pave);
+            Fill(cells, x0, x1, 1, 1, -1, -1, p.Pave);
+        }
+
+        // ===== 事務所棟 =====
+        // 倉庫の妻側に付く2層の別棟。階高4、奥行きは倉庫に合わせて最大16。
+        if (office >= 6)
+        {
+            int ow = office;
+            int od = Math.Min(depth, 16);
+            int oh = 9;
+
+            Fill(cells, -ow, -1, 0, 1, 0, od - 1, p.Pave);
+            Fill(cells, -ow, -1, 5, 5, 0, od - 1, p.Pave);
+
+            for (int y = 2; y < oh; y++)
+            {
+                bool band = (y == 5);
+                for (int x = -ow; x <= -1; x++)
+                {
+                    string b = band ? p.Mark : ((x % 2 == 0) ? p.Body : p.Glass);
+                    cells[(x, y, 0)] = b;
+                    cells[(x, y, od - 1)] = b;
+                }
+                for (int z = 0; z < od; z++)
+                    cells[(-ow, y, z)] = band ? p.Mark : ((z % 2 == 0) ? p.Body : p.Glass);
+            }
+
+            Fill(cells, -ow, -1, oh, oh, 0, od - 1, p.Roof);
+            for (int z = 0; z < od; z++) cells[(-ow, oh + 1, z)] = p.Rail;
+            for (int x = -ow; x <= -1; x++)
+            {
+                cells[(x, oh + 1, 0)] = p.Rail;
+                cells[(x, oh + 1, od - 1)] = p.Rail;
+            }
+
+            // 道路側の出入口。
+            for (int x = -ow / 2 - 1; x <= -ow / 2 + 1; x++)
+                for (int y = 2; y <= 4; y++)
+                    cells.Remove((x, y, od - 1));
+
+            // 倉庫との連絡口。
+            for (int y = 2; y <= 4; y++)
+                for (int z = 2; z <= 4; z++)
+                    cells.Remove((0, y, z));
+        }
+    }
 
     // ===== 共通ヘルパー =====
 

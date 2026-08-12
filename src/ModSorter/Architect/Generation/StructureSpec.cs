@@ -336,6 +336,26 @@ public sealed class StructureSpec
     // ターミナルの屋根。"flat"（既定・パラペット付き） | "vault"（かまぼこ屋根）。
     [JsonPropertyName("airport_terminal_roof")] public string? AirportTerminalRoof { get; set; }
 
+    // ===== 貨物ターミナル（structure_type="airport:cargo_terminal"）=====
+    // 1マス=1m。桁行きは「ドック数 × ドック間隔」の従属値なので width は使わない。
+    // depth を建物の奥行き（エプロン側が z=0）、height を庫内の有効高さとして使う。
+
+    // トラックドックの数。桁行きはこの数ぶん横に伸びる。
+    // 実物の計画値は建物床面積 1,000 sq ft あたり 0.6 台＝約155㎡に1台。
+    [JsonPropertyName("airport_docks")] public int? AirportDocks { get; set; }
+
+    // ドック1台あたりの桁行き（マス）。扉の幅は 9ft（約2.7m）。
+    [JsonPropertyName("airport_dock_pitch")] public int? AirportDockPitch { get; set; }
+
+    // エアサイドの大型扉の数。0 でなし。
+    [JsonPropertyName("airport_airside_doors")] public int? AirportAirsideDoors { get; set; }
+
+    // エアサイドの大型扉の幅（マス）。偶数は奇数へ丸める。
+    [JsonPropertyName("airport_door_width")] public int? AirportDoorWidth { get; set; }
+
+    // 事務所棟の桁行き（マス）。0 でなし。倉庫の妻側に付く2層の別棟。
+    [JsonPropertyName("airport_office")] public int? AirportOffice { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。
