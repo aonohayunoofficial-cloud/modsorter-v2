@@ -310,6 +310,32 @@ public sealed class StructureSpec
     // 屋根の上のアンテナ柱の高さ。0 でなし。
     [JsonPropertyName("airport_mast")] public int? AirportMast { get; set; }
 
+    // ===== 旅客ターミナル（structure_type="airport:terminal"）=====
+    // 1マス=1m。桁行きは「ゲート数 × ゲート間隔」の従属値なので width は使わない。
+    // depth を建物の奥行き（エプロン側が z=0）として使う。
+
+    // ゲート（搭乗口）の数。桁行きはこの数ぶん横に伸びる。
+    [JsonPropertyName("airport_gates")] public int? AirportGates { get; set; }
+
+    // ゲート1つあたりの桁行き（マス）。実物は平均 33〜40m。
+    // エプロンの airport_spot_width と同じ値にすると駐機スポットと中心が揃う。
+    [JsonPropertyName("airport_gate_spacing")] public int? AirportGateSpacing { get; set; }
+
+    // 階数。実物の旅客ターミナルは出発が上階・到着が下階の2層が基本。
+    [JsonPropertyName("airport_levels")] public int? AirportLevels { get; set; }
+
+    // 階高（マス）。4〜8。搭乗橋のロタンダは実物で 5m 級・最大 8m なのでここに合わせる。
+    [JsonPropertyName("airport_level_height")] public int? AirportLevelHeight { get; set; }
+
+    // 搭乗橋（PBB）の伸長（マス）。0 でなし。実物は 15〜45m。
+    [JsonPropertyName("airport_bridge")] public int? AirportBridge { get; set; }
+
+    // 車寄せの庇の張り出し（マス）。0 でなし。
+    [JsonPropertyName("airport_canopy")] public int? AirportCanopy { get; set; }
+
+    // ターミナルの屋根。"flat"（既定・パラペット付き） | "vault"（かまぼこ屋根）。
+    [JsonPropertyName("airport_terminal_roof")] public string? AirportTerminalRoof { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

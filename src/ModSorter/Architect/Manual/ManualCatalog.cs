@@ -135,7 +135,7 @@ public static class ManualCatalog
         // 空港（国交省 空港土木/建築施設 分類準拠）
         Mid("airport", "空港",
             Impl("control_tower", "管制塔", () => new ControlTowerParamsControl()),
-            Todo("passenger_terminal", "旅客ターミナル"),
+            Impl("passenger_terminal", "旅客ターミナル", () => new PassengerTerminalParamsControl()),
             Todo("cargo_terminal", "貨物ターミナル"),
             Todo("hangar", "格納庫"),
             Impl("runway", "滑走路", () => new AirportPavementParamsControl("runway")),
