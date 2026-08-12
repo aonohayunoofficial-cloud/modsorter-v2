@@ -54,6 +54,16 @@ namespace ModSorter.Architect.Generation;
 //   facade_face … 進入端・接続側の向き（既定 south）
 //   floor_block=舗装 / accent_block=標識 / base_block=ショルダー
 //   seat_block=縁灯 / wall_block=区画線・ストップマーク
+//
+// 管制塔だけは平面土木ではないので寸法の扱いが別で、縮尺を持たず 1マス=1m で組む。
+//   height=管制室の床の高さ / width・depth=庁舎の平面寸法
+//   airport_cab_width・airport_cab_height・airport_cab_shape・airport_cab_tilt … 管制室
+//   airport_shaft_width・airport_floor_step … シャフト
+//   airport_catwalk … 外周通路 / airport_base_height … 庁舎 / airport_mast … アンテナ柱
+//   airport_edge_light … 0 以外で航空障害灯を点ける
+//   tower_block=塔身 / glazing_block=窓 / accent_block=窓枠・方立・腰壁
+//   floor_block=床・キャットウォーク / roof_block=屋根 / parapet_block=手すり
+//   base_block=庁舎 / seat_block=灯火
 public static class AirportExpander
 {
     public const string Prefix = "airport:";
@@ -93,13 +103,15 @@ public static class AirportExpander
             case "taxi": return "taxiway";
             case "apron":
             case "ramp": return "apron";
+            case "control_tower":
+            case "tower": return "control_tower";
             default: return "runway";
         }
     }
 
     private sealed class Palette
     {
-        public readonly string Pave, Mark, Shoulder, Light, Line;
+        public readonly string Pave, Mark, Shoulder, Light, Line, Body, Glass, Roof, Rail;
 
         public Palette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -108,6 +120,12 @@ public static class AirportExpander
             Shoulder = Pick(spec.BaseBlock, allowed, Pave);
             Light = Pick(spec.SeatBlock, allowed, Mark);
             Line = Pick(spec.WallBlock, allowed, Mark);
+
+            // 管制塔で使う。平面土木の3種は参照しない。
+            Body = Pick(spec.TowerBlock ?? spec.WallBlock, allowed, Pave);
+            Glass = Pick(spec.GlazingBlock, allowed, Mark);
+            Roof = Pick(spec.RoofBlock, allowed, Shoulder);
+            Rail = Pick(spec.ParapetBlock, allowed, Mark);
         }
     }
 
@@ -121,6 +139,7 @@ public static class AirportExpander
         {
             case "taxiway": BuildTaxiway(cells, spec, p); break;
             case "apron": BuildApron(cells, spec, p); break;
+            case "control_tower": BuildControlTower(cells, spec, p); break;
             default: BuildRunway(cells, spec, p); break;
         }
 
@@ -318,6 +337,212 @@ public static class AirportExpander
             Fill(cells, 0, w - 1, 0, 0, lz, lz, p.Mark);
         }
     }
+
+
+    // ===== 管制塔 =====
+    // 平面土木ではないが "airport:" 配下なのでここで作る。縮尺は持たず 1マス=1m。
+    //
+    // 実寸の出典。
+    //   管制室の床面積 … FAA Order 6480.7D の標準型で 234 / 350 / 625 / 850 sq ft
+    //                    ＝ 22 / 33 / 58 / 79 ㎡。羽田の新管制塔は約130㎡・塔高113m級。
+    //   平面形         … 正方形・五角形・六角形・八角形・円形。八角形が最多。
+    //   窓の傾き       … 鉛直から外へ 15 度（室内の映り込みを天井へ逃がすため）。
+    //                    何段で1マス外へ出すかで近似し、4段＝14.0度が15度に最も近い。
+    //   腰壁           … 最下段はコンソールが並ぶ高さなので窓ではなく壁にする。
+    //   キャットウォーク … 窓の清掃用に管制室の外周へ回す。実物は幅1m級＋手すり。
+    //   シャフト       … エレベーター・階段・ケーブルシャフトを収める。外寸6〜10m級。
+    //   航空障害灯     … 塔頂と屋根の四方に付ける。
+    //
+    // 断面は「正面（見通す側）が z の小さい側」で組み、最後に Rotate で向きを回す。
+    // 中心を (0,0) に置くので座標は負へ出るが、Normalize が 0 起点へ寄せる。
+    private static void BuildControlTower(
+        Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
+    {
+        string shape = ShapeOf(spec.AirportCabShape);
+        int cabW = Odd(Clamp(spec.AirportCabWidth ?? 11, 5, 33));
+        int cabR = (cabW - 1) / 2;
+        int shaftW = Odd(Clamp(spec.AirportShaftWidth ?? 9, 3, cabW));
+        int shaftR = Math.Min(cabR, (shaftW - 1) / 2);
+        int cabH = Clamp(spec.AirportCabHeight ?? 4, 2, 12);
+        int tilt = Clamp(spec.AirportCabTilt ?? 4, 0, 12);
+        int walk = Clamp(spec.AirportCatwalk ?? 1, 0, 3);
+        int step = Clamp(spec.AirportFloorStep ?? 5, 0, 16);
+        int mast = Clamp(spec.AirportMast ?? 6, 0, 24);
+        bool light = (spec.AirportEdgeLight ?? 60) > 0;
+
+        int baseH = Clamp(spec.AirportBaseHeight ?? 0, 0, 24);
+        int baseW = Clamp(spec.Width, 0, 64);
+        int baseD = Clamp(spec.Depth, 0, 64);
+        bool hasBase = baseH >= 3 && baseW >= 7 && baseD >= 7;
+
+        // 管制室の床の高さ。庁舎の屋根より下へは来ない。
+        int floorY = Clamp(spec.Height, hasBase ? baseH + 4 : 6, 96);
+
+        // ===== 庁舎 =====
+        if (hasBase)
+        {
+            int bx = (baseW - 1) / 2;
+            int bz = (baseD - 1) / 2;
+
+            Fill(cells, -bx, bx, 0, 0, -bz, bz, p.Pave);
+
+            for (int y = 1; y <= baseH; y++)
+            {
+                Fill(cells, -bx, bx, y, y, -bz, -bz, p.Shoulder);
+                Fill(cells, -bx, bx, y, y, bz, bz, p.Shoulder);
+                Fill(cells, -bx, -bx, y, y, -bz, bz, p.Shoulder);
+                Fill(cells, bx, bx, y, y, -bz, bz, p.Shoulder);
+            }
+
+            // 窓。1マスおきに抜く。
+            int wy = Math.Max(2, baseH - 2);
+            for (int x = -bx + 1; x <= bx - 1; x++)
+                if (((x + bx) & 1) == 0)
+                {
+                    cells[(x, wy, -bz)] = p.Glass;
+                    cells[(x, wy, bz)] = p.Glass;
+                }
+            for (int z = -bz + 1; z <= bz - 1; z++)
+                if (((z + bz) & 1) == 0)
+                {
+                    cells[(-bx, wy, z)] = p.Glass;
+                    cells[(bx, wy, z)] = p.Glass;
+                }
+
+            // 屋根。シャフトの通る中央は空ける。
+            for (int x = -bx; x <= bx; x++)
+                for (int z = -bz; z <= bz; z++)
+                    if (!InPlan(shape, x, z, shaftR)) cells[(x, baseH + 1, z)] = p.Roof;
+
+            // 正面の出入口。
+            int doorH = Math.Min(3, baseH);
+            for (int x = -1; x <= 1; x++)
+                for (int y = 1; y <= doorH; y++)
+                    cells.Remove((x, y, -bz));
+        }
+
+        // ===== シャフト =====
+        PlanFill(cells, shape, shaftR, 0, p.Pave, false);
+        for (int y = 1; y < floorY; y++)
+            PlanFill(cells, shape, shaftR, y, p.Body, true);
+
+        // 中間床（機械室・休憩室の階）。
+        if (step >= 2 && shaftR >= 2)
+            for (int y = step; y <= floorY - 2; y += step)
+                PlanFill(cells, shape, shaftR - 1, y, p.Pave, false);
+
+        // 正面に走る縦のスリット窓。中間床の位置だけ帯で締める。
+        if (floorY >= 12)
+            for (int y = 4; y <= floorY - 4; y++)
+                cells[(0, y, -shaftR)] = (step >= 2 && y % step == 0) ? p.Mark : p.Glass;
+
+        // 庁舎が無いときはシャフトの足元に出入口を開ける。
+        if (!hasBase)
+        {
+            int dw = shaftR >= 3 ? 1 : 0;
+            for (int x = -dw; x <= dw; x++)
+                for (int y = 1; y <= 3; y++)
+                    cells.Remove((x, y, -shaftR));
+        }
+
+        // ===== 管制室の張り出し（シャフトから外へ広げる持ち送り）=====
+        for (int k = 1; k <= cabR - shaftR; k++)
+        {
+            int y = floorY - k;
+            if (y <= (hasBase ? baseH + 1 : 1)) break;
+            PlanFill(cells, shape, cabR - k, y, p.Mark, true);
+        }
+
+        // ===== 管制室 =====
+        PlanFill(cells, shape, cabR, floorY, p.Pave, false);
+
+        // キャットウォークと手すり。
+        if (walk > 0)
+        {
+            int rw = cabR + walk;
+            for (int dx = -rw; dx <= rw; dx++)
+                for (int dz = -rw; dz <= rw; dz++)
+                    if (InPlan(shape, dx, dz, rw) && !InPlan(shape, dx, dz, cabR))
+                        cells[(dx, floorY, dz)] = p.Pave;
+            PlanFill(cells, shape, rw, floorY + 1, p.Rail, true);
+        }
+
+        // 窓。tilt 段ごとに 1 マス外へ出して 15 度の外傾を近似する。
+        // 最下段はコンソールが並ぶ腰壁なので窓にしない。
+        int rTop = cabR;
+        for (int j = 0; j < cabH; j++)
+        {
+            int y = floorY + 1 + j;
+            rTop = cabR + (tilt > 0 ? j / tilt : 0);
+            PlanFill(cells, shape, rTop, y, j == 0 ? p.Mark : p.Glass, true);
+
+            // 方立。平面の角に立てる。
+            if (j > 0)
+                for (int dx = -rTop; dx <= rTop; dx++)
+                    for (int dz = -rTop; dz <= rTop; dz++)
+                        if (IsCorner(shape, dx, dz, rTop)) cells[(dx, y, dz)] = p.Mark;
+        }
+
+        // ===== 屋根・アンテナ柱・航空障害灯 =====
+        int roofY = floorY + 1 + cabH;
+        PlanFill(cells, shape, rTop + 1, roofY, p.Roof, false);
+
+        for (int k = 1; k <= mast; k++) cells[(0, roofY + k, 0)] = p.Mark;
+
+        if (light)
+        {
+            cells[(0, roofY + mast + 1, 0)] = p.Light;
+            cells[(rTop, roofY + 1, 0)] = p.Light;
+            cells[(-rTop, roofY + 1, 0)] = p.Light;
+            cells[(0, roofY + 1, rTop)] = p.Light;
+            cells[(0, roofY + 1, -rTop)] = p.Light;
+        }
+    }
+
+    // 管制室・シャフトの平面。"square" | "octagon"（既定） | "round"。
+    private static string ShapeOf(string? s)
+    {
+        string v = (s ?? "octagon").Trim().ToLowerInvariant();
+        return (v == "square" || v == "round") ? v : "octagon";
+    }
+
+    // 中央 1 マスを確保するため偶数を奇数へ丸める。
+    private static int Odd(int v) => (v % 2 == 0) ? v + 1 : v;
+
+    // 中心 (0,0) から見て (dx,dz) が半径 r の平面の内側か。
+    // 八角形は正八角形の一辺 ＝ 対辺幅/(1+√2) に合わせて ax+az の上限を r×1.45 とする。
+    private static bool InPlan(string shape, int dx, int dz, int r)
+    {
+        int ax = Math.Abs(dx), az = Math.Abs(dz);
+        if (shape == "round") return dx * dx + dz * dz <= (r + 0.35) * (r + 0.35);
+        if (ax > r || az > r) return false;
+        if (shape == "octagon") return ax + az <= (int)Math.Round(r * 1.45);
+        return true;
+    }
+
+    // 平面を 1 段ぶん塗る。ringOnly なら外周 1 マスだけ（4近傍が全部内側なら塗らない）。
+    private static void PlanFill(
+        Dictionary<(int x, int y, int z), string> cells,
+        string shape, int r, int y, string block, bool ringOnly)
+    {
+        if (r < 0) return;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++)
+            {
+                if (!InPlan(shape, dx, dz, r)) continue;
+                if (ringOnly
+                    && InPlan(shape, dx + 1, dz, r) && InPlan(shape, dx - 1, dz, r)
+                    && InPlan(shape, dx, dz + 1, r) && InPlan(shape, dx, dz - 1, r)) continue;
+                cells[(dx, y, dz)] = block;
+            }
+    }
+
+    // 平面の角。方立を立てる位置。
+    private static bool IsCorner(string shape, int dx, int dz, int r)
+        => InPlan(shape, dx, dz, r)
+           && (!InPlan(shape, dx + 1, dz, r) || !InPlan(shape, dx - 1, dz, r))
+           && (!InPlan(shape, dx, dz + 1, r) || !InPlan(shape, dx, dz - 1, r));
+
 
     // ===== 共通ヘルパー =====
 

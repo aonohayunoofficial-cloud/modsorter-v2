@@ -278,6 +278,38 @@ public sealed class StructureSpec
     // 10 にすると滑走路 2500m 級の全体像を 64 マスに収められる。
     [JsonPropertyName("airport_scale")] public int? AirportScale { get; set; }
 
+    // ===== 管制塔（structure_type="airport:control_tower"）=====
+    // 1マス=1m。height を「管制室の床の高さ」、width/depth を庁舎の平面寸法として使う。
+
+    // 管制室（キャブ）の対辺幅。偶数は奇数へ丸める。FAA 標準型の床面積は
+    // 234/350/625/850 sq ft ＝ 22/33/58/79 ㎡、羽田の新管制塔は約130㎡。
+    [JsonPropertyName("airport_cab_width")] public int? AirportCabWidth { get; set; }
+
+    // 管制室の窓の高さ（床から屋根まで）。最下段は腰壁（コンソールの高さ）になる。
+    [JsonPropertyName("airport_cab_height")] public int? AirportCabHeight { get; set; }
+
+    // 管制室の平面形。"octagon"（既定）| "square" | "round"。実物は八角形が最多。
+    [JsonPropertyName("airport_cab_shape")] public string? AirportCabShape { get; set; }
+
+    // 窓の傾き。何段で 1 マス外へ出すか。0 で垂直。
+    // 実物は鉛直から外へ 15 度。4段＝14.0度が最も近い。
+    [JsonPropertyName("airport_cab_tilt")] public int? AirportCabTilt { get; set; }
+
+    // 管制室の外周に回すキャットウォークの張り出し。0 でなし。実物は窓清掃用に幅1m級。
+    [JsonPropertyName("airport_catwalk")] public int? AirportCatwalk { get; set; }
+
+    // シャフト（エレベーター・階段・ケーブル）の外寸。実物は 6〜10m 級。
+    [JsonPropertyName("airport_shaft_width")] public int? AirportShaftWidth { get; set; }
+
+    // シャフト内の中間床の間隔。0 で中間床なし。
+    [JsonPropertyName("airport_floor_step")] public int? AirportFloorStep { get; set; }
+
+    // 庁舎（基部の建物）の高さ。0 で庁舎なし＝塔だけ。平面は width×depth。
+    [JsonPropertyName("airport_base_height")] public int? AirportBaseHeight { get; set; }
+
+    // 屋根の上のアンテナ柱の高さ。0 でなし。
+    [JsonPropertyName("airport_mast")] public int? AirportMast { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。
