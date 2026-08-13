@@ -491,10 +491,47 @@ public sealed class StructureSpec
     // 事務所棟の奥行き（マス）。0 で事務所棟なし。
     [JsonPropertyName("rail_annex")] public int? RailAnnex { get; set; }
 
+    // ===== 駅舎（structure_type="railway:station_building"）=====
+    // 地平・高架下は width=奥行き（線路と直交）/ depth=桁行き（線路方向）。
+    // 橋上は rail_span=線路を横切る長さ / depth=桁行き / height=桁下高さ。
+
+    // 駅舎の形式。"ground"（地平・既定）| "bridge"（橋上）| "elevated"（高架下）。
+    [JsonPropertyName("rail_station_type")] public string? RailStationType { get; set; }
+
+    // コンコースの天井高（マス）。みなし規定で3.0m以上、橋上の実施例は5.5〜6.8m。
+    [JsonPropertyName("rail_concourse")] public int? RailConcourse { get; set; }
+
+    // 改札通路の数。1通路あたり「機械2マス（通行方向の長さ）＋通路幅」で並ぶ。
+    [JsonPropertyName("rail_gates")] public int? RailGates { get; set; }
+
+    // 幅広通路にするか。実物900mm。移動等円滑化基準の有効幅90cm以上を満たす。
+    [JsonPropertyName("rail_gate_wide")] public bool RailGateWide { get; set; }
+
+    // 券売機の台数（マス）。0 でなし。改札外の壁沿いに並ぶ。
+    [JsonPropertyName("rail_ticket")] public int? RailTicket { get; set; }
+
+    // 待合室の桁行き（マス）。3 未満でなし。改札内に置く。
+    [JsonPropertyName("rail_waiting")] public int? RailWaiting { get; set; }
+
+    // 駅務室の桁行き（マス）。3 未満でなし。改札ラッチの外側に置く。
+    [JsonPropertyName("rail_office")] public int? RailOffice { get; set; }
+
+    // 便所を付けるか。改札外の妻側に置く。
+    [JsonPropertyName("rail_toilet")] public bool RailToilet { get; set; }
+
+    // エレベーターを付けるか。かご内法 幅140cm以上×奥行135cm以上（11人乗り以上）に
+    // 壁を足して3マス角のシャフトになる。
+    [JsonPropertyName("rail_elevator")] public bool RailElevator { get; set; }
+
+    // 出入口・ホーム連絡口の有効幅（マス）。自由通路の実施例は幅員4m。
+    [JsonPropertyName("rail_passage")] public int? RailPassage { get; set; }
+
+    // 車寄せの庇の張り出し（マス）。0 でなし。地平・高架下でだけ使う。
+    [JsonPropertyName("rail_entrance_canopy")] public int? RailEntranceCanopy { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。
-    // 未指定なら "arena"。正面の向きは facade_face を使う（既定 south）。
     [JsonPropertyName("venue_kind")] public string? VenueKind { get; set; }
 
     // 客席の座面材。未指定なら accent_block → wall_block を流用。

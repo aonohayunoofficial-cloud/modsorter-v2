@@ -56,9 +56,14 @@ public static partial class RailwayExpander
         for (int a = a0; a <= a1; a++)
         {
             int y = RoofYAt(shape, a, a0, a1, baseY, pitch);
-            int lo = prev == int.MinValue ? y : Math.Min(y, prev + 1);
-            if (slopeAlongX) Fill(cells, a, a, lo, y, b0, b1, id);
-            else Fill(cells, b0, b1, lo, y, a, a, id);
+            int lo = y, hi = y;
+            if (prev != int.MinValue)
+            {
+                lo = Math.Min(y, prev + 1);   // 上り側の段差を埋める
+                hi = Math.Max(y, prev - 1);   // 下り側の段差を埋める（アーチは2段以上落ちる）
+            }
+            if (slopeAlongX) Fill(cells, a, a, lo, hi, b0, b1, id);
+            else Fill(cells, b0, b1, lo, hi, a, a, id);
             prev = y;
         }
     }

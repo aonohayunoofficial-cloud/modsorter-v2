@@ -52,6 +52,7 @@ namespace ModSorter.Architect.Generation;
 //   RailwayExpander.Canopy.cs   ホーム上屋
 //   RailwayExpander.Overpass.cs 跨線橋
 //   RailwayExpander.Depot.cs    車庫
+//   RailwayExpander.Station.cs  駅舎（地平・橋上・高架下）
 public static partial class RailwayExpander
 {
     public const string Prefix = "railway:";
@@ -76,6 +77,8 @@ public static partial class RailwayExpander
         if (s.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) s = s.Substring(Prefix.Length);
         switch (s.Trim().ToLowerInvariant())
         {
+            case "station_building":
+            case "station": return "station";
             case "platform_canopy":
             case "canopy": return "platform_canopy";
             case "overpass":
@@ -121,6 +124,9 @@ public static partial class RailwayExpander
         // 駅舎はここに case を足す。
         switch (KindOf(spec.StructureType))
         {
+            case "station":
+                BuildStation(cells, spec, p);
+                break;
             case "platform_canopy":
                 BuildCanopy(cells, spec, p);
                 break;
