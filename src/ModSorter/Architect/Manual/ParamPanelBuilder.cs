@@ -61,6 +61,10 @@ public sealed class ParamPanelBuilder
     {
         _owner = owner;
         _onChanged = onChanged;
+
+        // パネル全体の左右の余白。右は縦スクロールバーと値の数字が密着しないよう広く取る。
+        _root.Margin = new Thickness(4, 0, 12, 0);
+
         _stack.Add(_root);
     }
 
@@ -100,16 +104,21 @@ public sealed class ParamPanelBuilder
     public ParamPanelBuilder IntSlider(
         string key, string label, int min, int max, int value, string? tooltip = null)
     {
-        var dock = new DockPanel { Margin = new Thickness(0, 4, 0, 2) };
+        var dock = new DockPanel { Margin = new Thickness(0, 4, 0, 3) };
 
+        // 項目名の欄。全角8文字ぶんを確保し、それを超える名前は末尾を省略記号にする。
+        // 省略されても読めるよう、ツールチップ未指定なら項目名そのものを出す。
         var name = Label(label, "TextMain");
-        name.Width = 68;
-        if (tooltip != null) name.ToolTip = tooltip;
+        name.Width = 112;
+        name.TextTrimming = TextTrimming.CharacterEllipsis;
+        name.ToolTip = tooltip ?? label;
         DockPanel.SetDock(name, Dock.Left);
 
+        // 値の数字。右端にスクロールバーが来るので右側に余白を残す。
         var valueText = Label(value.ToString(), "GrassGreen");
-        valueText.Width = 34;
+        valueText.Width = 40;
         valueText.TextAlignment = TextAlignment.Right;
+        valueText.Margin = new Thickness(6, 0, 2, 0);
         DockPanel.SetDock(valueText, Dock.Right);
 
         var slider = new Slider
@@ -120,7 +129,7 @@ public sealed class ParamPanelBuilder
             TickFrequency = 1,
             IsSnapToTickEnabled = true,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 8, 0)
+            Margin = new Thickness(10, 0, 4, 0)
         };
         slider.ValueChanged += (_, e) =>
         {
@@ -186,11 +195,22 @@ public sealed class ParamPanelBuilder
     {
         _blocks[key] = defaultId;
 
+        // "項目名: minecraft:xxx" はパネル幅を超えるため、折り返す TextBlock を中身にして
+        // ボタン自体をパネル幅いっぱいに広げる。文字色はボタンのスタイルから継承させる。
+        var caption = new TextBlock
+        {
+            Text = $"{label}: {defaultId}",
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = PixelFont,
+            FontSize = 12
+        };
+
         var button = new Button
         {
-            Content = $"{label}: {defaultId}",
+            Content = caption,
             Style = (Style)_owner.FindResource("McButtonGray"),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 0, 0, 4)
         };
         button.Click += (_, __) =>
@@ -208,7 +228,7 @@ public sealed class ParamPanelBuilder
                 if (picked != null)
                 {
                     _blocks[key] = picked;
-                    button.Content = $"{label}: {picked}";
+                    caption.Text = $"{label}: {picked}";
                     _onChanged();
                 }
             }

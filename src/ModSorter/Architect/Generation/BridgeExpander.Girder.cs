@@ -15,10 +15,14 @@ namespace ModSorter.Architect.Generation;
 //   walkY = surfY+1 … 歩道面・地覆の天端
 //   その上          … 高欄、さらに上に照明柱と灯具
 //
+// 横断方向は「外側線→車線→車線境界線→…→中央分離帯→…→外側線」の順に左から詰める。
+// 区画線に専用の1マス列を与えるので、線の有無で車線幅が変わらず、左右も必ず対称になる。
+//
 // 丸めの扱い。床版の実寸は 0.22m、舗装は 0.08m で合わせても 0.3m しかないが、
 // 1マス=1m では床版と路面を別の層に分けないと主桁と路面の境が読めない。
 // よって床版1層＋路面1層の計2マスを充てる。歩道の段差（実寸 0.15〜0.25m）も
-// 同じ理由で1マスとする。いずれも実寸より厚くなる方向の丸め。
+// 同じ理由で1マスとする。区画線（実寸 0.15m）も1マス列を占める。
+// いずれも実寸より厚い・広い方向の丸め。
 public static partial class BridgeExpander
 {
     private static void BuildGirder(
@@ -52,16 +56,51 @@ public static partial class BridgeExpander
         int walk = Clamp(spec.BridgeSidewalk ?? 2, 0, 6);
         int rail = Clamp(spec.BridgeRailing ?? 1, 0, 3);
         bool marks = spec.BridgeLaneMark;
+        int markW = marks ? 1 : 0;
 
-        int roadW = lanes * laneW + median;
+        // 1車線しかない橋に中央分離帯は入らない。
+        if (lanes < 2) median = 0;
+
+        // 上下線の車線数。中央分離帯があるときだけ分ける。奇数なら左側が1本多い。
+        int lanesL = median > 0 ? (lanes + 1) / 2 : lanes;
+        int lanesR = median > 0 ? lanes - lanesL : 0;
+
+        // 1方向の車道幅。車線と車線境界線を交互に並べた合計。
+        int Carriage(int n) => n <= 0 ? 0 : n * laneW + (n - 1) * markW;
+
+        int roadW = markW
+                  + (median > 0 ? Carriage(lanesL) + median + Carriage(lanesR) : Carriage(lanes))
+                  + markW;
+
         int edge = walk > 0 ? walk + 1 : 1;   // 地覆1マス＋歩道
         int deckW = roadW + edge * 2;
         int roadX0 = edge;
-        int roadX1 = edge + roadW - 1;
+        int roadX1 = roadX0 + roadW - 1;
 
-        // 中央分離帯があるときの上下線の分かれ目。分離帯なしなら車道は1ブロック。
-        int lanesLeft = median > 0 ? lanes / 2 : lanes;
-        int medianX0 = roadX0 + lanesLeft * laneW;
+        // ===== 車線・中央分離帯・区画線の割り付け =====
+        // 左端の外側線の次から車線を並べ、車線と車線の間に境界線の列を挟む。
+        // 中央分離帯は上り線を並べ終えた位置に入る。
+        var boundaries = new List<int>();
+        int medianX0 = -1;
+        int cx = roadX0 + markW;
+        for (int side = 0; side < (median > 0 ? 2 : 1); side++)
+        {
+            int n = side == 0 ? (median > 0 ? lanesL : lanes) : lanesR;
+            for (int i = 0; i < n; i++)
+            {
+                cx += laneW;
+                if (i < n - 1)
+                {
+                    if (markW > 0) boundaries.Add(cx);
+                    cx += markW;
+                }
+            }
+            if (side == 0 && median > 0)
+            {
+                medianX0 = cx;
+                cx += median;
+            }
+        }
 
         // ===== 高さ =====
         int depthRatio = Clamp(spec.BridgeDepthRatio ?? 20, 12, 30);
@@ -120,7 +159,7 @@ public static partial class BridgeExpander
             Fill(cells, medianX0, medianX0 + median - 1, surfY, surfY + 1, 0, total - 1, p.Curb);
 
         // ===== 区画線 =====
-        // 外側線は実線、車線境界線は5マス周期で3マスの破線。
+        // 車道外側線は実線、車線境界線は実線長5m・空白長5mの破線。
         if (marks)
         {
             for (int z = 0; z < total; z++)
@@ -129,17 +168,9 @@ public static partial class BridgeExpander
                 cells[(roadX1, surfY, z)] = p.Mark;
             }
 
-            var boundaries = new List<int>();
-            for (int i = 1; i < lanesLeft; i++) boundaries.Add(roadX0 + i * laneW);
-            if (median > 0)
-            {
-                int rightX0 = medianX0 + median;
-                for (int i = 1; i < lanes - lanesLeft; i++) boundaries.Add(rightX0 + i * laneW);
-            }
-
             foreach (int bx in boundaries)
                 for (int z = 0; z < total; z++)
-                    if (z % 5 < 3) cells[(bx, surfY, z)] = p.Mark;
+                    if (z % 10 < 5) cells[(bx, surfY, z)] = p.Mark;
         }
 
         // ===== 地覆と歩道 =====
