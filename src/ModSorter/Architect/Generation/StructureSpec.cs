@@ -585,6 +585,43 @@ public sealed class StructureSpec
     // 照明の間隔（マス）。0 で照明なし。道路照明の灯具間隔は 30m 級。
     [JsonPropertyName("bridge_light_step")] public int? BridgeLightStep { get; set; }
 
+    // ===== 橋梁: 吊り橋（bridge:suspension_bridge）=====
+    // sag_ratio … サグ比 1/n。実橋は 1/10 前後（安芸灘大橋 74.0m/750m ＝ 1/10）。
+    [JsonPropertyName("bridge_sag_ratio")] public int? BridgeSagRatio { get; set; }
+    // tower_height … 床版から主塔頂までの高さ。0 で自動（サグ＋余裕）。
+    [JsonPropertyName("bridge_tower_height")] public int? BridgeTowerHeight { get; set; }
+    // tower_type … "portal"（門型）/"h"（H型）/"truss"（トラス塔）
+    [JsonPropertyName("bridge_tower_type")] public string? BridgeTowerType { get; set; }
+    // hanger_step … ハンガー間隔。実橋は10〜20m級（明石海峡大橋14m）。
+    [JsonPropertyName("bridge_hanger_step")] public int? BridgeHangerStep { get; set; }
+    // stiffen_depth … 補剛桁高。実橋は支間の1/100級だが1マス=1mでは潰れるので最小2。
+    [JsonPropertyName("bridge_stiffen_depth")] public int? BridgeStiffenDepth { get; set; }
+    // anchorage … アンカレイジ（ケーブル定着体）を作るか。
+    [JsonPropertyName("bridge_anchorage")] public bool BridgeAnchorage { get; set; }
+
+    // ===== 橋梁: アーチ橋（bridge:arch_bridge）=====
+    // arch_type … "deck"（上路式）/"through"（下路式）/"half"（中路式）
+    [JsonPropertyName("bridge_arch_type")] public string? BridgeArchType { get; set; }
+    // rise_ratio … ライズ比 1/n。実橋は 1/5〜1/10（日本大百科全書）。
+    [JsonPropertyName("bridge_rise_ratio")] public int? BridgeRiseRatio { get; set; }
+    [JsonPropertyName("bridge_arch_ribs")] public int? BridgeArchRibs { get; set; }
+    // vertical_step … 鉛直材（上路式の支柱）・吊材（下路式）の間隔。
+    [JsonPropertyName("bridge_vertical_step")] public int? BridgeVerticalStep { get; set; }
+    // tie … タイドアーチのタイ材（水平反力を橋自身で受ける）。
+    [JsonPropertyName("bridge_tie")] public bool BridgeTie { get; set; }
+    // bracing … アーチリブ間の横構。
+    [JsonPropertyName("bridge_bracing")] public bool BridgeBracing { get; set; }
+
+    // ===== 橋梁: 跳開橋（bridge:bascule_bridge）=====
+    // leaves … 1=単葉 / 2=双葉。
+    [JsonPropertyName("bridge_leaves")] public int? BridgeLeaves { get; set; }
+    [JsonPropertyName("bridge_leaf_span")] public int? BridgeLeafSpan { get; set; }
+    // open_angle … 跳開角。勝鬨橋は70秒で70度まで開く設計（土木学会）。
+    [JsonPropertyName("bridge_open_angle")] public int? BridgeOpenAngle { get; set; }
+    // counterweight … 釣合い錘（トラニオン後方・橋脚内のピットに降りる）。
+    [JsonPropertyName("bridge_counterweight")] public bool BridgeCounterweight { get; set; }
+    [JsonPropertyName("bridge_machine_house")] public bool BridgeMachineHouse { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。

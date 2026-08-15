@@ -155,9 +155,9 @@ public static class ManualCatalog
         // 橋梁
         Mid("bridge", "橋梁",
             Impl("girder_bridge", "桁橋", () => new GirderBridgeParamsControl()),
-            Todo("suspension_bridge", "吊り橋"),
-            Todo("arch_bridge", "アーチ橋"),
-            Todo("bascule_bridge", "跳開橋")),
+            Impl("suspension_bridge", "吊り橋", () => new SuspensionBridgeParamsControl()),
+            Impl("arch_bridge", "アーチ橋", () => new ArchBridgeParamsControl()),
+            Impl("bascule_bridge", "跳開橋", () => new BasculeBridgeParamsControl())),
 
         // 産業インフラ
         Mid("industry", "産業",
