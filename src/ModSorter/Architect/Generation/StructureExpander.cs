@@ -131,6 +131,15 @@ public static partial class StructureExpander
             // RailwayExpander 側で 0 起点へ正規化するので、通常の展開は一切通さない。
             return RailwayExpander.Build(spec, allowedBlocks, fallback);
         }
+        if (BridgeExpander.Handles(structureType))
+        {
+            // 橋梁（"bridge:" 接頭辞）は BridgeExpander が桁橋などを確定的に作る。
+            // 上の structureType == "bridge"（Civil.cs の簡易橋）は完全一致判定なので
+            // "bridge:girder_bridge" はここまで落ちてくる。既存の簡易橋には影響しない。
+            // 橋台の取付部が z<0 へ張り出すぶんも BridgeExpander 側で 0 起点へ
+            // 正規化するので、通常の床/壁/屋根/開口部の展開は一切通さない。
+            return BridgeExpander.Build(spec, allowedBlocks, fallback);
+        }
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);

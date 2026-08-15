@@ -529,6 +529,62 @@ public sealed class StructureSpec
     // 車寄せの庇の張り出し（マス）。0 でなし。地平・高架下でだけ使う。
     [JsonPropertyName("rail_entrance_canopy")] public int? RailEntranceCanopy { get; set; }
 
+    // ===== 橋梁（structure_type="bridge:<種類>"）=====
+    // 1マス=1m。鉄道・空港の建物系と同じ縮尺なので並べても寸法が食い違わない。
+    // 橋長と全幅は下の bridge_* から従属して決まるので width / depth / height は
+    // BridgeExpander では参照しない（UI 側は表示のために同じ値を入れておく）。
+
+    // 支間数（径間の数）。橋脚の本数は支間数-1。
+    [JsonPropertyName("bridge_spans")] public int? BridgeSpans { get; set; }
+
+    // 1径間の支間長（マス＝m）。桁橋の一般的な適用支間は25〜150m。
+    [JsonPropertyName("bridge_span")] public int? BridgeSpan { get; set; }
+
+    // 連続桁にするか。false なら単純桁で、支点ごとに主桁を切って遊間を入れる。
+    [JsonPropertyName("bridge_continuous")] public bool BridgeContinuous { get; set; }
+
+    // 連続桁の側径間比（%）。3径間以上のとき両端の径間をこの割合まで詰める。
+    // 80（既定）で側径間:中央径間＝1:1.25。鋼重が最も軽くなる比率。
+    [JsonPropertyName("bridge_side_ratio")] public int? BridgeSideRatio { get; set; }
+
+    // 桁高比。支間長の 1/n を主桁の高さにする。20（既定）が標準的な桁橋の桁高。
+    // 連続桁では中間支点で曲げを分担できるぶん、展開側でさらに 8 割へ落とす。
+    [JsonPropertyName("bridge_depth_ratio")] public int? BridgeDepthRatio { get; set; }
+
+    // 主桁の本数。0/未指定なら全幅からおよそ3m間隔で自動決定（2主桁〜多主桁）。
+    [JsonPropertyName("bridge_girders")] public int? BridgeGirders { get; set; }
+
+    // 横桁（対傾構）の間隔（マス）。0 で横桁なし。
+    [JsonPropertyName("bridge_cross_step")] public int? BridgeCrossStep { get; set; }
+
+    // 車線数と1車線の幅（マス）。実物の車線幅は 3.25〜3.5m。
+    [JsonPropertyName("bridge_lanes")] public int? BridgeLanes { get; set; }
+    [JsonPropertyName("bridge_lane_width")] public int? BridgeLaneWidth { get; set; }
+
+    // 中央分離帯の幅（マス）。0 で分離帯なし。1 以上で上下線を分ける。
+    [JsonPropertyName("bridge_median")] public int? BridgeMedian { get; set; }
+
+    // 片側の歩道幅（マス）。0 で歩道なし（地覆だけ）。実物の歩道は 2.0m 級。
+    [JsonPropertyName("bridge_sidewalk")] public int? BridgeSidewalk { get; set; }
+
+    // 高欄・防護柵の高さ（マス）。0 でなし。実物は 1.1m なので 1 が実寸相当。
+    [JsonPropertyName("bridge_railing")] public int? BridgeRailing { get; set; }
+
+    // 区画線（外側線・車線境界線）を描くか。実物の線幅 0.15m に対し 1 マスを充てる。
+    [JsonPropertyName("bridge_lane_mark")] public bool BridgeLaneMark { get; set; }
+
+    // 橋脚の形式。"t"（既定・張出式＝T型）| "wall"（壁式）| "frame"（ラーメン・2本柱）。
+    [JsonPropertyName("bridge_pier_type")] public string? BridgePierType { get; set; }
+
+    // 橋脚の高さ（マス）。桁下端までの高さ。地面から桁下までの空間になる。
+    [JsonPropertyName("bridge_pier_height")] public int? BridgePierHeight { get; set; }
+
+    // 両端に橋台と取付部を作るか。true で橋の前後へ 3 マスの取付道路が伸びる。
+    [JsonPropertyName("bridge_abutment")] public bool BridgeAbutment { get; set; }
+
+    // 照明の間隔（マス）。0 で照明なし。道路照明の灯具間隔は 30m 級。
+    [JsonPropertyName("bridge_light_step")] public int? BridgeLightStep { get; set; }
+
     // ===== 屋外イベント会場（structure_type="venue"）=====
     // 会場の種類。"arena"（円形闘技場・コロッセウム式） | "stadium"（競技場） |
     // "bandshell"（野外音楽堂） | "stage"（ステージ） | "tents"（テント広場）。
