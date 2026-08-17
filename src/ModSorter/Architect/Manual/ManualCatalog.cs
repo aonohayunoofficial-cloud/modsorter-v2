@@ -164,9 +164,9 @@ public static class ManualCatalog
             Todo("power_plant", "発電所"),
             Todo("wind_turbine", "風車"),
             Todo("water_wheel", "水車"),
-            Todo("silo", "サイロ"),
-            Todo("water_tower", "給水塔"),
-            Todo("tank", "タンク")),
+            Impl("silo", "サイロ", () => new VesselParamsControl("silo")),
+            Impl("water_tower", "給水塔", () => new VesselParamsControl("water_tower")),
+            Impl("tank", "タンク", () => new VesselParamsControl("tank"))),
     };
 
     // ===== 大分類3: 船体（フェーズ5〜6） =====

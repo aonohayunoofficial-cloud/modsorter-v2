@@ -5,7 +5,11 @@ namespace ModSorter.Architect.Generation;
 
 // モデルが吐く中間表現。座標ではなく「設計意図」だけを持つ。
 // 座標への展開は StructureExpander が確定的に行う。
-public sealed class StructureSpec
+//
+// partial。小分類ごとのプロパティ群は StructureSpec.<分野>.cs へ分ける。
+// System.Text.Json はプロパティ名で解決するので、宣言がどのファイルにあっても
+// 直列化・逆直列化の結果は変わらない。
+public sealed partial class StructureSpec
 {
     [JsonPropertyName("width")] public int Width { get; set; }  // x方向 W
     [JsonPropertyName("depth")] public int Depth { get; set; }  // z方向 D

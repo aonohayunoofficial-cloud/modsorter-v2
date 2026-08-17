@@ -140,6 +140,17 @@ public static partial class StructureExpander
             // 正規化するので、通常の床/壁/屋根/開口部の展開は一切通さない。
             return BridgeExpander.Build(spec, allowedBlocks, fallback);
         }
+
+        if (IndustryExpander.Handles(structureType))
+        {
+            // 産業インフラ（"industry:" 接頭辞）は IndustryExpander が縦型容器などを
+            // 確定的に作る。円筒・円錐・ドームは回転体として直接焼くので、矩形前提の
+            // 床/壁/屋根や「非矩形フットプリントでは屋根が flat に落ちる」制約に
+            // かからない。防油堤や基礎パッドが負座標へ張り出すぶんも IndustryExpander
+            // 側で 0 起点へ正規化する。
+            return IndustryExpander.Build(spec, allowedBlocks, fallback);
+        }
+
         string wall = Pick(spec.WallBlock, allowedBlocks, fallback);
         string floor = Pick(spec.FloorBlock ?? spec.WallBlock, allowedBlocks, wall);
         string roof = Pick(spec.RoofBlock ?? spec.WallBlock, allowedBlocks, wall);
