@@ -162,8 +162,8 @@ public static class ManualCatalog
         // 産業インフラ
         Mid("industry", "産業",
             Todo("power_plant", "発電所"),
-            Todo("wind_turbine", "風車"),
-            Todo("water_wheel", "水車"),
+            Impl("wind_turbine", "風車", () => new RotorParamsControl("wind_turbine")),
+            Impl("water_wheel", "水車", () => new RotorParamsControl("water_wheel")),
             Impl("silo", "サイロ", () => new VesselParamsControl("silo")),
             Impl("water_tower", "給水塔", () => new VesselParamsControl("water_tower")),
             Impl("tank", "タンク", () => new VesselParamsControl("tank"))),

@@ -39,6 +39,8 @@ public static partial class IndustryExpander
         {
             case "water_tower": return "water_tower";
             case "tank": return "tank";
+            case "wind_turbine": return "wind_turbine";
+            case "water_wheel": return "water_wheel";
             case "silo":
             default: return "silo";
         }
@@ -46,7 +48,7 @@ public static partial class IndustryExpander
 
     private sealed class Palette
     {
-        public readonly string Shell, Roof, Base, Deck, Rail, Accent, Glaze, Light, Stair;
+        public readonly string Shell, Roof, Base, Deck, Rail, Accent, Glaze, Light, Stair, Blade, Cap;
 
         public Palette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -59,11 +61,15 @@ public static partial class IndustryExpander
             Glaze = Pick(spec.GlazingBlock, allowed, Shell);
             Light = Pick(spec.SeatBlock, allowed, Roof);
             Stair = Pick(spec.VerandaBlock, allowed, Deck);
+            // 回転体（風車・水車）で使う。翼・羽根・水輪の骨組みと、風車のキャップ。
+            Blade = Pick(spec.TowerBlock, allowed, Deck);
+            Cap = Pick(spec.TowerRoofBlock, allowed, Roof);
         }
     }
 
-    // 梯子は形状が決まっているので選ばせない。
+    // 梯子と水は形状・種類が決まっているので選ばせない。
     private const string LadderId = "minecraft:ladder";
+    private const string WaterId = "minecraft:water";
 
     // 座標 -> ブロックステート。梯子の facing、階段の facing/half/shape を持たせる。
     // 状態を持たないブロックはここへ入れない（GeneratedBlock.Properties が null になる）。
@@ -80,6 +86,8 @@ public static partial class IndustryExpander
         {
             case "water_tower": BuildWaterTower(cells, props, spec, p); break;
             case "tank": BuildTank(cells, props, spec, p); break;
+            case "wind_turbine": BuildWindTurbine(cells, spec, p); break;
+            case "water_wheel": BuildWaterWheel(cells, spec, p); break;
             case "silo":
             default: BuildSilo(cells, props, spec, p); break;
         }
@@ -394,11 +402,15 @@ public static partial class IndustryExpander
                     cells[(x, y, z)] = id;
     }
 
+    // 回転回数。Rotate の写像は (x,z)→(-z,x) で、canonical の正面 +z（南）は
+    // 1手ごとに 南→西→北→東 と移る。ゆえに west が1手・north が2手・east が3手。
+    // （従来 east と west が入れ替わっていた。縦型容器は facade_face を渡していないため
+    // 出力は変わらないが、回転体は向きを使うので正す。）
     private static int Face(string? face) => (face ?? "south").Trim().ToLowerInvariant() switch
     {
-        "east" => 1,
+        "west" => 1,
         "north" => 2,
-        "west" => 3,
+        "east" => 3,
         _ => 0,
     };
 
