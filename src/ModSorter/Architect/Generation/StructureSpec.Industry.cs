@@ -27,6 +27,13 @@ public sealed partial class StructureSpec
     // 点検口（サイロは頂部ハッチ、タンクは側板マンホール、給水塔は塔身の出入口）。
     [JsonPropertyName("industry_manhole")] public bool IndustryManhole { get; set; }
 
+    // 外部ラダーを置く方角。"north" | "south" | "east" | "west"。未指定は south。
+    [JsonPropertyName("industry_ladder_face")] public string? IndustryLadderFace { get; set; }
+
+    // 開口部（サイロの払い出し口・給水塔の塔身出入口・タンクの側板マンホール）の方角。
+    // 未指定は north。梯子と同じ方角にすると梯子が開口を塞ぐ。
+    [JsonPropertyName("industry_opening_face")] public string? IndustryOpeningFace { get; set; }
+
     // ===== サイロ =====
     // スカート支持の高さ。0で直置き。
     [JsonPropertyName("industry_skirt")] public int? IndustrySkirt { get; set; }

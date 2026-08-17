@@ -19,13 +19,18 @@ namespace ModSorter.Architect.Generation;
 //
 // 丸めの扱い。1マス=1m なので防油堤の0.5mは1マス、胴板・屋根板（実寸5〜10mm）も
 // 1マスとする。いずれも実寸より厚い・高い方向の丸め。
+//
+// 昇降設備と開口の向きは industry_ladder_face / industry_opening_face で別々に決める。
+// 同じ方角にすると梯子が開口を塞ぐため、UI の既定値は別方角にしてある。
 public static partial class IndustryExpander
 {
     // ===== サイロ =====
     // 下からスカート（払い出しの空間）→ホッパー→胴→屋根。
     private static void BuildSilo(
-        Dictionary<(int x, int y, int z), string> cells, Props props,
-        StructureSpec spec, Palette p)
+        Dictionary<(int x, int y, int z), string> cells,
+        Props props,
+        StructureSpec spec,
+        Palette p)
     {
         int d = Clamp(spec.IndustryDiameter ?? 6, 3, 16);
         int body = Clamp(spec.IndustryBodyHeight ?? 18, 4, 48);
@@ -33,37 +38,40 @@ public static partial class IndustryExpander
         bool hopper = spec.IndustryHopper && skirt >= 2;
         string roof = spec.IndustryRoof ?? "dome";
         int pitch = Clamp(spec.IndustryRoofPitch ?? 2, 1, 24);
+        string ladderFace = spec.IndustryLadderFace ?? "south";
+        string openFace = spec.IndustryOpeningFace ?? "north";
 
-        Disc(cells, 0, 0, d, 0, 0, p.Base);            // 土間
+        Disc(cells, 0, 0, d, 0, 0, p.Base);                                 // 土間
 
         if (skirt > 0)
         {
-            Ring(cells, 0, 0, d, 1, skirt, p.Base);    // スカート支持
-            OpenRing(cells, 0, 0, d, 1, Math.Min(2, skirt), 3);   // 払い出し口
+            Ring(cells, 0, 0, d, 1, skirt, p.Base);                         // スカート支持
+            OpenRing(cells, 0, 0, d, 1, Math.Min(2, skirt), 3, openFace);   // 払い出し口
         }
 
         int bodyY0 = skirt + 1;
 
         if (hopper)
         {
-            // 上へ広がる漏斗。各段は自分の半径から一つ下の段の半径を除いた環。
+            // 上へ広がる漏斗。各段は自分の半径から、一つ下の段の半径（ただし
+            // 自分の半径-1 を下限）を除いた環。半径差が1マス未満でも面が抜けない。
             double half = d / 2.0;
             for (int k = 0; k < skirt; k++)
             {
                 double r = 1.0 + (half - 1.0) * (k + 1) / skirt;
-                double rPrev = 1.0 + (half - 1.0) * k / skirt;
+                double inner = Math.Min(1.0 + (half - 1.0) * k / skirt, r - 1.0);
                 for (int x = 0; x < d; x++)
                     for (int z = 0; z < d; z++)
-                        if (InR(x, z, d, r) && !InR(x, z, d, rPrev))
+                        if (InR(x, z, d, r) && !InR(x, z, d, inner))
                             cells[(x, 1 + k, z)] = p.Shell;
             }
         }
         else
         {
-            Disc(cells, 0, 0, d, bodyY0, bodyY0, p.Deck);   // 平底
+            Disc(cells, 0, 0, d, bodyY0, bodyY0, p.Deck);                   // 平底
         }
 
-        Ring(cells, 0, 0, d, bodyY0, bodyY0 + body - 1, p.Shell);   // 胴
+        Ring(cells, 0, 0, d, bodyY0, bodyY0 + body - 1, p.Shell);           // 胴
 
         // 補強バンド。コンクリートステーブサイロは外周のフープで締める。
         for (int y = bodyY0 + 3; y < bodyY0 + body - 1; y += 4)
@@ -71,21 +79,25 @@ public static partial class IndustryExpander
 
         int roofY = bodyY0 + body;
         int levels = BuildRoof(cells, 0, 0, d, roofY, roof, pitch, p.Roof);
-
         int apex = roofY + levels - 1;
         int cx = (d - 1) / 2;
+
         if (spec.IndustryManhole) cells[(cx, apex, cx)] = p.Glaze;
+
         if (spec.IndustryChute)
             for (int z = cx; z <= d + 1; z++) cells[(cx, apex + 1, z)] = p.Accent;
 
-        if (spec.IndustryLadder) Ladder(cells, props, 0, 0, d, 1, roofY, 1);
+        // 梯子は最後。補強バンドと同じ列に来ても梯子が勝つ。
+        if (spec.IndustryLadder) Ladder(cells, props, 0, 0, d, 1, roofY, ladderFace);
     }
 
     // ===== 給水塔 =====
     // 高置水槽方式。塔身（昇降路シャフト）の上に水槽を載せる。
     private static void BuildWaterTower(
-        Dictionary<(int x, int y, int z), string> cells, Props props,
-        StructureSpec spec, Palette p)
+        Dictionary<(int x, int y, int z), string> cells,
+        Props props,
+        StructureSpec spec,
+        Palette p)
     {
         int td = Clamp(spec.IndustryDiameter ?? 11, 5, 24);
         int depth = Clamp(spec.IndustryBodyHeight ?? 5, 2, 12);
@@ -93,18 +105,22 @@ public static partial class IndustryExpander
         int sh = Clamp(spec.IndustryShaftHeight ?? 30, 4, 60);
         string roof = spec.IndustryRoof ?? "dome";
         int pitch = Clamp(spec.IndustryRoofPitch ?? 3, 1, 24);
+        string ladderFace = spec.IndustryLadderFace ?? "south";
+        string openFace = spec.IndustryOpeningFace ?? "north";
 
-        int so = (td - sw) / 2;                  // 塔身を水槽の中心へ寄せる
-        int fd = Math.Min(td, sw + 4);           // 基礎の直径
+        int so = (td - sw) / 2;                 // 塔身を水槽の中心へ寄せる
+        int fd = Math.Min(td, sw + 4);          // 基礎の直径
         int fo = (td - fd) / 2;
 
         Disc(cells, fo, fo, fd, 0, 0, p.Base);
         Ring(cells, so, so, sw, 1, sh, p.Shell);
-        if (spec.IndustryManhole && sw >= 3) OpenRing(cells, so, so, sw, 1, 2, 1);
+
+        if (spec.IndustryManhole && sw >= 3)
+            OpenRing(cells, so, so, sw, 1, 2, 1, openFace);
 
         int tankY = sh + 1;
-        Disc(cells, 0, 0, td, tankY, tankY, p.Deck);                    // 水槽の底
-        Ring(cells, 0, 0, td, tankY + 1, tankY + depth, p.Shell);       // 水槽の胴
+        Disc(cells, 0, 0, td, tankY, tankY, p.Deck);                        // 水槽の底
+        Ring(cells, 0, 0, td, tankY + 1, tankY + depth, p.Shell);           // 水槽の胴
 
         if (spec.IndustryBalcony)
         {
@@ -115,17 +131,19 @@ public static partial class IndustryExpander
         int roofY = tankY + depth + 1;
         int levels = BuildRoof(cells, 0, 0, td, roofY, roof, pitch, p.Roof);
 
-        if (spec.IndustryLadder) Ladder(cells, props, so, so, sw, 1, sh, 1);
+        if (spec.IndustryLadder) Ladder(cells, props, so, so, sw, 1, sh, ladderFace);
 
         int cx = (td - 1) / 2;
-        cells[(cx, roofY + levels, cx)] = p.Light;   // 頂部の航空障害灯
+        cells[(cx, roofY + levels, cx)] = p.Light;                          // 航空障害灯
     }
 
     // ===== タンク =====
     // 屋外貯蔵タンク。底板・側板・円錐屋根に、風止めリング・らせん階段・防油堤を付ける。
     private static void BuildTank(
-        Dictionary<(int x, int y, int z), string> cells, Props props,
-        StructureSpec spec, Palette p)
+        Dictionary<(int x, int y, int z), string> cells,
+        Props props,
+        StructureSpec spec,
+        Palette p)
     {
         int d = Clamp(spec.IndustryDiameter ?? 39, 6, 80);
         int body = Clamp(spec.IndustryBodyHeight ?? 21, 4, 32);
@@ -133,6 +151,10 @@ public static partial class IndustryExpander
         int pitch = Clamp(spec.IndustryRoofPitch ?? 16, 4, 24);
         int girder = Clamp(spec.IndustryWindGirder ?? 0, 0, 16);
         int dike = Clamp(spec.IndustryDike ?? 1, 0, 4);
+        // らせん階段が +x〜+z（東→南）の弧を使うので、梯子の既定は北、
+        // 側板マンホールの既定は西。どちらも UI で変えられる。
+        string ladderFace = spec.IndustryLadderFace ?? "north";
+        string openFace = spec.IndustryOpeningFace ?? "west";
 
         Disc(cells, -1, -1, d + 2, 0, 0, p.Base);       // 基礎パッド
         Disc(cells, 0, 0, d, 1, 1, p.Deck);             // 底板
@@ -140,15 +162,16 @@ public static partial class IndustryExpander
 
         if (girder > 0)
             for (int y = 2 + girder; y <= body + 1; y += girder)
-                Ring(cells, -1, -1, d + 2, y, y, p.Accent);   // 風止めリング
+                Ring(cells, -1, -1, d + 2, y, y, p.Accent);     // 風止めリング
 
         int roofY = body + 2;
         BuildRoof(cells, 0, 0, d, roofY, roof, pitch, p.Roof);
 
-        if (spec.IndustryManhole) OpenRing(cells, 0, 0, d, 2, 3, 1, p.Glaze);
+        if (spec.IndustryManhole) OpenRing(cells, 0, 0, d, 2, 3, 1, openFace, p.Glaze);
+
         if (spec.IndustryStair) Helix(cells, props, 0, 0, d, 2, body + 1, p.Deck, p.Stair);
-        // 梯子は -z 側。らせん階段が +x〜+z の弧を使うので、同じ列でぶつからない。
-        if (spec.IndustryLadder) Ladder(cells, props, 0, 0, d, 2, roofY, -1);
+
+        if (spec.IndustryLadder) Ladder(cells, props, 0, 0, d, 2, roofY, ladderFace);
 
         if (dike > 0)
         {

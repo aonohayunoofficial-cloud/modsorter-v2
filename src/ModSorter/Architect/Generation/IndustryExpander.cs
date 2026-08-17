@@ -122,8 +122,14 @@ public static partial class IndustryExpander
                         cells[(ox + x, y, oz + z)] = id;
     }
 
-    // 半径が段ごとに縮む回転体の殻。各段は自分の半径から次の段の半径を除いた環を置き、
-    // 最後の段だけ中身まで埋めて頂部を塞ぐ。勾配が急でも面が抜けない。
+    // 半径が段ごとに縮む回転体の殻。各段は「自分の半径」から「次の段の半径」または
+    // 「自分の半径-1」の内側を除いた環を置き、最後の段だけ中身まで埋めて頂部を塞ぐ。
+    //
+    // 内側の抜き半径に r-1 の下限（min）を入れる理由。ドーム屋根で 1/n を小さくすると
+    // 高さが直径に近いところまで立ち上がり、隣り合う段の半径差が1マスを大きく下回る。
+    // 次の段の半径だけで内側を抜くと環の幅が0マスになり、その段が空になって
+    // 屋根が浮いたり側面に隙間が空いた。min を取れば環の幅は必ず1マス以上になり、
+    // 勾配の緩い円錐屋根では従来どおり次の段までを一気に埋める。
     private static void Revolve(Dictionary<(int x, int y, int z), string> cells,
         int ox, int oz, int d, int baseY, IReadOnlyList<double> radii, string id)
     {
@@ -131,7 +137,7 @@ public static partial class IndustryExpander
         {
             bool last = k == radii.Count - 1;
             double r = radii[k];
-            double rn = last ? -1 : radii[k + 1];
+            double rn = last ? -1 : Math.Min(radii[k + 1], r - 1.0);
             for (int x = 0; x < d; x++)
                 for (int z = 0; z < d; z++)
                 {
@@ -156,6 +162,9 @@ public static partial class IndustryExpander
     }
 
     // ドーム屋根。高さ h の半楕円体。h = 直径/n。
+    // 半径が1マスを下回る段は加えない。半径0の段を持つと Revolve の最終段（中身まで
+    // 埋める段）が空になり、段数（RoofLevels）だけ増えて頂部の点検口・投入シュートが
+    // 宙に浮いた。最終段の半径が1マス以上なら必ず円板で塞がる。
     private static List<double> DomeRadii(int d, int h)
     {
         if (h < 1) h = 1;
@@ -164,9 +173,10 @@ public static partial class IndustryExpander
         for (int k = 0; k <= h; k++)
         {
             double r = half * Math.Sqrt(Math.Max(0.0, 1.0 - (double)k * k / ((double)h * h)));
+            if (r < 1.0) break;
             list.Add(r);
-            if (r <= 1.0) break;
         }
+        if (list.Count == 0) list.Add(half);
         return list;
     }
 
@@ -194,52 +204,90 @@ public static partial class IndustryExpander
         return radii.Count;
     }
 
-    // 外周の環だけを手前（+z）側で抜く／塗り替える。内側のホッパーや床には当たらない。
-    // id が null なら抜いて開口にし、指定があればその材に塗り替える。
-    private static void OpenRing(Dictionary<(int x, int y, int z), string> cells,
-        int ox, int oz, int d, int y0, int y1, int width, string? id = null)
+    // 方角を単位ベクトルへ。north が -z、south が +z、east が +x、west が -x。
+    private static (int dx, int dz) Dir(string? face) =>
+        (face ?? "south").Trim().ToLowerInvariant() switch
+        {
+            "north" => (0, -1),
+            "east" => (1, 0),
+            "west" => (-1, 0),
+            _ => (0, 1),
+        };
+
+    // 直径 d の円を dir 方向の中心線で切り、円に入っている外側の端の添字を返す。
+    // fix は中心線の座標（直交方向）。円が空なら false。
+    private static bool AxisEnd(int d, (int dx, int dz) dir, out int fix, out int outer)
     {
         double c = (d - 1) / 2.0;
+        fix = (int)Math.Round(c);
+        outer = 0;
+
+        int lo = -1, hi = -1;
+        for (int i = 0; i < d; i++)
+        {
+            int x = dir.dx != 0 ? i : fix;
+            int z = dir.dz != 0 ? i : fix;
+            if (!InR(x, z, d, d / 2.0)) continue;
+            if (lo < 0) lo = i;
+            hi = i;
+        }
+        if (lo < 0) return false;
+
+        outer = dir.dx + dir.dz > 0 ? hi : lo;
+        return true;
+    }
+
+    // 外周の環だけを face の側で抜く／塗り替える。内側のホッパーや床には当たらない。
+    // id が null なら抜いて開口にし、指定があればその材に塗り替える。
+    //
+    // 幅の判定は中心からの距離で見る。直径が偶数だと中心がマス境界に来るため、
+    // 距離0のマスが存在せず幅1の開口が1マスも当たらなかった（給水塔の塔身は既定
+    // 直径4＝偶数なので出入口が開かなかった）。偶数径では半マスずらした閾値にする。
+    private static void OpenRing(Dictionary<(int x, int y, int z), string> cells,
+        int ox, int oz, int d, int y0, int y1, int width, string? face, string? id = null)
+    {
+        var dir = Dir(face);
+        double c = (d - 1) / 2.0;
         double r = d / 2.0;
+
+        double lim = (width - 1) / 2.0;
+        if (d % 2 == 0) lim = Math.Floor(lim) + 0.5;
+
         for (int y = y0; y <= y1; y++)
             for (int x = 0; x < d; x++)
-            {
-                if (Math.Abs(x - c) > (width - 1) / 2.0) continue;
                 for (int z = 0; z < d; z++)
                 {
-                    if (z < c) continue;
                     if (!InR(x, z, d, r) || InR(x, z, d, r - 1.0)) continue;
+                    // along は face へ進む量。0以下は反対側と真横なので触らない。
+                    double along = dir.dx != 0 ? (x - c) * dir.dx : (z - c) * dir.dz;
+                    double cross = dir.dx != 0 ? z - c : x - c;
+                    if (along <= 0) continue;
+                    if (Math.Abs(cross) > lim) continue;
                     if (id == null) cells.Remove((ox + x, y, oz + z));
                     else cells[(ox + x, y, oz + z)] = id;
                 }
-            }
     }
 
     // 外部ラダー。minecraft:ladder を胴板の外側1マスに1列立てる。
-    // facing は「取り付く壁から梯子へ向かう向き」なので、+z 側なら south、-z 側なら north。
-    // dir=+1 で手前（+z）側、dir=-1 で奥（-z）側。タンクはらせん階段が +x〜+z の弧を
-    // 使うので -1 側へ逃がす。
+    // facing は「取り付く壁から梯子へ向かう向き」なので、置いた側の方角そのもの。
+    // 置く側は face で決める。開口部と同じ方角にすると梯子が開口を塞ぐので、
+    // UI の既定値は梯子と開口で別方角にしてある。
     private static void Ladder(Dictionary<(int x, int y, int z), string> cells, Props props,
-        int ox, int oz, int d, int y0, int y1, int dir)
+        int ox, int oz, int d, int y0, int y1, string? face)
     {
-        double c = (d - 1) / 2.0;
-        int x = (int)Math.Round(c);
+        var dir = Dir(face);
+        if (!AxisEnd(d, dir, out int fix, out int outer)) return;
 
-        int zEnd = -1;
-        for (int z = 0; z < d; z++)
-        {
-            if (!InR(x, z, d, d / 2.0)) continue;
-            if (dir > 0) zEnd = z;              // 最大 z（+z 側の外周）
-            else if (zEnd < 0) zEnd = z;        // 最小 z（-z 側の外周）
-        }
-        if (zEnd < 0) return;
-
-        int zl = oz + zEnd + (dir > 0 ? 1 : -1);
-        string facing = dir > 0 ? "south" : "north";
+        int step = dir.dx + dir.dz > 0 ? 1 : -1;
+        int lx = dir.dx != 0 ? outer + step : fix;
+        int lz = dir.dz != 0 ? outer + step : fix;
+        string facing = dir.dx != 0
+            ? (dir.dx > 0 ? "east" : "west")
+            : (dir.dz > 0 ? "south" : "north");
 
         for (int y = y0; y <= y1; y++)
         {
-            var key = (ox + x, y, zl);
+            var key = (ox + lx, y, oz + lz);
             cells[key] = LadderId;
             props[key] = new Dictionary<string, string> { ["facing"] = facing };
         }
