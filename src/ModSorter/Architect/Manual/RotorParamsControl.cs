@@ -136,45 +136,83 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 .BlockPick("glaze_d", "窓", "minecraft:glass_pane")
                 .EndGroup();
 
-            // ===== 垂直軸型 =====
+            // ===== 垂直軸型 共通の向き =====
             _ui.BeginChoiceGroup("type", "darrieus", "gyromill", "helical", "savonius")
                 .Heading("向き")
                 .Choice("face_v", "翼の初期位置の基準", faces, "south")
                 .Note("垂直軸型は風向に依存しないので、この向きは翼の並びを回すだけ。")
-                .Heading("ローター")
-                .IntSlider("rd_v", "回転直径", 3, 120, 64,
-                    "Éole（ダリウス3.8MW）は直径64m。直線翼の試験機は4m")
-                .IntSlider("rh_v", "ローターの高さ", 3, 120, 96,
-                    "Éole は高さ96m。サボニウスは直径の2〜4倍が最良")
-                .IntSlider("blades_v", "翼の枚数", 2, 6, 2,
-                    "Éole は2枚。直線翼は3枚、サボニウスは2〜3枚")
-                .IntSlider("chord_v", "翼弦長", 1, 8, 2, "翼の断面の幅")
-                .IntSlider("angle_v", "回転角", 0, 359, 0, "翼の位置")
-                .Heading("支柱・主軸")
-                .IntSlider("post_v", "ローター下端の高さ", 0, 60, 4,
-                    "地上（浮体式では水面上）からローター下端まで")
-                .IntSlider("shaft_v", "主軸の直径", 1, 12, 3)
                 .EndGroup();
 
-            _ui.BeginChoiceGroup("type", "helical")
-                .Heading("ねじり")
-                .IntSlider("twist_v", "ねじり角", 0, 720, 180,
-                    "下端から上端までに翼が回る角度。180度で半周")
-                .EndGroup();
-
-            _ui.BeginChoiceGroup("type", "savonius")
-                .Heading("段組み")
-                .IntSlider("stages_v", "段数", 1, 8, 3,
-                    "3段に分けて60度ずつずらすと、どの向きの風でも起動できる")
-                .Note("重なり比は0.2相当（直径の1/5）で自動。段の境目に端板が入る。")
-                .EndGroup();
-
+            // ===== ダリウス型（φ型）=====
+            // 寸法の桁が形式ごとに違うので、スライダーも形式ごとに分ける。
             _ui.BeginChoiceGroup("type", "darrieus")
-                .Heading("支線")
-                .Toggle("guy_v", "ガイワイヤあり", "ガイワイヤなし", false)
-                .Note("主軸の頂部から3方向へ、回転直径の半分+4マスの位置の錨まで張る。")
+                .Heading("ローター")
+                .IntSlider("rd_da", "回転直径", 6, 64, 34,
+                    "Sandia 34-m テストベッドは直径34m。Éole の64mが史上最大")
+                .IntSlider("rh_da", "ローターの高さ", 6, 96, 42,
+                    "高さ/直径は1.25が標準。Éole は直径64mに対し96m")
+                .IntSlider("blades_da", "翼の枚数", 2, 3, 2,
+                    "Sandia・FloWind・Éole いずれも2枚")
+                .IntSlider("chord_da", "翼弦長", 1, 8, 2,
+                    "Sandia 34-m は根元1.22m・赤道0.91m。根元は自動で1.4倍に広がる")
+                .IntSlider("angle_da", "回転角", 0, 359, 0, "翼の位置")
+                .Heading("主軸・基部")
+                .IntSlider("post_da", "ローター下端の高さ", 0, 20, 3,
+                    "φ型は翼の下端が主軸の根元に付くので低い")
+                .IntSlider("shaft_da", "主軸（トルクチューブ）の直径", 1, 12, 2,
+                    "回転直径の5%を下回る値は自動で引き上げる")
+                .Toggle("guy_da", "ガイワイヤあり", "ガイワイヤなし", true)
+                .Note("翼は直線＋円弧でトロポスキーン曲線を描く。主軸の頂部から3方向へ支線を張り、" +
+                      "根元に増速機と発電機の機械室が付く。")
                 .EndGroup();
 
+            // ===== 直線翼（H型・ジャイロミル）=====
+            _ui.BeginChoiceGroup("type", "gyromill")
+                .Heading("ローター")
+                .IntSlider("rd_gy", "回転直径", 3, 40, 26,
+                    "Falkenberg の200kW機は回転直径26m・翼長24m")
+                .IntSlider("rh_gy", "翼の長さ", 3, 40, 24, "高さ/直径はほぼ1")
+                .IntSlider("blades_gy", "翼の枚数", 2, 4, 3, "H型は3枚が基本")
+                .IntSlider("chord_gy", "翼弦長", 1, 8, 2,
+                    "N×弦長/直径 が0.25を下回る値は自動で引き上げる")
+                .IntSlider("angle_gy", "回転角", 0, 359, 0, "翼の位置")
+                .Heading("塔・主軸")
+                .IntSlider("post_gy", "ローター下端の高さ", 0, 60, 24, "塔の上に載る形式")
+                .IntSlider("shaft_gy", "主軸の直径", 1, 12, 2)
+                .Note("支持アームは上下端に入り、翼長が回転直径を超える機体では中間にも入る。")
+                .EndGroup();
+
+            // ===== ヘリカル（ねじり直線翼）=====
+            _ui.BeginChoiceGroup("type", "helical")
+                .Heading("ローター")
+                .IntSlider("rd_he", "回転直径", 2, 12, 3, "qr5 は直径3.1m。建物・街路用の小型機")
+                .IntSlider("rh_he", "翼の長さ", 3, 24, 5, "qr5 は高さ5m。掃過面積13.6m²")
+                .IntSlider("blades_he", "翼の枚数", 2, 5, 3, "qr5 は3枚")
+                .IntSlider("chord_he", "翼弦長", 1, 6, 1)
+                .IntSlider("twist_he", "ねじり角", 60, 360, 120,
+                    "1枚が下端から上端までに回る角度。qr5 は120度で3枚が全周を覆う")
+                .IntSlider("angle_he", "回転角", 0, 359, 0, "翼の位置")
+                .Heading("塔・主軸")
+                .IntSlider("post_he", "ローター下端の高さ", 0, 30, 9, "マストに載せる形式")
+                .IntSlider("shaft_he", "主軸の直径", 1, 8, 1)
+                .EndGroup();
+
+            // ===== サボニウス型（S型ロータ）=====
+            _ui.BeginChoiceGroup("type", "savonius")
+                .Heading("ローター")
+                .IntSlider("rd_sa", "回転直径", 1, 16, 4, "小型機は0.5〜3m。大型でも数m")
+                .IntSlider("rh_sa", "ローターの高さ", 2, 32, 8, "高さ/直径は2〜4が最良")
+                .IntSlider("blades_sa", "バケットの枚数", 2, 3, 2, "2枚が基本")
+                .IntSlider("stages_sa", "段数", 1, 4, 2,
+                    "段ごとに位相をずらすとどの向きの風でも起動できる")
+                .IntSlider("angle_sa", "回転角", 0, 359, 0, "バケットの位置")
+                .Note("重なり比は0.2、端板は直径1.1倍で自動。弦長はバケットなので持たない。")
+                .Heading("塔・主軸")
+                .IntSlider("post_sa", "ローター下端の高さ", 0, 30, 2)
+                .IntSlider("shaft_sa", "主軸の直径", 1, 8, 1)
+                .EndGroup();
+
+            // ===== 垂直軸型 共通の設置形態・ブロック =====
             _ui.BeginChoiceGroup("type", "darrieus", "gyromill", "helical", "savonius")
                 .Heading("設置形態")
                 .Toggle("float_v", "浮体式（洋上）", "陸上", false)
@@ -187,15 +225,16 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 .BlockPick("shell_v", "主軸", "minecraft:light_gray_concrete")
                 .BlockPick("blade_v", "翼", "minecraft:white_concrete")
                 .BlockPick("accent_v", "アーム・軸受け・浮体", "minecraft:iron_block")
-                .BlockPick("deck_v", "端板", "minecraft:gray_concrete")
-                .BlockPick("base_v", "基礎・海底・錨", "minecraft:smooth_stone")
+                .BlockPick("deck_v", "端板・機械室の屋根", "minecraft:gray_concrete")
+                .BlockPick("base_v", "基礎・機械室・海底・錨", "minecraft:smooth_stone")
                 .BlockPick("lattice_v", "ガイワイヤ", "minecraft:iron_bars")
                 .BlockPick("light_v", "灯火", "minecraft:redstone_lamp")
-                .Note("浮体式の水は minecraft:water を使うので選択項目にしていない。")
+                .Note("浮体式の水は minecraft:water を使うので選択項目にしていない。" +
+                      "灯火は全高30マス以上のときだけ付く。")
                 .EndGroup();
-        }
 
-        Content = _ui.Root;
+            Content = _ui.Root;
+        }
     }
 
     // 流れの向き → 面が向く方角。canonical は面が南（+z）で流れが東（+x）。
@@ -354,18 +393,32 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 _ui.GetBlock("light_v", "minecraft:redstone_lamp"),
             };
 
-            int rd = _ui.GetInt("rd_v");
-            int rh = _ui.GetInt("rh_v");
-            int blades = _ui.GetInt("blades_v");
-            int chord = _ui.GetInt("chord_v");
-            int post = _ui.GetInt("post_v");
-            int shaft = _ui.GetInt("shaft_v");
-            int stages = _ui.GetInt("stages_v");
-            int twist = _ui.GetInt("twist_v");
-            bool guy = type == "darrieus" && _ui.GetBool("guy_v");
+            // スライダーは形式ごとに分けてあるので、選ばれた形式の接尾辞で読む。
+            string sfx = type switch
+            {
+                "darrieus" => "da",
+                "gyromill" => "gy",
+                "helical" => "he",
+                _ => "sa",
+            };
+
+            int rd = _ui.GetInt("rd_" + sfx);
+            int rh = _ui.GetInt("rh_" + sfx);
+            int blades = _ui.GetInt("blades_" + sfx);
+            int post = _ui.GetInt("post_" + sfx);
+            int ang = _ui.GetInt("angle_" + sfx);
+            int wantShaft = _ui.GetInt("shaft_" + sfx);
+            int wantChord = type == "savonius" ? 1 : _ui.GetInt("chord_" + sfx);
+            int stages = type == "savonius" ? _ui.GetInt("stages_sa") : 1;
+            int twist = type == "helical" ? _ui.GetInt("twist_he") : 0;
+            bool guy = type == "darrieus" && _ui.GetBool("guy_da");
             bool floating = _ui.GetBool("float_v");
             int draft = floating ? _ui.GetInt("draft_v") : 0;
             string face = _ui.GetChoice("face_v", "south");
+
+            // 弦長と主軸径の下限は展開側と同じ判定を使い回す。
+            int chord = IndustryExpander.VawtChord(type, rd, blades, wantChord);
+            int shaft = IndustryExpander.VawtShaft(rd, wantShaft);
 
             if (floating && !allowed.Contains("minecraft:water")) allowed.Add("minecraft:water");
 
@@ -378,7 +431,7 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 IndustryRotorHeight = rh,
                 IndustryBladeCount = blades,
                 IndustryRotorWidth = chord,
-                IndustryRotorAngle = _ui.GetInt("angle_v"),
+                IndustryRotorAngle = ang,
                 IndustryRotorTwist = twist,
                 IndustryVawtStages = stages,
                 IndustryTowerHeight = post,
@@ -395,9 +448,12 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 SeatBlock = _ui.GetBlock("light_v", "minecraft:redstone_lamp")
             };
 
-            // 展開側と同じ式。海面の広がりとガイワイヤの錨まで含めて外形を出す。
+            // 展開側と同じ式。サボニウスの端板（直径1.1倍）・機械室・海面の広がり・
+            // ガイワイヤの錨まで含めて外形を出す。
             double sea = Math.Max(shaft / 2.0 + 4.0, rd / 4.0);
-            int span = rd + 2;
+            int houseHalf = Math.Clamp(rd / 8, 2, 6);
+            int span = type == "savonius" ? (int)Math.Ceiling(rd * 1.1) + 2 : rd + 2;
+            if (!floating && Math.Min(post, 4) >= 2) span = Math.Max(span, houseHalf * 2 + 3);
             if (guy) span = Math.Max(span, 2 * (rd / 2 + 4) + 2);
             if (floating) span = Math.Max(span, (int)Math.Ceiling(sea) * 2 + 2);
             width = span;
@@ -411,10 +467,13 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 "helical" => $"ヘリカル ねじり{twist}度",
                 _ => $"サボニウス型（S型ロータ）{stages}段",
             };
-            summary = $"風車 {typeJp} 回転直径{rd}×ローター高さ{rh} / 翼{blades}枚・弦長{chord} / " +
+            summary = $"風車 {typeJp} 回転直径{rd}×ローター高さ{rh} / " +
+                      $"翼{blades}枚{(type == "savonius" ? "" : $"・弦長{chord}")} / " +
                       $"主軸 直径{shaft}・下端高さ{post} / " +
                       $"{(floating ? $"浮体式 喫水{draft}" : "陸上")}" +
-                      $"{(guy ? " / ガイワイヤあり" : "")} / 全高{height}・敷地{span}角";
+                      $"{(guy ? " / ガイワイヤあり" : "")} / 全高{height}・敷地{span}角" +
+                      (chord > wantChord ? $"（弦長は{wantChord}→{chord}に上げた）" : "") +
+                      (shaft > wantShaft ? $"（主軸は{wantShaft}→{shaft}に上げた）" : "");
 
             vspec.Width = width;
             vspec.Depth = depth;
@@ -423,11 +482,13 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
         }
 
         // ===== 近代・水平軸 =====
+        // ここはメソッド直下のスコープなので、内側の分岐（水車・オランダ型）で使う
+        // blade・hubY と同名を置けない。他の項目と同じ M 接尾辞で分ける。
         string shell = _ui.GetBlock("shell_m", "minecraft:white_concrete");
-        string blade = _ui.GetBlock("blade_m", "minecraft:white_concrete");
+        string bladeM = _ui.GetBlock("blade_m", "minecraft:white_concrete");
         allowed = new List<string>
         {
-            shell, blade,
+            shell, bladeM,
             _ui.GetBlock("accent_m", "minecraft:light_gray_concrete"),
             _ui.GetBlock("base_m", "minecraft:smooth_stone"),
             _ui.GetBlock("light_m", "minecraft:redstone_lamp"),
@@ -455,7 +516,7 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
             IndustryNacelle = nacelle,
             IndustryManhole = _ui.GetBool("manhole_m"),
             WallBlock = shell,
-            TowerBlock = blade,
+            TowerBlock = bladeM,
             AccentBlock = _ui.GetBlock("accent_m", "minecraft:light_gray_concrete"),
             BaseBlock = _ui.GetBlock("base_m", "minecraft:smooth_stone"),
             SeatBlock = _ui.GetBlock("light_m", "minecraft:redstone_lamp")
@@ -464,12 +525,12 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
         // 展開側と同じ式。ナセル長・高さ・ハブ高さ・ローターの抑え方まで揃える。
         int nl = Math.Max(4, (int)Math.Round(thM / 7.5));
         int nh = Math.Max(3, Math.Min(6, tbM));
-        int hubY = thM + nh / 2;
-        int rdEff = Math.Min(rdM, 2 * (hubY - 2));
+        int hubYM = thM + nh / 2;
+        int rdEff = Math.Min(rdM, 2 * (hubYM - 2));
         int pad = Math.Clamp(tbM * 4, 6, 32);
         width = Math.Max(rdEff + 2, pad + 2);
         depth = nl + thickM + 2;
-        height = Math.Max(hubY + nh, hubY + rdEff / 2 + 1);
+        height = Math.Max(hubYM + nh, hubYM + rdEff / 2 + 1);
         summary = $"風車 近代・水平軸 タワー 高さ{thM}×基部{tbM} / ローター径{rdEff}・{bladesM}枚 / " +
                   $"{(nacelle ? $"ナセル 長さ{nl}" : "ナセルなし")} / " +
                   $"正面{FaceJp(faceM)} / 全高{height}" +
