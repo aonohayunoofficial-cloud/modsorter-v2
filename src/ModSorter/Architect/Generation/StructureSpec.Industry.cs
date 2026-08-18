@@ -67,10 +67,10 @@ public sealed partial class StructureSpec
     [JsonPropertyName("industry_dike")] public int? IndustryDike { get; set; }
 
     // ===== 風車・水車 共通（回転体）=====
-    // ローター（風車）・水輪（水車）の直径。
+    // ローター（風車）・水輪（水車）の直径。垂直軸型では回転直径。
     [JsonPropertyName("industry_rotor_diameter")] public int? IndustryRotorDiameter { get; set; }
 
-    // 回転面の厚み。風車では翼の厚み、水車では水輪の幅。
+    // 回転面の厚み。水平軸では翼の厚み、水車では水輪の幅、垂直軸型では翼弦長。
     [JsonPropertyName("industry_rotor_width")] public int? IndustryRotorWidth { get; set; }
 
     // 翼・羽根の枚数。
@@ -79,18 +79,44 @@ public sealed partial class StructureSpec
     // 回転角（度）。0で1枚目が +x を指す。姿勢を変えて並べるために持つ。
     [JsonPropertyName("industry_rotor_angle")] public int? IndustryRotorAngle { get; set; }
 
+    // 格子・帆・支線に使うブロック。フェンス（オランダ型の帆）や鉄柵（ガイワイヤ）を
+    // 指す。板ブロックでは面が塞がって透けないので、専用に持つ。
+    [JsonPropertyName("industry_lattice_block")] public string? IndustryLatticeBlock { get; set; }
+
     // ===== 風車 =====
-    // 形式。"modern"（近代・水平軸）| "dutch"（オランダ型）。未指定は modern。
+    // 形式。"modern"（近代・水平軸）| "dutch"（オランダ型）|
+    // "darrieus"（ダリウス φ型）| "gyromill"（直線翼 H型）|
+    // "helical"（ねじり直線翼）| "savonius"（S型ロータ）。未指定は modern。
     [JsonPropertyName("industry_mill_type")] public string? IndustryMillType { get; set; }
 
-    // 塔（タワー・塔身）の高さ。
+    // 塔（タワー・塔身）の高さ。垂直軸型ではローター下端までの支柱の高さ。
     [JsonPropertyName("industry_tower_height")] public int? IndustryTowerHeight { get; set; }
 
     // 塔の基部の直径。頂部は近代型で基部-2、オランダ型で基部-4まで細る。
+    // 垂直軸型では主軸（回転軸）の直径。
     [JsonPropertyName("industry_tower_base")] public int? IndustryTowerBase { get; set; }
 
     // ナセル（近代型の機械室）を付けるか。
     [JsonPropertyName("industry_nacelle")] public bool IndustryNacelle { get; set; }
+
+    // ===== 垂直軸型風車 =====
+    // ローターの高さ。ダリウスは翼の張る高さ、直線翼・サボニウスは翼の長さ。
+    [JsonPropertyName("industry_rotor_height")] public int? IndustryRotorHeight { get; set; }
+
+    // ねじり角（度）。ヘリカル形式で、下端から上端までに翼が回る角度。
+    [JsonPropertyName("industry_rotor_twist")] public int? IndustryRotorTwist { get; set; }
+
+    // サボニウスの段数。段ごとに 360/(枚数×段数) 度ずらして起動性を上げる。
+    [JsonPropertyName("industry_vawt_stages")] public int? IndustryVawtStages { get; set; }
+
+    // ガイワイヤ（主軸頂部から地面へ張る支線）を付けるか。
+    [JsonPropertyName("industry_guy")] public bool IndustryGuy { get; set; }
+
+    // 浮体式（スパーブイ）にするか。基礎の代わりに水面下の浮体を作る。
+    [JsonPropertyName("industry_floating")] public bool IndustryFloating { get; set; }
+
+    // 喫水（水面下の長さ）。浮体式のときだけ使う。
+    [JsonPropertyName("industry_draft")] public int? IndustryDraft { get; set; }
 
     // ===== 水車 =====
     // 水の掛け方。"overshot"（上掛け）| "breast"（胸掛け）| "undershot"（下掛け）。

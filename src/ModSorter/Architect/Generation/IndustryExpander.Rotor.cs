@@ -52,11 +52,10 @@ public static partial class IndustryExpander
     }
 
     // 半径方向の板（翼・羽根・スポーク）。r0 から r1 へ 0.5 刻みで進み、
-    // 弦長を根元 chord0 から先端 chord1 へ細める。
-    // lattice=true で骨組みだけ残す（オランダ型の羽根は帆桟の格子）。
+    // 弦長を根元 chord0 から先端 chord1 へ細める。面は全ブロックで埋める。
     private static void BladeXY(Dictionary<(int x, int y, int z), string> cells,
         double cx, double cy, double angDeg, double r0, double r1,
-        double chord0, double chord1, int z0, int z1, string id, bool lattice)
+        double chord0, double chord1, int z0, int z1, string id)
     {
         if (r1 <= r0) return;
         double a = angDeg * Math.PI / 180.0;
@@ -70,16 +69,59 @@ public static partial class IndustryExpander
             double half = (chord - 1.0) / 2.0;
             for (double s = -half; s <= half + 1e-9; s += 0.5)
             {
-                if (lattice)
-                {
-                    bool edge = Math.Abs(Math.Abs(s) - half) < 0.26;
-                    bool rib = Math.Abs(t / 2.0 - Math.Round(t / 2.0)) < 0.13;
-                    if (!edge && !rib) continue;
-                }
                 int x = (int)Math.Round(cx + ux * t + px * s);
                 int y = (int)Math.Round(cy + uy * t + py * s);
                 Put(cells, x, y, z0, z1, id);
             }
+        }
+    }
+
+    // オランダ型の羽根1枚。縦框（whip）を全ブロックの1列で通し、その片側に帆桟と
+    // 帆布を張る。帆布だけを透けるブロック（フェンス）にし、縁と3マスおきの桟は
+    // 全ブロックにするので、遠目でも羽根の輪郭が分かる。
+    //
+    // 描く順は帆布→桟→框。丸めで座標が重なっても骨のほうが残る。
+    private static void SailXY(Dictionary<(int x, int y, int z), string> cells,
+        double cx, double cy, double angDeg, double r0, double r1, int chord, int z,
+        string frame, string cloth)
+    {
+        if (r1 <= r0 || chord < 1) return;
+        double a = angDeg * Math.PI / 180.0;
+        double ux = Math.Cos(a), uy = Math.Sin(a);
+        double px = -uy, py = ux;
+
+        int steps = Math.Max(1, (int)Math.Ceiling((r1 - r0) * 2));
+        for (int pass = 0; pass < 2; pass++)
+            for (int s = 0; s <= steps; s++)
+            {
+                double t = r0 + (r1 - r0) * s / steps;
+                bool bar = s % 6 == 0;                       // 帆桟。0.5刻みなので3マスおき
+                for (int c = 0; c < chord; c++)
+                {
+                    bool frameCell = c == 0 || c == chord - 1 || bar;
+                    if (pass == 0 && frameCell) continue;    // 1周目は帆布だけ
+                    if (pass == 1 && !frameCell) continue;   // 2周目は骨だけ
+                    int x = (int)Math.Round(cx + ux * t + px * c);
+                    int y = (int)Math.Round(cy + uy * t + py * c);
+                    Put(cells, x, y, z, z, frameCell ? frame : cloth);
+                }
+            }
+    }
+
+    // 3次元の直線。既にブロックがある座標は上書きしない（支線が構造体を食わない）。
+    private static void Line3D(Dictionary<(int x, int y, int z), string> cells,
+        int x0, int y0, int z0, int x1, int y1, int z1, string id)
+    {
+        int steps = Math.Max(Math.Abs(x1 - x0), Math.Max(Math.Abs(y1 - y0), Math.Abs(z1 - z0)));
+        if (steps <= 0) return;
+        for (int s = 0; s <= steps; s++)
+        {
+            double f = s / (double)steps;
+            int x = (int)Math.Round(x0 + (x1 - x0) * f);
+            int y = (int)Math.Round(y0 + (y1 - y0) * f);
+            int z = (int)Math.Round(z0 + (z1 - z0) * f);
+            if (y < 0) continue;
+            if (!cells.ContainsKey((x, y, z))) cells[(x, y, z)] = id;
         }
     }
 
@@ -139,13 +181,19 @@ public static partial class IndustryExpander
     }
 
     // ===== 風車 =====
+    // 形式で分岐する。水平軸（近代・オランダ型）と垂直軸（ダリウス・直線翼・
+    // ヘリカル・サボニウス）で組み立てがまるごと違う。
     private static void BuildWindTurbine(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
     {
-        if ((spec.IndustryMillType ?? "modern").Trim().ToLowerInvariant() == "dutch")
+        string type = (spec.IndustryMillType ?? "modern").Trim().ToLowerInvariant();
+        switch (type)
         {
-            BuildDutchMill(cells, spec, p);
-            return;
+            case "dutch": BuildDutchMill(cells, spec, p); return;
+            case "darrieus":
+            case "gyromill":
+            case "helical":
+            case "savonius": BuildVawt(cells, spec, p, type); return;
         }
 
         int th = Clamp(spec.IndustryTowerHeight ?? 78, 6, 120);
@@ -199,16 +247,20 @@ public static partial class IndustryExpander
         for (int i = 0; i < blades; i++)
             BladeXY(cells, 0, hubY, ang + 360.0 * i / blades,
                 Math.Max(1.5, tb / 2.0), R, Math.Max(2.0, tb), 1.0,
-                0, thick - 1, p.Blade, false);
+                0, thick - 1, p.Blade);
     }
 
-    // オランダ型。下太りの塔身＋回転キャップ＋格子羽根。
+    // オランダ型。下太りの塔身＋回転キャップ＋帆を張った羽根。
+    // 羽根は縦框（whip）を全ブロックで通し、その片側に帆桟（全ブロック）と
+    // 帆布（フェンス等の透けるブロック）を張る。従来は縁と桟だけの格子だったため
+    // 遠目に羽根が消えていた。
     private static void BuildDutchMill(
         Dictionary<(int x, int y, int z), string> cells, StructureSpec spec, Palette p)
     {
         int th = Clamp(spec.IndustryTowerHeight ?? 20, 6, 48);
         int tb = Clamp(spec.IndustryTowerBase ?? 10, 5, 24);
         int sails = Clamp(spec.IndustryBladeCount ?? 4, 2, 8);
+        int chord = Clamp(spec.IndustryRotorWidth ?? 4, 2, 8);
         int ang = Clamp(spec.IndustryRotorAngle ?? 0, 0, 359);
         double R = Clamp(spec.IndustryRotorDiameter ?? 26, 6, 80) / 2.0;
         double topD = Math.Max(4.0, tb - 4.0);
@@ -267,9 +319,223 @@ public static partial class IndustryExpander
         int hubY = th + 1 + Math.Max(1, capH / 2);
         int zFront = (int)Math.Round(topD / 2.0) + 2;
         AxleZ(cells, 0, hubY, 1.0, 0, zFront, p.Accent);
+
+        // 十字の桁（cross tree）。框の根元同士を全ブロックで繋いで骨を見せる。
         for (int i = 0; i < sails; i++)
-            BladeXY(cells, 0, hubY, ang + 360.0 * i / sails, 2.0, R,
-                4.0, 3.0, zFront, zFront, p.Blade, true);
+            BladeXY(cells, 0, hubY, ang + 360.0 * i / sails, 1.0, 3.0,
+                1.0, 1.0, zFront, zFront, p.Blade);
+
+        for (int i = 0; i < sails; i++)
+            SailXY(cells, 0, hubY, ang + 360.0 * i / sails, 2.0, R, chord,
+                zFront, p.Blade, p.Lattice);
+    }
+
+    // ===== 垂直軸型風車 =====
+    // 主軸は canonical の原点に立て、翼は水平面（x-z）の角度で配る。
+    // 風向に依存しない形式なので facade_face は翼の初期位置の基準にしかならない。
+    //
+    // 実寸の出典。
+    //   ダリウス（φ型）… Cap-Chat の Éole は3.8MW・全高110m・ローター直径64m・
+    //     高さ96m・2枚翼〔Möllerström, A historical review of VAWTs rated 100 kW or more〕。
+    //   直線翼（H型・ジャイロミル）… 日本飛行機の運用試験機は直径4m・高さ4.5m・
+    //     風速25m/sまで運転〔川崎重工 プレスリリース〕。別例でスパン2.4m・弦長0.30m・
+    //     回転直径3.6m・3枚翼で約3kW。
+    //   ヘリカル … H型の翼をらせんにして、枚数を増やさず起動性を上げる形式。
+    //   サボニウス（S型ロータ）… 重なり比0.2〜0.3が最良、アスペクト比（高さ/直径）は
+    //     2〜4。羽根2〜3枚で、3段に分けて60°ずつずらす〔大阪大学 サボニウス風車の
+    //     数値解析による性能予測／浜島書店 サボニウス型風車風力発電機〕。
+    //   浮体式 … SeaTwirl の30kW機はタービン直径10m・全高31m・水面上13m（水面下18m）、
+    //     K-LINE の浮遊軸型 FAWT はロータ径9.3m・浮体径1.7m・20kW。
+    private static void BuildVawt(Dictionary<(int x, int y, int z), string> cells,
+        StructureSpec spec, Palette p, string type)
+    {
+        int d = Clamp(spec.IndustryRotorDiameter ?? 64, 3, 120);
+        int h = Clamp(spec.IndustryRotorHeight ?? 96, 3, 120);
+        int blades = Clamp(spec.IndustryBladeCount ?? 2, 2, 6);
+        int chord = Clamp(spec.IndustryRotorWidth ?? 2, 1, 8);
+        int ang = Clamp(spec.IndustryRotorAngle ?? 0, 0, 359);
+        int post = Clamp(spec.IndustryTowerHeight ?? 4, 0, 60);
+        int shaft = Clamp(spec.IndustryTowerBase ?? 3, 1, 12);
+        bool floating = spec.IndustryFloating;
+        int draft = floating ? Clamp(spec.IndustryDraft ?? 18, 2, 60) : 0;
+
+        double R = d / 2.0;
+        int y0 = draft + post;      // ローター下端
+        int top = y0 + h;           // 主軸の頂部
+
+        if (floating)
+        {
+            // スパーブイ。海底の板と水を敷き、浮体を水面（y=draft）まで立てる。
+            double sea = Math.Max(shaft / 2.0 + 4.0, R / 2.0);
+            HDisc(cells, 0, 0, sea, 0, 0, p.Base);
+            for (int y = 1; y <= draft; y++)
+                HDisc(cells, 0, 0, sea, y, y, WaterId);
+            // 浮体は主軸より太い。FAWT はロータ径9.3mに対し浮体径1.7m。
+            HDisc(cells, 0, 0, Math.Max(1.5, shaft / 2.0 + 1.0), 1, draft, p.Accent);
+        }
+        else
+        {
+            HDisc(cells, 0, 0, Math.Max(2.0, shaft / 2.0 + 1.5), 0, 0, p.Base);
+            // 発電機室。増速機と発電機を地上に置けるのが垂直軸型の利点。
+            if (post >= 2) Fill(cells, -2, 2, 1, 2, -2, 2, p.Accent);
+        }
+
+        // 主軸。細いうちは中身まで詰め、太くなったら管にする。
+        if (shaft <= 4) HDisc(cells, 0, 0, shaft / 2.0, draft + 1, top, p.Shell);
+        else for (int y = draft + 1; y <= top; y++) HRing(cells, 0, 0, shaft / 2.0, y, p.Shell);
+
+        int twist = Clamp(spec.IndustryRotorTwist ?? 180, 0, 720);
+
+        switch (type)
+        {
+            case "darrieus":
+                // φ型。翼は上下端で主軸に付き、中央で最大半径になる曲線（トロポスキーン）。
+                for (int i = 0; i < blades; i++)
+                    DarrieusBlade(cells, R, y0, h, ang + 360.0 * i / blades, chord, p.Blade);
+                HDisc(cells, 0, 0, Math.Max(1.5, shaft / 2.0 + 1.0), y0, y0, p.Accent);
+                HDisc(cells, 0, 0, Math.Max(1.5, shaft / 2.0 + 1.0), top, top, p.Accent);
+                break;
+
+            case "savonius":
+                BuildSavonius(cells, d, h, y0, blades,
+                    Clamp(spec.IndustryVawtStages ?? 3, 1, 8), ang, p);
+                break;
+
+            default:
+                // H型（直線翼）とヘリカル。ヘリカルは高さに沿って翼の角度を回す。
+                bool helical = type == "helical";
+                for (int i = 0; i < blades; i++)
+                {
+                    double a0 = ang + 360.0 * i / blades;
+                    StraightBlade(cells, R, y0, h, a0, helical ? twist : 0, chord, p.Blade);
+                    // 支持アーム。翼の上下端を主軸へ繋ぐ。
+                    ArmXZ(cells, R, y0, a0, chord, p.Accent);
+                    ArmXZ(cells, R, y0 + h - 1, a0 + (helical ? twist : 0), chord, p.Accent);
+                }
+                break;
+        }
+
+        // 頂部の灯火。
+        cells[(0, top + 1, 0)] = p.Light;
+
+        // ガイワイヤ。主軸の頂部から3方向へ張る。浮体式では張らない。
+        if (spec.IndustryGuy && !floating)
+        {
+            int anchor = (int)Math.Round(R) + 4;
+            for (int i = 0; i < 3; i++)
+            {
+                double a = (ang + 120.0 * i) * Math.PI / 180.0;
+                int ax = (int)Math.Round(Math.Cos(a) * anchor);
+                int az = (int)Math.Round(Math.Sin(a) * anchor);
+                cells[(ax, 0, az)] = p.Base;
+                Line3D(cells, 0, top, 0, ax, 1, az, p.Lattice);
+            }
+        }
+    }
+
+    // ダリウス（φ型）の翼1枚。半径は r = R*sin(π*f)（f は下端からの高さの比）で、
+    // 上下端が主軸に付き中央が最も張り出す。刻みを細かく取って線が切れないようにする。
+    private static void DarrieusBlade(Dictionary<(int x, int y, int z), string> cells,
+        double R, int y0, int h, double angDeg, int chord, string id)
+    {
+        double a = angDeg * Math.PI / 180.0;
+        double ux = Math.Cos(a), uz = Math.Sin(a);
+        double px = -uz, pz = ux;
+
+        int steps = Math.Max(16, h * 8);
+        for (int s = 0; s <= steps; s++)
+        {
+            double f = s / (double)steps;
+            int y = y0 + (int)Math.Round(h * f);
+            double r = R * Math.Sin(Math.PI * f);
+            for (int c = 0; c < chord; c++)
+            {
+                double off = c - (chord - 1) / 2.0;
+                int x = (int)Math.Round(ux * r + px * off);
+                int z = (int)Math.Round(uz * r + pz * off);
+                if (y >= 0) cells[(x, y, z)] = id;
+            }
+        }
+    }
+
+    // 直線翼。twist が 0 なら垂直（H型）、正ならその角度だけ上端までねじれる（ヘリカル）。
+    private static void StraightBlade(Dictionary<(int x, int y, int z), string> cells,
+        double R, int y0, int h, double angDeg, double twist, int chord, string id)
+    {
+        int steps = Math.Max(h, h * 4);
+        for (int s = 0; s <= steps; s++)
+        {
+            double f = s / (double)steps;
+            int y = y0 + (int)Math.Round((h - 1) * f);
+            double a = (angDeg + twist * f) * Math.PI / 180.0;
+            double ux = Math.Cos(a), uz = Math.Sin(a);
+            double px = -uz, pz = ux;
+            for (int c = 0; c < chord; c++)
+            {
+                double off = c - (chord - 1) / 2.0;
+                int x = (int)Math.Round(ux * R + px * off);
+                int z = (int)Math.Round(uz * R + pz * off);
+                if (y >= 0) cells[(x, y, z)] = id;
+            }
+        }
+    }
+
+    // 支持アーム。主軸から半径 R の翼まで、水平面を1マス幅で繋ぐ。
+    private static void ArmXZ(Dictionary<(int x, int y, int z), string> cells,
+        double R, int y, double angDeg, int chord, string id)
+    {
+        if (y < 0) return;
+        double a = angDeg * Math.PI / 180.0;
+        double ux = Math.Cos(a), uz = Math.Sin(a);
+        int steps = Math.Max(2, (int)Math.Ceiling(R * 2));
+        for (int s = 0; s <= steps; s++)
+        {
+            double t = R * s / steps;
+            int x = (int)Math.Round(ux * t);
+            int z = (int)Math.Round(uz * t);
+            if (!cells.ContainsKey((x, y, z))) cells[(x, y, z)] = id;
+        }
+    }
+
+    // サボニウス（S型ロータ）。半円バケットを重なり比ぶん食い込ませて S 字にする。
+    // 全体直径 D = 4*rb - e、バケット中心の偏心 q = rb - e/2（e は重なり）。
+    // 段ごとに 360/(枚数×段数) 度ずらすと、どの向きの風でも起動できる。
+    private static void BuildSavonius(Dictionary<(int x, int y, int z), string> cells,
+        int d, int h, int y0, int blades, int stages, int ang, Palette p)
+    {
+        double e = Math.Max(1.0, d / 5.0);          // 重なり比0.2相当
+        double rb = (d + e) / 4.0;
+        double q = rb - e / 2.0;
+        double R = d / 2.0;
+
+        int hs = Math.Max(1, h / stages);
+        for (int k = 0; k < stages; k++)
+        {
+            int ya = y0 + k * hs;
+            int yb = k == stages - 1 ? y0 + h - 1 : ya + hs - 1;
+            double off = ang + 360.0 * k / (blades * (double)stages);
+
+            HDisc(cells, 0, 0, R, ya - 1, ya - 1, p.Deck);      // 段の仕切り板
+
+            for (int i = 0; i < blades; i++)
+            {
+                double a = (off + 360.0 * i / blades) * Math.PI / 180.0;
+                double ux = Math.Cos(a), uz = Math.Sin(a);
+                double px = -uz, pz = ux;
+                int steps = Math.Max(12, (int)Math.Ceiling(rb * Math.PI * 2));
+                for (int s = 0; s <= steps; s++)
+                {
+                    double t = Math.PI * s / steps;             // 0..π の半円
+                    double cp = q + rb * Math.Cos(t);
+                    double cu = rb * Math.Sin(t);
+                    int x = (int)Math.Round(px * cp + ux * cu);
+                    int z = (int)Math.Round(pz * cp + uz * cu);
+                    for (int y = ya; y <= yb; y++)
+                        if (y >= 0) cells[(x, y, z)] = p.Blade;
+                }
+            }
+        }
+        HDisc(cells, 0, 0, R, y0 + h, y0 + h, p.Deck);          // 頂部の端板
     }
 
     // ===== 水車 =====
@@ -333,13 +599,13 @@ public static partial class IndustryExpander
         int spokes = Clamp(paddles / 2, 4, 16);
         for (int i = 0; i < spokes; i++)
             BladeXY(cells, 0, cy, ang + 360.0 * i / spokes, 1.5, R - 1.0,
-                1.0, 1.0, z0, z1, p.Blade, false);
+                1.0, 1.0, z0, z1, p.Blade);
 
         for (int i = 0; i < paddles; i++)
         {
             double a = ang + 360.0 * i / paddles;
             double inner = Math.Max(1.5, R - 2.0);
-            BladeXY(cells, 0, cy, a, inner, R - 0.5, 1.0, 1.0, z0, z1, p.Deck, false);
+            BladeXY(cells, 0, cy, a, inner, R - 0.5, 1.0, 1.0, z0, z1, p.Deck);
 
             if (over)
             {

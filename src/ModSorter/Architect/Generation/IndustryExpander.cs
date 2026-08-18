@@ -48,7 +48,8 @@ public static partial class IndustryExpander
 
     private sealed class Palette
     {
-        public readonly string Shell, Roof, Base, Deck, Rail, Accent, Glaze, Light, Stair, Blade, Cap;
+        public readonly string Shell, Roof, Base, Deck, Rail, Accent, Glaze, Light, Stair,
+            Blade, Cap, Lattice;
 
         public Palette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -64,6 +65,8 @@ public static partial class IndustryExpander
             // 回転体（風車・水車）で使う。翼・羽根・水輪の骨組みと、風車のキャップ。
             Blade = Pick(spec.TowerBlock, allowed, Deck);
             Cap = Pick(spec.TowerRoofBlock, allowed, Roof);
+            // オランダ型の帆、垂直軸型のガイワイヤ。フェンス・鉄柵など透けるブロック。
+            Lattice = Pick(spec.IndustryLatticeBlock, allowed, Rail);
         }
     }
 
