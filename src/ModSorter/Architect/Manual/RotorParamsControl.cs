@@ -232,9 +232,10 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 .Note("浮体式の水は minecraft:water を使うので選択項目にしていない。" +
                       "灯火は全高30マス以上のときだけ付く。")
                 .EndGroup();
-
-            Content = _ui.Root;
         }
+
+        // 水車・風車のどちらの枝を通っても必ず貼る。
+        Content = _ui.Root;
     }
 
     // 流れの向き → 面が向く方角。canonical は面が南（+z）で流れが東（+x）。
