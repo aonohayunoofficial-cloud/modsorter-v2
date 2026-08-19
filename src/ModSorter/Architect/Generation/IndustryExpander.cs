@@ -10,10 +10,13 @@ namespace ModSorter.Architect.Generation;
 //
 // 1マス=1m。他の土木・建築系と同じ縮尺なので並べて置いても寸法が食い違わない。
 //
-// このファイルには入口と回転体の幾何だけを置く。種類ごとの組み立ては partial の
+// このファイルには入口と共通の幾何だけを置く。種類ごとの組み立ては partial の
 // 別ファイルに分ける。
 //   IndustryExpander.Vessel.cs  縦型容器（サイロ・給水塔・タンク）
-//   ※ 発電所・風車・水車は未実装。実装時は KindOf と Build に足す。
+//   IndustryExpander.Rotor.cs   風車・水車
+//   IndustryExpander.Power.cs   発電所（ボイラ建屋・タービン建屋・煙突・冷却塔・
+//                               原子炉格納容器・変電ヤード）
+//   ※ 種類を足すときは KindOf と Build の両方に足す。
 //
 // StructureSpec との対応。
 //   industry_diameter / industry_body_height … 円筒
@@ -41,6 +44,12 @@ public static partial class IndustryExpander
             case "tank": return "tank";
             case "wind_turbine": return "wind_turbine";
             case "water_wheel": return "water_wheel";
+            case "boiler_house": return "boiler_house";
+            case "turbine_hall": return "turbine_hall";
+            case "stack": return "stack";
+            case "cooling_tower": return "cooling_tower";
+            case "containment": return "containment";
+            case "switchyard": return "switchyard";
             case "silo":
             default: return "silo";
         }
@@ -91,6 +100,12 @@ public static partial class IndustryExpander
             case "tank": BuildTank(cells, props, spec, p); break;
             case "wind_turbine": BuildWindTurbine(cells, spec, p); break;
             case "water_wheel": BuildWaterWheel(cells, spec, p); break;
+            case "boiler_house": BuildPowerHall(cells, props, spec, p, true); break;
+            case "turbine_hall": BuildPowerHall(cells, props, spec, p, false); break;
+            case "stack": BuildStack(cells, props, spec, p); break;
+            case "cooling_tower": BuildCoolingTower(cells, props, spec, p); break;
+            case "containment": BuildContainment(cells, props, spec, p); break;
+            case "switchyard": BuildSwitchyard(cells, props, spec, p); break;
             case "silo":
             default: BuildSilo(cells, props, spec, p); break;
         }

@@ -161,12 +161,20 @@ public static class ManualCatalog
 
         // 産業インフラ
         Mid("industry", "産業",
-            Todo("power_plant", "発電所"),
             Impl("wind_turbine", "風車", () => new RotorParamsControl("wind_turbine")),
             Impl("water_wheel", "水車", () => new RotorParamsControl("water_wheel")),
             Impl("silo", "サイロ", () => new VesselParamsControl("silo")),
             Impl("water_tower", "給水塔", () => new VesselParamsControl("water_tower")),
             Impl("tank", "タンク", () => new VesselParamsControl("tank"))),
+
+        // 発電所。1基まるごとではなく構成する単体構造物ごとに並べる（港湾・空港と同じ扱い）。
+        Mid("power_plant", "発電所",
+            Impl("boiler_house", "ボイラ建屋", () => new PowerPlantParamsControl("boiler_house")),
+            Impl("turbine_hall", "タービン建屋", () => new PowerPlantParamsControl("turbine_hall")),
+            Impl("stack", "煙突", () => new PowerPlantParamsControl("stack")),
+            Impl("cooling_tower", "冷却塔", () => new PowerPlantParamsControl("cooling_tower")),
+            Impl("containment", "原子炉格納容器", () => new PowerPlantParamsControl("containment")),
+            Impl("switchyard", "変電ヤード", () => new PowerPlantParamsControl("switchyard"))),
     };
 
     // ===== 大分類3: 船体（フェーズ5〜6） =====
