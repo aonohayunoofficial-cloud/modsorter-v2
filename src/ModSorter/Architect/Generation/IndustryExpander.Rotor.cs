@@ -335,12 +335,15 @@ public static partial class IndustryExpander
     // 風向に依存しない形式なので facade_face は翼の初期位置の基準にしかならない。
     //
     // 実寸の出典。形式ごとに寸法の桁が違うので、既定値も形式ごとに分ける。
-    //   ダリウス（φ型）… Sandia 17-m は直径17m・高さ/直径1.25・翼弦0.61m。
-    //     Sandia 34-m テストベッドは直径34m・高さ42.5m・2枚翼で、翼弦は根元1.22m・
-    //     赤道0.91m〔Electric Power from Vertical-Axis Wind Turbines／
-    //     A Retrospective of VAWT Technology〕。FloWind 17 は直径17m・高さ23m・142kW。
-    //     Cap-Chat の Éole は直径64m・ローター高さ96m・全高110m・3.8MW で史上最大
-    //     〔Möllerström, A historical review of VAWTs rated 100 kW and above〕。
+    //   ダリウス（φ型）… Sandia 17-m は直径17m・高さ/直径1.25・翼弦0.61m。FloWind 17 は
+    //     直径17m・高さ23m・142kW。Sandia 34-m テストベッドは直径34m・高さ42.5m・2枚翼で、
+    //     翼弦は根元1.22m・赤道0.91m〔Electric Power from Vertical-Axis Wind Turbines／
+    //     A Retrospective of VAWT Technology〕。Cap-Chat の Éole は直径64m・ローター高さ96m・
+    //     全高110m・3.8MW で史上最大〔Möllerström, A historical review of VAWTs rated
+    //     100 kW and above〕。既定は運転実績の多い17-m級（直径17m・高さ21m）とする。
+    //     翼の形は「根元の直線＋円弧＋赤道の直線」でトロポスキーン曲線を近似する。赤道では
+    //     左右の翼が平行に立つので、輪郭は伏せたお椀（樽）になる〔Sandia, Practical
+    //     approximations to a troposkien by straight-line and circular-arc segments〕。
     //     ソリディティ σ=N×弦長/直径 は0.07〜0.1。
     //   直線翼（H型・ジャイロミル）… Falkenberg の200kW機は回転直径26m・翼長24mで
     //     高さ/直径がほぼ1〔Noise Emission of a 200 kW Vertical Axis Wind Turbine〕。
@@ -386,24 +389,36 @@ public static partial class IndustryExpander
         else
         {
             // 円形フーチング。回転直径に見合う大きさを取る。
-            HDisc(cells, 0, 0, Math.Max(2.0, R / 4.0 + 1.0), 0, 0, p.Base);
+            HDisc(cells, 0, 0, Math.Max(1.5, R / 4.0 + 1.0), 0, 0, p.Base);
 
-            // 機械室。増速機と発電機を地上に置けるのが垂直軸型の利点で、実機では
-            // 主軸の根元に建屋が付く。ローター下端より高くならない範囲で建てる。
-            int hw = Clamp(d / 8, 2, 6);
-            int hh = Math.Min(post, 4);
-            if (hh >= 2)
+            // 機械室。増速機と発電機を地上に置けるのが垂直軸型の利点で、φ型・H型のような
+            // 大型機では主軸の根元に建屋が付く。ローター下端より高くならない範囲で建てる。
+            // qr5 級のヘリカルやサボニウスは発電機がマストの中に入るので建屋を持たない。
+            // 直径6マスの機体に5マス角の建屋が付くと縮尺が壊れるため、大型機だけに限る。
+            if (d >= 12)
             {
-                for (int y = 1; y < hh; y++)
+                int hw = Clamp(d / 8, 2, 6);
+                int hh = Math.Min(post, 4);
+                if (hh >= 2)
                 {
-                    Fill(cells, -hw, hw, y, y, -hw, -hw, p.Base);
-                    Fill(cells, -hw, hw, y, y, hw, hw, p.Base);
-                    Fill(cells, -hw, -hw, y, y, -hw, hw, p.Base);
-                    Fill(cells, hw, hw, y, y, -hw, hw, p.Base);
+                    for (int y = 1; y < hh; y++)
+                    {
+                        Fill(cells, -hw, hw, y, y, -hw, -hw, p.Base);
+                        Fill(cells, -hw, hw, y, y, hw, hw, p.Base);
+                        Fill(cells, -hw, -hw, y, y, -hw, hw, p.Base);
+                        Fill(cells, hw, hw, y, y, -hw, hw, p.Base);
+                    }
+                    Fill(cells, -hw, hw, hh, hh, -hw, hw, p.Deck);
+                    cells.Remove((0, 1, hw));
+                    cells.Remove((0, 2, hw));
                 }
-                Fill(cells, -hw, hw, hh, hh, -hw, hw, p.Deck);
-                cells.Remove((0, 1, hw));
-                cells.Remove((0, 2, hw));
+            }
+            else if (post >= 3)
+            {
+                // 小型機の制御盤。ローターの真下を避け、外側に1×2で立てる。
+                int cz = Math.Max(2, (int)Math.Round(R) + 1);
+                cells[(0, 1, cz)] = p.Base;
+                cells[(0, 2, cz)] = p.Deck;
             }
         }
 
@@ -469,43 +484,55 @@ public static partial class IndustryExpander
         }
     }
 
-    // 形式ごとの既定の回転直径。実機の代表寸法に合わせる。
+    // 形式ごとの既定の回転直径。実機の代表寸法に合わせる。ただしヘリカルとサボニウスは
+    // 実機が3m級しかなく、1マス=1m ではらせんも S 字も読めない。比を保ったまま、形が
+    // 読める最小の直径6マスまで上げる。
     internal static int VawtDefaultDiameter(string type) => type switch
     {
-        "darrieus" => 34,       // Sandia 34-m テストベッド
+        "darrieus" => 17,       // Sandia 17-m／FloWind 17
         "gyromill" => 26,       // Falkenberg 200kW
-        "helical" => 3,         // qr5 は3.1m
-        _ => 4,                 // サボニウス
+        "helical" => 6,         // qr5 は直径3.1m
+        _ => 6,                 // サボニウス
     };
 
-    // 形式ごとの既定のローター高さ。高さ/直径はφ型1.25、H型ほぼ1、
-    // ヘリカル1.6、サボニウス2。
+    // 形式ごとの既定のローター高さ。高さ/直径はφ型1.25（17→21）、H型ほぼ1、
+    // ヘリカル1.6（qr5 は5m/3.1m）、サボニウス2。
     internal static int VawtDefaultHeight(string type) => type switch
     {
-        "darrieus" => 42,
+        "darrieus" => 21,
         "gyromill" => 24,
-        "helical" => 5,
-        _ => 8,
+        "helical" => 10,
+        _ => 12,
     };
 
-    // 翼弦の下限。ソリディティ σ=N×弦長/直径 が実機を下回ると線1本の見た目になる。
-    // φ型は0.08、直線翼・ヘリカルは0.25。サボニウスはバケットなので弦長を持たない。
+    // 翼弦の下限。
+    //   φ型 … Sandia 17-m は翼弦0.61m・半径8.5m、34-m は0.91m・半径17m。ソリディティ
+    //          σ=N×弦長/直径 で0.08を下限に取る。
+    //   直線翼・ヘリカル … 大型H型ローターの設計例は直径7mで翼弦0.93m（弦長/半径0.265）。
+    //          これを弦長=0.13×直径として下限に取り、σ が0.5を超えないところで止める。
+    //          直径26mなら4マスになり、1マスの薄板ではなく翼らしい厚みになる。
+    //   サボニウスはバケットなので弦長を持たない。
+    // 丸めは実寸より太い側へ切り上げる（この partial 冒頭の丸めの扱いに合わせる）。
     internal static int VawtChord(string type, int d, int blades, int want)
     {
         if (type == "savonius") return 1;
-        double sigma = type == "darrieus" ? 0.08 : 0.25;
-        int min = Math.Max(1, (int)Math.Round(sigma * d / Math.Max(1, blades)));
-        return Clamp(Math.Max(want, min), 1, 12);
+        int n = Math.Max(1, blades);
+        int min = type == "darrieus"
+            ? (int)Math.Ceiling(0.08 * d / n)
+            : Math.Min((int)Math.Ceiling(0.13 * d), Math.Max(1, (int)Math.Floor(0.5 * d / n)));
+        return Clamp(Math.Max(want, Math.Max(1, min)), 1, 12);
     }
 
     // 主軸（トルクチューブ）の下限。実機は回転直径の5%前後の太さがある。
     internal static int VawtShaft(int d, int want)
         => Clamp(Math.Max(want, Math.Max(1, (int)Math.Round(d * 0.05))), 1, 12);
 
-    // ダリウス（φ型）の翼1枚。実機は直線＋円弧（SLCA）でトロポスキーン曲線を近似し、
-    // 側面が直線的に立ち上がって赤道で丸くなる。半径 R の円に下端・上端から接線を引き、
-    // 接点から接点までを円弧で結ぶ。高さの半分が半径を下回る扁平な機体では接線が
-    // 引けないので正弦で代用する。
+    // ダリウス（φ型）の翼1枚。実機は直線と円弧でトロポスキーン曲線を近似し、Sandia の翼は
+    // 「根元の直線＋円弧＋赤道の直線」で構成される。赤道に直線区間があるので左右の翼が
+    // そこで平行に立ち、輪郭は伏せたお椀（樽）になる。
+    // 赤道の直線区間は全高の15%、円弧の半径は全高の30%を取り、円弧の下端から主軸の根元
+    // （r=0）へ引いた接線を根元の直線にする。上下は赤道で対称。
+    // 扁平すぎて接線が引けない機体では従来どおり正弦で代用する。
     // 翼弦は根元を1.4倍に広げる（Sandia 34-m は根元1.22m・赤道0.91m）。
     private static void DarrieusBlade(Dictionary<(int x, int y, int z), string> cells,
         double R, int y0, int h, double angDeg, int chord, string id)
@@ -515,20 +542,38 @@ public static partial class IndustryExpander
         double px = -uz, pz = ux;
 
         double half = h / 2.0;
-        bool arc = half > R + 0.5;
-        double yT = arc ? half - R * R / half : 0.0;                        // 接点の高さ
-        double rT = arc ? R * Math.Sqrt(Math.Max(0.0, 1.0 - R * R / (half * half))) : 0.0;
+        double ls = h * 0.15 / 2.0;         // 赤道の直線区間の半分
+        double yc = half - ls;              // 円弧の中心の高さ（下端から）
+        double ra = h * 0.30;               // 円弧の半径
+        double xc = R - ra;                 // 円弧の中心の半径位置
+        double dist = Math.Sqrt(xc * xc + yc * yc);
+
+        bool slca = yc > 0.5 && dist > ra + 1e-6;
+        double yT = 0.0, rT = 0.0;
+        if (slca)
+        {
+            // 主軸の根元（r=0, y=0）から円弧へ引いた接線の接点。外側の解を採る。
+            double phi = Math.Atan2(-yc, -xc);
+            double alpha = Math.Acos(Math.Min(1.0, ra / dist));
+            double t1 = phi + alpha, t2 = phi - alpha;
+            double th = xc + ra * Math.Cos(t1) >= xc + ra * Math.Cos(t2) ? t1 : t2;
+            rT = xc + ra * Math.Cos(th);
+            yT = yc + ra * Math.Sin(th);
+            if (rT <= Math.Max(0.5, xc) || yT <= 0.5 || yT >= yc) slca = false;
+        }
 
         int steps = Math.Max(16, h * 8);
         for (int s = 0; s <= steps; s++)
         {
             double t = h * s / (double)steps;                                // 下端からの高さ
             double f = t / h;
+            double u = Math.Min(t, h - t);                                    // 端からの距離
             double r;
-            if (!arc) r = R * Math.Sin(Math.PI * f);
-            else if (t < yT) r = yT <= 0 ? 0 : rT * t / yT;
-            else if (t > h - yT) r = yT <= 0 ? 0 : rT * (h - t) / yT;
-            else r = Math.Sqrt(Math.Max(0.0, R * R - (t - half) * (t - half)));
+            if (!slca) r = R * Math.Sin(Math.PI * f);
+            else if (u < yT) r = rT * u / yT;                                 // 根元の直線
+            else if (u < yc) r = xc + Math.Sqrt(Math.Max(0.0, ra * ra - (u - yc) * (u - yc)));
+            else r = R;                                                       // 赤道の直線
+            if (r < 0.0) r = 0.0;
 
             int y = y0 + (int)Math.Round(t);
             int c1 = Math.Max(1, (int)Math.Round(chord * (1.4 - 0.4 * Math.Sin(Math.PI * f))));
@@ -594,7 +639,7 @@ public static partial class IndustryExpander
     private static void BuildSavonius(Dictionary<(int x, int y, int z), string> cells,
         int d, int h, int y0, int blades, int stages, int ang, Palette p)
     {
-        double e = Math.Max(1.0, d * 0.2);          // 重なり比0.2
+        double e = Math.Max(1.0, d * 0.15);         // 重なり比0.15（最適は0.1〜0.15）
         double rb = (d + e) / 4.0;
         double q = rb - e / 2.0;
         double plate = Math.Max(1.0, d * 0.55);     // 端板は直径1.1D
@@ -614,7 +659,7 @@ public static partial class IndustryExpander
                 double a = (off + 360.0 * i / blades) * Math.PI / 180.0;
                 double ux = Math.Cos(a), uz = Math.Sin(a);
                 double px = -uz, pz = ux;
-                int steps = Math.Max(12, (int)Math.Ceiling(rb * Math.PI * 2));
+                int steps = Math.Max(16, (int)Math.Ceiling(rb * Math.PI * 4));
                 for (int s = 0; s <= steps; s++)
                 {
                     double t = Math.PI * s / steps;             // 0..π の半円

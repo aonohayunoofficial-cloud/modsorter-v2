@@ -147,10 +147,10 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
             // 寸法の桁が形式ごとに違うので、スライダーも形式ごとに分ける。
             _ui.BeginChoiceGroup("type", "darrieus")
                 .Heading("ローター")
-                .IntSlider("rd_da", "回転直径", 6, 64, 34,
-                    "Sandia 34-m テストベッドは直径34m。Éole の64mが史上最大")
-                .IntSlider("rh_da", "ローターの高さ", 6, 96, 42,
-                    "高さ/直径は1.25が標準。Éole は直径64mに対し96m")
+                .IntSlider("rd_da", "回転直径", 6, 64, 17,
+                    "Sandia 17-m・FloWind 17 が直径17m。34-m テストベッドで34m、Éole の64mが最大")
+                .IntSlider("rh_da", "ローターの高さ", 6, 96, 21,
+                    "高さ/直径は1.25が標準。直径17mなら21m")
                 .IntSlider("blades_da", "翼の枚数", 2, 3, 2,
                     "Sandia・FloWind・Éole いずれも2枚")
                 .IntSlider("chord_da", "翼弦長", 1, 8, 2,
@@ -162,8 +162,9 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 .IntSlider("shaft_da", "主軸（トルクチューブ）の直径", 1, 12, 2,
                     "回転直径の5%を下回る値は自動で引き上げる")
                 .Toggle("guy_da", "ガイワイヤあり", "ガイワイヤなし", true)
-                .Note("翼は直線＋円弧でトロポスキーン曲線を描く。主軸の頂部から3方向へ支線を張り、" +
-                      "根元に増速機と発電機の機械室が付く。")
+                .Note("翼は根元の直線・円弧・赤道の直線でトロポスキーン曲線を近似するので、" +
+                      "赤道で左右の翼が平行に立ち、伏せたお椀の輪郭になる。主軸の頂部から" +
+                      "3方向へ支線を張り、根元に増速機と発電機の機械室が付く。")
                 .EndGroup();
 
             // ===== 直線翼（H型・ジャイロミル）=====
@@ -173,20 +174,23 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                     "Falkenberg の200kW機は回転直径26m・翼長24m")
                 .IntSlider("rh_gy", "翼の長さ", 3, 40, 24, "高さ/直径はほぼ1")
                 .IntSlider("blades_gy", "翼の枚数", 2, 4, 3, "H型は3枚が基本")
-                .IntSlider("chord_gy", "翼弦長", 1, 8, 2,
-                    "N×弦長/直径 が0.25を下回る値は自動で引き上げる")
+                .IntSlider("chord_gy", "翼弦長", 1, 8, 4,
+                    "大型H型の設計例は直径7mで翼弦0.93m。弦長が直径の0.13を下回る値は" +
+                    "自動で引き上げる（直径26mなら4マス）")
                 .IntSlider("angle_gy", "回転角", 0, 359, 0, "翼の位置")
                 .Heading("塔・主軸")
                 .IntSlider("post_gy", "ローター下端の高さ", 0, 60, 24, "塔の上に載る形式")
                 .IntSlider("shaft_gy", "主軸の直径", 1, 12, 2)
-                .Note("支持アームは上下端に入り、翼長が回転直径を超える機体では中間にも入る。")
+                .Note("支持アームは翼弦の半分の幅で入る。上下端に入り、翼長が回転直径を" +
+                      "超える機体では中間にも入る。")
                 .EndGroup();
 
             // ===== ヘリカル（ねじり直線翼）=====
             _ui.BeginChoiceGroup("type", "helical")
                 .Heading("ローター")
-                .IntSlider("rd_he", "回転直径", 2, 12, 3, "qr5 は直径3.1m。建物・街路用の小型機")
-                .IntSlider("rh_he", "翼の長さ", 3, 24, 5, "qr5 は高さ5m。掃過面積13.6m²")
+                .IntSlider("rd_he", "回転直径", 2, 16, 6,
+                    "qr5 は直径3.1m。1マス=1mではらせんが読めないので既定は6マス")
+                .IntSlider("rh_he", "翼の長さ", 3, 24, 10, "qr5 の高さ/直径1.6を保つ")
                 .IntSlider("blades_he", "翼の枚数", 2, 5, 3, "qr5 は3枚")
                 .IntSlider("chord_he", "翼弦長", 1, 6, 1)
                 .IntSlider("twist_he", "ねじり角", 60, 360, 120,
@@ -195,18 +199,20 @@ public sealed class RotorParamsControl : UserControl, IManualParamControl
                 .Heading("塔・主軸")
                 .IntSlider("post_he", "ローター下端の高さ", 0, 30, 9, "マストに載せる形式")
                 .IntSlider("shaft_he", "主軸の直径", 1, 8, 1)
+                .Note("小型機は発電機がマストの中に入るので機械室を建てず、外側に制御盤だけ置く。")
                 .EndGroup();
 
             // ===== サボニウス型（S型ロータ）=====
             _ui.BeginChoiceGroup("type", "savonius")
                 .Heading("ローター")
-                .IntSlider("rd_sa", "回転直径", 1, 16, 4, "小型機は0.5〜3m。大型でも数m")
-                .IntSlider("rh_sa", "ローターの高さ", 2, 32, 8, "高さ/直径は2〜4が最良")
+                .IntSlider("rd_sa", "回転直径", 1, 16, 6,
+                    "実機は0.5〜3m。1マス=1mでS字が読める6マスを既定にする")
+                .IntSlider("rh_sa", "ローターの高さ", 2, 32, 12, "高さ/直径は2〜4が最良")
                 .IntSlider("blades_sa", "バケットの枚数", 2, 3, 2, "2枚が基本")
                 .IntSlider("stages_sa", "段数", 1, 4, 2,
                     "段ごとに位相をずらすとどの向きの風でも起動できる")
                 .IntSlider("angle_sa", "回転角", 0, 359, 0, "バケットの位置")
-                .Note("重なり比は0.2、端板は直径1.1倍で自動。弦長はバケットなので持たない。")
+                .Note("重なり比は0.15、端板は直径1.1倍で自動。弦長はバケットなので持たない。")
                 .Heading("塔・主軸")
                 .IntSlider("post_sa", "ローター下端の高さ", 0, 30, 2)
                 .IntSlider("shaft_sa", "主軸の直径", 1, 8, 1)
