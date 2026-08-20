@@ -9,7 +9,15 @@ namespace ModSorter.Architect.Generation;
 // partial。分野ごとのプロパティ群は StructureSpec.<分野>.cs へ分ける。
 // System.Text.Json はプロパティ名で解決するので、宣言がどのファイルにあっても
 // 直列化・逆直列化の結果は変わらない。
-//   StructureSpec.cs          共通（寸法・素材・屋根・塔・平面形状・煙突・軒・開口部）
+//
+// 共通（複数分野で使う）プロパティは大きくなりすぎたので機能別に分けた。
+//   StructureSpec.cs           基本（寸法・素材・階・柱型・土台・座面・縁側・様式）
+//   StructureSpec.Roof.cs      屋根まわり（屋根形状・勾配・パラペット・軒・煙突）
+//   StructureSpec.Tower.cs     屋根上の突出物（塔屋・塔）
+//   StructureSpec.Footprint.cs 平面形状（フットプリント・複数ボリューム合成）
+//   StructureSpec.Openings.cs  構造タイプ・入口保証・開口部
+//
+// 分野別（その分野でしか使わない）プロパティは従来どおり分野名のファイルへ。
 //   StructureSpec.Harbor.cs   港湾  structure_type="harbor:<種類>"
 //   StructureSpec.Airport.cs  空港  structure_type="airport:<種類>"
 //   StructureSpec.Rail.cs     鉄道  structure_type="railway:<種類>"
@@ -19,7 +27,7 @@ namespace ModSorter.Architect.Generation;
 //   StructureSpec.Ship.cs     船    structure_type="ship"
 //
 // 複数分野で共用する素材スロット（wall / floor / roof / base / accent / parapet /
-// glazing / seat）はこの共通ファイルに置く。分野別ファイルはその分野だけで使う
+// glazing / seat）はこの共通ファイル側に置く。分野別ファイルはその分野だけで使う
 // プロパティを持つ。
 public sealed partial class StructureSpec
 {
@@ -31,18 +39,6 @@ public sealed partial class StructureSpec
     [JsonPropertyName("floor_block")] public string? FloorBlock { get; set; }
     [JsonPropertyName("roof_block")] public string? RoofBlock { get; set; }
     [JsonPropertyName("wall_block")] public string? WallBlock { get; set; }
-
-    // 屋根の形: "flat"（平屋根・既定） または "gable"（切妻・三角）
-    [JsonPropertyName("roof_type")] public string? RoofType { get; set; }
-
-    // 屋根勾配（gable/gable_stairs のとき有効）。run 何マス進むごとに rise 1マス上げるか。
-    // 1 = 1マスにつき1段＝45°（既定・従来と同じ後方互換）。
-    // 2 ≒ 26.6°（6:12相当の標準的な緩勾配）、3 ≒ 18.4°（4:12相当）、と大きいほど緩い。
-    // null/0/1 はすべて 1（45°）として扱う。
-    [JsonPropertyName("roof_pitch")] public int? RoofPitch { get; set; }
-
-    // gable のときの棟の向き: "x"（棟がx軸に平行・z方向に傾斜） または "z"
-    [JsonPropertyName("ridge_axis")] public string? RidgeAxis { get; set; }
 
     // 中間床を入れる高さ(y)のリスト。例: [3] なら y=3 に2階の床。複数指定で3階建て以上。
     // 1階の床(y=0)と屋根は別管理なので、ここには中間の階の床だけを入れる。
@@ -64,93 +60,10 @@ public sealed partial class StructureSpec
     // 例: 床が oak_planks のとき base_block を cobblestone にすると足元だけ石の基礎になる。
     [JsonPropertyName("base_block")] public string? BaseBlock { get; set; }
 
-    // ドーム屋根(roof_type="dome")の高さ。未指定なら水平半径から自動。
-    [JsonPropertyName("dome_height")] public int? DomeHeight { get; set; }
-
-    // 鋸屋根(roof_type="sawtooth")の山の数。0/未指定なら長さから自動（1山およそ6マス）。
-    [JsonPropertyName("sawtooth_bays")] public int? SawtoothBays { get; set; }
-
-    // モニター屋根(roof_type="monitor")の越し屋根の幅（傾斜方向のマス数）。
-    // 0/未指定なら傾斜方向のおよそ1/3。
-    [JsonPropertyName("monitor_width")] public int? MonitorWidth { get; set; }
-
-    // モニター屋根の立ち上がり高さ（棟から天面までのマス数）。0/未指定なら2。
-    [JsonPropertyName("monitor_height")] public int? MonitorHeight { get; set; }
-
-    // 鋸屋根・モニター屋根の垂直採光面に使うブロック。未指定ならガラス。
-    [JsonPropertyName("glazing_block")] public string? GlazingBlock { get; set; }
-
     // 座面・小物の素材。複数分野で共用する。
     //   会場（venue）… 客席の座面。未指定なら accent_block → wall_block を流用。
     //   産業（industry）… 灯火。
     [JsonPropertyName("seat_block")] public string? SeatBlock { get; set; }
-
-    // パラペット（陸屋根の立ち上がり）。屋根面の外周を屋根の上へ何マス立ち上げるか。
-    // 0（既定）でパラペットなし。対応する屋根形状は flat のみ（勾配屋根では無視される）。
-    [JsonPropertyName("parapet_height")] public int? ParapetHeight { get; set; }
-
-    // パラペットの素材。未指定なら wall_block を流用。
-    [JsonPropertyName("parapet_block")] public string? ParapetBlock { get; set; }
-
-    // パラペットの最上段に狭間（クレネル）を抜くか。true で矢壁と狭間の凹凸になる。
-    // 抜くのは最上段だけなので、下の段が環として残り屋根面は隠れたまま。
-    // parapet_height が0のときは無視される（flat 以外でも無視）。
-    [JsonPropertyName("parapet_crenel")] public bool ParapetCrenel { get; set; }
-
-    // 狭間の周期（マス）。3（既定）で「矢壁2マス＋狭間1マス」。2〜6にクランプ。
-    // 縁が x 方向に走る位置は x、z 方向に走る位置は z を周期で判定するので、
-    // 向かい合う壁の狭間が揃う。角（両方向の縁が交わる位置）は必ず矢壁を残す。
-    [JsonPropertyName("parapet_crenel_step")] public int? ParapetCrenelStep { get; set; }
-
-    // 塔屋（屋上の機械室・階段室）の平面寸法。3未満なら塔屋を作らない。
-    [JsonPropertyName("penthouse_width")] public int? PenthouseWidth { get; set; }
-    [JsonPropertyName("penthouse_depth")] public int? PenthouseDepth { get; set; }
-
-    // 塔屋の高さ（屋根面から上へ何マス）。0/未指定で塔屋なし。
-    // 対応する屋根形状は flat のみ（勾配屋根では無視される）。
-    [JsonPropertyName("penthouse_height")] public int? PenthouseHeight { get; set; }
-
-    // 塔屋の壁材。未指定なら wall_block を流用。天面は roof_block。
-    [JsonPropertyName("penthouse_block")] public string? PenthouseBlock { get; set; }
-
-    // 塔屋の寄せ方向。"center"（既定）| "north" | "south" | "east" | "west" |
-    // "northeast" | "northwest" | "southeast" | "southwest"（4隅寄せ）。
-    // north が z の小さい側、south が z の大きい側、west が x の小さい側、east が x の大きい側。
-    // 展開側は文字列に north/south/east/west が含まれるかで x・z の寄せを独立に決めるため、
-    // "north_east" のような区切り付きの表記でも同じ結果になる。
-    [JsonPropertyName("penthouse_align")] public string? PenthouseAlign { get; set; }
-
-    // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
-    [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
-
-    // ファサード型(temple)の正面の向き。柱廊をどの面に置くか。
-    // "north" | "south" | "east" | "west"。未指定なら "south"。
-    [JsonPropertyName("facade_face")] public string? FacadeFace { get; set; }
-
-    // ===== 塔（鐘塔・尖塔・ミナレット）=====
-    // 建物の平面内に立てる正方形の塔の一辺（マス）。3未満/未指定なら塔なし。
-    [JsonPropertyName("tower_width")] public int? TowerWidth { get; set; }
-
-    // 塔の高さ（壁の上端 y=height-1 から塔の壁の上端まで何マス）。0/未指定なら塔なし。
-    // penthouse と違い屋根形状を問わず作る。棟より低いと屋根に埋まる。
-    [JsonPropertyName("tower_height")] public int? TowerHeight { get; set; }
-
-    // 塔の位置。"front"（既定・正面の中央） | "front_corners"（正面の両角） |
-    // "four_corners"（四隅） | "center"（平面の中央） | "rear"（背面の中央）。
-    // 「正面」は facade_face で決まる。
-    [JsonPropertyName("tower_align")] public string? TowerAlign { get; set; }
-
-    // 塔の頂部の形。"spire"（既定・尖塔） | "dome"（丸屋根） | "flat"（陸屋根）。
-    [JsonPropertyName("tower_roof")] public string? TowerRoof { get; set; }
-
-    // 塔の壁材。未指定なら wall_block を流用。
-    [JsonPropertyName("tower_block")] public string? TowerBlock { get; set; }
-
-    // 塔の頂部の素材。未指定なら roof_block を流用。
-    [JsonPropertyName("tower_roof_block")] public string? TowerRoofBlock { get; set; }
-
-    // 鐘楼の開口を作るか。true で塔の上端付近の四面中央を抜く（tower_height が4以上のとき）。
-    [JsonPropertyName("tower_belfry")] public bool TowerBelfry { get; set; }
 
     // ===== 縁側／基壇の縁 =====
     // 平面の外側へこの幅だけ、y=0 に床を敷き足す（マス）。0/未指定なら無し。
@@ -161,156 +74,10 @@ public sealed partial class StructureSpec
     // 縁側に使う素材。未指定なら base_block → floor_block を流用。
     [JsonPropertyName("veranda_block")] public string? VerandaBlock { get; set; }
 
-    // 全体の構造タイプ。"building"（既定・通常の建物。床/壁/屋根/開口部のロジックを通す）
-    // または特殊形状。特殊形状は床/壁/屋根/開口部を一切作らず、専用ビルダーが座標を作る。
-    // "building"（既定） | "ramp"（スロープ） | "bridge"（橋） | "ship"（船） | "venue"（屋外会場）。
-    // "ship" のときは ShipExpander が船体・甲板・上部構造物・出入口を確定的に作る。
-    // "venue" のときは VenueExpander が観客席・フィールド・シェル・テントを確定的に作る。
-    // "civic:" で始まるときは PublicFacilityExpander が公共施設（体育館・病院・消防署・
-    // 市庁舎）を確定的に作る。接頭辞の後ろの語で施設種別を分岐する。
-    // "harbor:" で始まるときは HarborExpander が港湾の単体構造物（岸壁 "quay"・桟橋 "pier"・
-    // 防波堤 "breakwater"）を確定的に作る。断面は下の harbor_* から組むので width だけを
-    // 延長として使い、depth/height は参照しない。
-    // 通常の開口部/入口保証は通さない（出入口はそれぞれのビルダーが自動配置する）。
-    [JsonPropertyName("structure_type")] public string? StructureType { get; set; }
+    // 建物の様式: "walled"（既定・壁のある建物） または "colonnade"（壁のない開放型・列柱）
+    [JsonPropertyName("building_style")] public string? BuildingStyle { get; set; }
 
-    // 入口の自動生成を止めるか。true で「door が1つも無ければ正面中央に1つ開ける」保証を
-    // 通さない。記念碑・オベリスク・台座のように穴を開けてはいけない塊のための指定。
-    // openings に明示したドア・アーチ・大開口は true でもそのまま適用される。
-    [JsonPropertyName("no_entrance")] public bool NoEntrance { get; set; }
-
-    // 開口部（窓・ドア）。面と面内の相対位置で指定する。
-    [JsonPropertyName("openings")] public List<Opening> Openings { get; set; } = new();
-
-    // ===== 平面形状（フットプリント）=====
-    // 建物の平面(X-Z)を矩形以外にするための指定。未指定なら従来どおり width×depth の矩形。
-    // 展開は StructureExpander.BuildFootprint が確定的に行い、床・土台・壁・平屋根は
-    // このマスクの範囲だけに作られる。非矩形のときは様式が "walled" 相当にフォールバックし、
-    // 棟や軒が矩形前提の屋根（gable/gable_stairs/shed/sawtooth/monitor）は "flat" に寄る。
-    // 頂冠形（dome/pyramid/spire）はマスクに沿って絞れるので、平面が "circle"（かつ
-    // footprint_add/footprint_sub が空）のときだけ非矩形でもそのまま使える。
-    //
-    // 形状の決め方（後勝ちではなく集合演算）:
-    //   1. footprint_shape のプリセットで大枠を作る
-    //      （"rect" 既定 / "l" / "u" / "t" / "plus" / "circle"）。
-    //   2. footprint_add の矩形をすべて OR で足す。
-    //   3. footprint_sub の矩形をすべて削る（最後に一括で引く）。
-    // add をすべて足してから sub をすべて引くため、add 同士・sub 同士の順序は結果に影響しない。
-    //
-    // プリセット "l"（L字）: 右下(x大・z大)の一角を削った形。削る大きさは footprint_params
-    //   の cut_w / cut_d（未指定なら幅・奥行のおよそ半分）。
-    // プリセット "u"（コの字）: 手前(z大側)の中央を削り込む。開口幅は cut_w、深さは cut_d。
-    // プリセット "t"（T字）: 縦棒＋横棒。横棒は z 小側、縦棒は中央。太さは cut_w / cut_d。
-    // プリセット "plus"（十字）: 中央の縦帯＋横帯。帯の太さは cut_w / cut_d。
-    // プリセット "circle"（円形）: width×depth を直径とする楕円。cut_w / cut_d は使わない。
-    //   壁は円周1マス厚のリングになる。記念柱・円形霊廟・灯台・サイロに使う。
-    [JsonPropertyName("footprint_shape")] public string? FootprintShape { get; set; }
-
-    // プリセットの寸法パラメータ（省略可）。cut_w は x 方向、cut_d は z 方向の切り欠き/帯幅。
-    [JsonPropertyName("footprint_params")] public FootprintParams? FootprintParams { get; set; }
-
-    // 追加する矩形（プリセットに OR で足す）。座標は 0..width-1 / 0..depth-1 の範囲で解釈。
-    [JsonPropertyName("footprint_add")] public List<Rect> FootprintAdd { get; set; } = new();
-
-    // 削る矩形（すべての add を足した後に一括で引く）。窓や中庭ではなく平面の欠けを作る用途。
-    [JsonPropertyName("footprint_sub")] public List<Rect> FootprintSub { get; set; } = new();
-
-    // ===== 複数ボリューム合成（フェーズ2）=====
-    // 双胴船のように「離れた複数の塊」を1つの構造として合成するための指定。
-    // 空（既定）なら従来どおり単一の箱として展開する（後方互換）。
-    // 各 VolumePart は完全な StructureSpec を内包し、オフセット分だけ平行移動して重ねる。
-    // 重なったセルは後勝ち（リストで後ろの Part が上書き）。
-    [JsonPropertyName("volumes")] public List<VolumePart> Volumes { get; set; } = new();
-
-    // ===== 煙突 =====
-    // 本数。0（既定）なら煙突なし。1以上で屋根の上に自動で等間隔に立てる。
-    [JsonPropertyName("chimney_count")] public int ChimneyCount { get; set; }
-
-    // 建物内部を貫くか。true=床(y=1)から屋根を貫いて上端まで通す（暖炉風）。
-    // false=屋根の上に出る部分だけ（見た目だけの煙突）。
-    [JsonPropertyName("chimney_pierce")] public bool ChimneyPierce { get; set; }
-
-    // 寄せ方向。"center"（既定・中心線上） | "north" | "south" | "east" | "west"。
-    // 寄せた方向へ列全体が寄り、それと直交する軸に沿って本数ぶん等間隔に並ぶ。
-    [JsonPropertyName("chimney_align")] public string? ChimneyAlign { get; set; }
-
-    // 屋根の上に出す高さ（マス）。未指定/0以下なら既定 2。
-    [JsonPropertyName("chimney_height")] public int? ChimneyHeight { get; set; }
-
-    // 煙突の素材。未指定なら roof_block → wall_block の順で流用。
-    [JsonPropertyName("chimney_block")] public string? ChimneyBlock { get; set; }
-
-    // 煙突の太さ。"thin"（既定・中実1マス柱） | "medium"（プラス型・中空） | "thick"（4×4外周・中空2×2）。
-    // medium/thick の中空は全高（貫通ONなら床から屋根上まで）にわたって適用する。
-    [JsonPropertyName("chimney_thickness")] public string? ChimneyThickness { get; set; }
-
-    // 軒の出（eave overhang）。屋根を壁より外側へ何マス張り出すか。0（既定）で軒なし。
-    // 対応する屋根形状は flat / gable / shed のみ。pyramid/dome/gable_stairs では無視される。
-    // 実装は屋根の軒先を水平に外へ伸ばし、最後に建物全体を +eave シフトして負座標を出さない。
-    [JsonPropertyName("eave_overhang")] public int? EaveOverhang { get; set; }
-
-    // 軒をどの面に出すか（面の外側へ張り出す）。EaveOverhang>0 のとき有効。
-    // north=z<0側 / south=z>=d側 / west=x<0側 / east=x>=w側。既定は全 false（＝軒なし）。
-    [JsonPropertyName("eave_north")] public bool EaveNorth { get; set; }
-    [JsonPropertyName("eave_south")] public bool EaveSouth { get; set; }
-    [JsonPropertyName("eave_east")] public bool EaveEast { get; set; }
-    [JsonPropertyName("eave_west")] public bool EaveWest { get; set; }
-}
-
-// 複数ボリューム合成の1要素（フェーズ2）。
-// Part（完全な StructureSpec）を Offset だけ平行移動して合成する。
-// Offset は全体原点からの絶対配置。負値は Expander 側で 0 にクランプされる。
-public sealed class VolumePart
-{
-    [JsonPropertyName("offset_x")] public int OffsetX { get; set; }  // x方向のずらし
-    [JsonPropertyName("offset_y")] public int OffsetY { get; set; }  // y方向のずらし（浮上可）
-    [JsonPropertyName("offset_z")] public int OffsetZ { get; set; }  // z方向のずらし
-
-    // この要素の中身。単一の箱として展開される（内部の volumes は無視＝再帰1段まで）。
-    [JsonPropertyName("part")] public StructureSpec? Part { get; set; }
-}
-
-// フットプリントのプリセット寸法。指定がなければ Expander 側で妥当な既定を計算する。
-public sealed class FootprintParams
-{
-    // x 方向の切り欠き幅／帯幅。0 以下なら未指定扱い（自動）。
-    [JsonPropertyName("cut_w")] public int CutW { get; set; }
-
-    // z 方向の切り欠き奥行／帯幅。0 以下なら未指定扱い（自動）。
-    [JsonPropertyName("cut_d")] public int CutD { get; set; }
-}
-
-// 平面上の矩形領域。X,Z は左手前の角（0 起点）、W,D はその大きさ（マス数）。
-// 範囲外にはみ出す指定は Expander 側で width/depth にクランプされる。
-public sealed class Rect
-{
-    [JsonPropertyName("x")] public int X { get; set; }
-    [JsonPropertyName("z")] public int Z { get; set; }
-    [JsonPropertyName("w")] public int W { get; set; }
-    [JsonPropertyName("d")] public int D { get; set; }
-}
-
-// 開口部1つ。座標ではなく「どの面の、どのあたりか」で表す。
-public sealed class Opening
-{
-    // "north" | "south" | "east" | "west"
-    [JsonPropertyName("face")] public string Face { get; set; } = "";
-
-    // "window" | "door"
-    [JsonPropertyName("kind")] public string Kind { get; set; } = "window";
-
-    // 面に沿った位置（端=0 から数えた何番目か）。中央寄りなら W/2 や D/2 あたり。
-    [JsonPropertyName("offset")] public int Offset { get; set; }
-
-    // 下から何段目か（床のすぐ上=1）。door は通常1、window は1〜2あたり。
-    [JsonPropertyName("level")] public int Level { get; set; } = 1;
-
-    // 開口の横幅（マス）。kind="gate"（大型シャッター/搬入口）のとき有効。0以下なら3。
-    [JsonPropertyName("width")] public int Width { get; set; }
-
-    // 開口の縦高さ（マス）。kind="gate" のとき有効。0以下なら3。
-    [JsonPropertyName("height")] public int Height { get; set; }
-
-    // 窓に使うブロック（kind=window のとき）。未指定なら glass。
-    [JsonPropertyName("block")] public string? Block { get; set; }
+    // ファサード型(temple)の正面の向き。柱廊をどの面に置くか。
+    // "north" | "south" | "east" | "west"。未指定なら "south"。
+    [JsonPropertyName("facade_face")] public string? FacadeFace { get; set; }
 }
