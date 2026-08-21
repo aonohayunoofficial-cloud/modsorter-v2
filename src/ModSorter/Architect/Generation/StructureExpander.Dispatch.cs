@@ -89,6 +89,16 @@ public static partial class StructureExpander
             return IndustryExpander.Build(spec, allowedBlocks, fallback);
         }
 
+        if (HullExpander.Handles(structureType))
+        {
+            // 手動生成の船体（"hull:" 接頭辞）は HullExpander が共通の断面生成器から
+            // 竜骨・フレーム・外板・甲板を確定的に作る。AI生成側の "ship"（ShipExpander）
+            // は上の完全一致判定で先に返るので、互いに干渉しない。
+            // 竜骨の張り出しが y<0 へ出るぶんも HullExpander 側で 0 起点へ正規化するので、
+            // 通常の床/壁/屋根/開口部の展開は一切通さない。
+            return HullExpander.Build(spec, allowedBlocks, fallback);
+        }
+
         return null;
     }
 }
