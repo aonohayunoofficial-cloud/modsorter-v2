@@ -76,14 +76,43 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
            .IntSlider("bulwark", "舷墻の高さ", 0, 6, 0,
                "0でなし。バイキング船は最上列の外板が舷縁を兼ねるので0が実物");
 
+        _ui.Heading("マスト・帆")
+           .IntSlider("masts", "マストの本数", 0, 3, 1, "ロングシップは1本。0でマストなし")
+           .IntSlider("mast_h", "マストの高さ", 2, 64, 11,
+               "甲板から上へのマス数。ゴクスタ船のマストは11〜13mと推定")
+           .Choice("sail", "帆", new[]
+           {
+               ("張る", "set"), ("畳む", "furled"), ("なし", "none"),
+           }, "set")
+           .BeginChoiceGroup("sail", "set", "furled")
+           .IntSlider("sail_w", "帆の幅", 2, 64, 11, "帆桁の長さを兼ねる。ゴクスタ船の帆は110m²級")
+           .IntSlider("sail_h", "帆の丈", 1, 64, 10, "畳んだときは1列だけになる")
+           .EndGroup()
+           .Note("横帆1枚。帆桁は横に寝た丸太なので axis を持ち、船首の向きに追従する。");
+
+        _ui.Heading("盾掛け・舵・飾り")
+           .IntSlider("shields", "盾の枚数（片舷）", 0, 32, 16,
+               "ゴクスタ船は片舷16・計32枚。舷縁の外へ1マス出るので幅が左右2マス増える")
+           .Toggle("rudder", "舵あり", "舵なし", true)
+           .Note("舵は船尾の片舷に吊るクォーターラダー。舵柄が舷内へ伸びる。")
+           .Choice("head", "船首材・船尾材の飾り", new[]
+           {
+               ("渦巻き", "spiral"), ("竜頭", "dragon"), ("なし", "none"),
+           }, "spiral")
+           .Note("渦巻きで高さ3、竜頭で高さ5。1マス未満の彫刻は表さない。");
+
         _ui.Heading("使用ブロック")
            .BlockPick("shell", "外板", "minecraft:oak_planks")
            .BlockPick("deck", "甲板・舷縁", "minecraft:spruce_planks")
            .BlockPick("keelb", "竜骨・船首材・船尾材", "minecraft:stripped_oak_log")
            .BlockPick("frameb", "フレーム・フロア材", "minecraft:oak_log")
            .BlockPick("railb", "舷墻・手すり", "minecraft:spruce_planks")
+           .BlockPick("mastb", "マスト・帆桁", "minecraft:spruce_log")
+           .BlockPick("sailb", "帆", "minecraft:white_wool")
+           .BlockPick("shieldb", "盾", "minecraft:yellow_terracotta")
+           .BlockPick("fitb", "舵・舵柄・飾り", "minecraft:stripped_spruce_log")
            .Note("ゴクスタ船は船体がオーク、甲板が松。舷墻の高さが0のときは舷墻の" +
-                 "ブロックを使わない。マスト・帆・シールドラックは未実装。");
+                 "ブロックを使わない。");
 
         Content = _ui.Root;
     }
@@ -134,14 +163,26 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
             HullFrameStep = _ui.GetInt("frame"),
             HullKeelDepth = _ui.GetInt("keel"),
             HullBulwark = _ui.GetInt("bulwark"),
+            HullMastCount = _ui.GetInt("masts"),
+            HullMastHeight = _ui.GetInt("mast_h"),
+            HullSail = _ui.GetChoice("sail", "none"),
+            HullSailWidth = _ui.GetInt("sail_w"),
+            HullSailHeight = _ui.GetInt("sail_h"),
+            HullShieldPerSide = _ui.GetInt("shields"),
+            HullSteeringOar = _ui.GetBool("rudder"),
+            HullStemHead = _ui.GetChoice("head", "none"),
             HullBlock = shell,
             DeckBlock = _ui.GetBlock("deck", "minecraft:spruce_planks"),
             BaseBlock = _ui.GetBlock("keelb", "minecraft:stripped_oak_log"),
             AccentBlock = _ui.GetBlock("frameb", "minecraft:oak_log"),
-            ParapetBlock = _ui.GetBlock("railb", "minecraft:spruce_planks")
+            ParapetBlock = _ui.GetBlock("railb", "minecraft:spruce_planks"),
+            SuperstructureBlock = _ui.GetBlock("mastb", "minecraft:spruce_log"),
+            RoofBlock = _ui.GetBlock("sailb", "minecraft:white_wool"),
+            TowerBlock = _ui.GetBlock("shieldb", "minecraft:yellow_terracotta"),
+            SeatBlock = _ui.GetBlock("fitb", "minecraft:stripped_spruce_log")
         };
 
-        // 外寸は展開側の Form から取る。UI と生成側で式を二重に持たない。
+        // 外寸は展開側の Form と Top から取る。UI と生成側で式を二重に持たない。
         // Extent は canonical（船首 +z）なので、東西向きでは幅と奥行きを入れ替える。
         var ext = HullExpander.Extent(spec);
         bool swap = face is "east" or "west";
@@ -156,11 +197,31 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
             ? $"フレーム{Math.Max(2, spec.HullFrameStep!.Value)}間隔"
             : "フレームなし";
         string bulwarkNote = spec.HullBulwark > 0 ? $"舷墻{spec.HullBulwark}" : "舷墻なし";
+        string mastNote = spec.HullMastCount > 0
+            ? $"マスト{spec.HullMastCount}本・高さ{spec.HullMastHeight}"
+            : "マストなし";
+        string sailNote = spec.HullSail switch
+        {
+            "set" => $"帆 {spec.HullSailWidth}×{spec.HullSailHeight}",
+            "furled" => $"帆を畳む（幅{spec.HullSailWidth}）",
+            _ => "帆なし",
+        };
+        string shieldNote = spec.HullShieldPerSide > 0
+            ? $"盾 片舷{spec.HullShieldPerSide}・計{spec.HullShieldPerSide * 2}枚"
+            : "盾掛けなし";
+        string headNote = spec.HullStemHead switch
+        {
+            "spiral" => "渦巻き飾り",
+            "dragon" => "竜頭",
+            _ => "飾りなし",
+        };
 
         summary = $"{KindJp()} 全長{spec.HullLength}×型幅{spec.HullBeam}×深さ{depth} / 喫水{draft} / " +
                   $"断面{spec.HullSection} / 入角{spec.HullEntryAngle}度 / {transomNote} / " +
                   $"船首材{spec.HullStemRake}度 / シア{spec.HullSheer}% / {frameNote} / " +
-                  $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / 船首{FaceJp(face)} / " +
+                  $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {mastNote} / {sailNote} / " +
+                  $"{shieldNote} / {(spec.HullSteeringOar == true ? "舵あり" : "舵なし")} / " +
+                  $"{headNote} / 船首{FaceJp(face)} / " +
                   $"外寸 {spec.Width}×{spec.Depth}×{spec.Height}";
         return spec;
     }

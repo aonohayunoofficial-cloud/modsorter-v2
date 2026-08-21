@@ -54,11 +54,13 @@ public static partial class HullExpander
         StructureSpec spec, IReadOnlyList<string> allowedBlocks, string fallback)
     {
         var p = new Palette(spec, allowedBlocks, fallback);
+        var t = new TopPalette(spec, allowedBlocks, p.Shell);
         var form = new Form(spec);
         var cells = new Dictionary<(int x, int y, int z), string>();
         var props = new Props();
 
         BuildBareHull(cells, props, form, p);
+        BuildTopside(cells, props, form, spec, t);
 
         Rotate(ref cells, ref props, Face(spec.FacadeFace));
         return Normalize(cells, props);
@@ -72,7 +74,13 @@ public static partial class HullExpander
     {
         var f = new Form(spec);
         var (w, h) = f.Bounds();
-        return (w, f.L, h);
+        var t = new Top(spec, f);
+
+        // 盾掛けは舷の外へ1マス出るので左右で2マス広がる。
+        // マストと船首材の飾りは甲板より上へ伸びるので、竜骨の張り出しぶんを足して比べる。
+        int width = w + (t.ShieldPerSide > 0 ? 2 : 0);
+        int height = Math.Max(h, t.TopY + f.KeelDepth + 1);
+        return (width, f.L, height);
     }
 
     // ===== 共通の小物 =====
@@ -121,6 +129,7 @@ public static partial class HullExpander
 
             var dst = new Dictionary<string, string>(src);
             if (dst.TryGetValue("facing", out var fc)) dst["facing"] = RotateFacing(fc, t);
+            if (dst.TryGetValue("axis", out var ax)) dst["axis"] = RotateAxis(ax, t);
             rp[key] = dst;
         }
 
