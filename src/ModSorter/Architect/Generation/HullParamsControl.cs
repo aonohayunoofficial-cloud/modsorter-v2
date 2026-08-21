@@ -93,6 +93,8 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
         _ui.Heading("盾掛け・舵・飾り")
            .IntSlider("shields", "盾の枚数（片舷）", 0, 32, 16,
                "ゴクスタ船は片舷16・計32枚。舷縁の外へ1マス出るので幅が左右2マス増える")
+           .Note("盾は直径94cm・厚さ2〜3cmの板。トラップドアを選ぶと開いた薄板として" +
+                 "舷側の面へ張り付く。1枚おきに2枚目の素材を使うので黄と黒の交互になる。")
            .Toggle("rudder", "舵あり", "舵なし", true)
            .Note("舵は船尾の片舷に吊るクォーターラダー。舵柄が舷内へ伸びる。")
            .Choice("head", "船首材・船尾材の飾り", new[]
@@ -109,7 +111,8 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
            .BlockPick("railb", "舷墻・手すり", "minecraft:spruce_planks")
            .BlockPick("mastb", "マスト・帆桁", "minecraft:spruce_log")
            .BlockPick("sailb", "帆", "minecraft:white_wool")
-           .BlockPick("shieldb", "盾", "minecraft:yellow_terracotta")
+           .BlockPick("shieldb", "盾（1枚目）", "minecraft:birch_trapdoor")
+           .BlockPick("shieldb2", "盾（2枚目）", "minecraft:dark_oak_trapdoor")
            .BlockPick("fitb", "舵・舵柄・飾り", "minecraft:stripped_spruce_log")
            .Note("ゴクスタ船は船体がオーク、甲板が松。舷墻の高さが0のときは舷墻の" +
                  "ブロックを使わない。");
@@ -178,7 +181,8 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
             ParapetBlock = _ui.GetBlock("railb", "minecraft:spruce_planks"),
             SuperstructureBlock = _ui.GetBlock("mastb", "minecraft:spruce_log"),
             RoofBlock = _ui.GetBlock("sailb", "minecraft:white_wool"),
-            TowerBlock = _ui.GetBlock("shieldb", "minecraft:yellow_terracotta"),
+            TowerBlock = _ui.GetBlock("shieldb", "minecraft:birch_trapdoor"),
+            HullShieldBlockAlt = _ui.GetBlock("shieldb2", "minecraft:dark_oak_trapdoor"),
             SeatBlock = _ui.GetBlock("fitb", "minecraft:stripped_spruce_log")
         };
 
@@ -207,7 +211,7 @@ public sealed class HullParamsControl : UserControl, IManualParamControl
             _ => "帆なし",
         };
         string shieldNote = spec.HullShieldPerSide > 0
-            ? $"盾 片舷{spec.HullShieldPerSide}・計{spec.HullShieldPerSide * 2}枚"
+            ? $"盾 片舷{spec.HullShieldPerSide}・計{spec.HullShieldPerSide * 2}枚（2種を交互）"
             : "盾掛けなし";
         string headNote = spec.HullStemHead switch
         {

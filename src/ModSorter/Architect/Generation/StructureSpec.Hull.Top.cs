@@ -35,4 +35,8 @@ public sealed partial class StructureSpec
 
     // 船首材・船尾材の飾り。"none" | "spiral"（渦巻き・高さ3） | "dragon"（竜頭・高さ5）。
     [JsonPropertyName("hull_stem_head")] public string? HullStemHead { get; set; }
+
+    // 盾の2枚目の素材。1枚おきにこちらを使う。未指定なら tower_block と同じ＝交互にならない。
+    // ゴクスタ船の盾は黄と黒の交互に塗られていた。
+    [JsonPropertyName("hull_shield_block_alt")] public string? HullShieldBlockAlt { get; set; }
 }

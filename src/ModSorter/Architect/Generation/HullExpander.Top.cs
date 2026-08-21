@@ -17,13 +17,14 @@ public static partial class HullExpander
 {
     private sealed class TopPalette
     {
-        public readonly string Mast, Sail, Shield, Fitting;
+        public readonly string Mast, Sail, Shield, ShieldAlt, Fitting;
 
         public TopPalette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
             Mast = Pick(spec.SuperstructureBlock, allowed, fallback);
             Sail = Pick(spec.RoofBlock, allowed, Mast);
             Shield = Pick(spec.TowerBlock, allowed, Mast);
+            ShieldAlt = Pick(spec.HullShieldBlockAlt ?? spec.TowerBlock, allowed, Shield);
             Fitting = Pick(spec.SeatBlock, allowed, Mast);
         }
     }
@@ -118,7 +119,12 @@ public static partial class HullExpander
                 }
         }
 
-        // 2) 盾掛け。舷縁（�housing 舷墻があればその天端）の外側へ1マス出して並べる。
+        // 2) 盾掛け（skjaldrim）。舷縁（舷墻があればその天端）の外側へ、
+        //    薄板を舷側の面へ張り付けて並べる。実物の盾は直径94cm・厚さ2〜3cmの板で、
+        //    互いに半分ずつ重ねて櫂穴を覆うので、横から見れば切れ目のない帯になる。
+        //    フルブロックだと厚さ1mの張り出しになって船体が太るため、
+        //    トラップドアを開いた状態（厚さ3/16マスの垂直板）で張る。
+        //    ゴクスタ船の盾は黄と黒の交互なので、2種を1枚おきに使う。
         if (top.ShieldPerSide > 0)
         {
             int z0 = Math.Max(1, f.L / 2 - top.ShieldPerSide / 2);
@@ -132,8 +138,12 @@ public static partial class HullExpander
                 if (x1 - x0 < 1) continue;   // 舷が細るところには掛けない
 
                 int y = dk + f.Bulwark;
-                cells[(x0 - 1, y, z)] = t.Shield;
-                cells[(x1 + 1, y, z)] = t.Shield;
+                string id = (i & 1) == 0 ? t.Shield : t.ShieldAlt;
+
+                // 開いたトラップドアの板は自分のマスの facing 側の面に立つので、
+                // 船体を向く方角を入れる。回転では RotateFacing が facing を回す。
+                PutShield(cells, props, (x0 - 1, y, z), id, "east");
+                PutShield(cells, props, (x1 + 1, y, z), id, "west");
             }
         }
 
@@ -175,6 +185,30 @@ public static partial class HullExpander
             int b = k >= top.HeadHeight - 1 ? cx0 : cx1;
             for (int x = a; x <= b; x++) cells[(x, baseY + k, z)] = t.Fitting;
         }
+    }
+
+    // 盾1枚。トラップドアなら垂直の薄板として舷側の面へ張る。
+    // それ以外のブロックが選ばれたときはブロックステートを付けずに置く
+    // （持たない状態を書くと不正な blockstate になる）。
+    private static void PutShield(
+        Dictionary<(int x, int y, int z), string> cells, Props props,
+        (int x, int y, int z) key, string id, string facing)
+    {
+        cells[key] = id;
+        if (!id.EndsWith("_trapdoor", StringComparison.OrdinalIgnoreCase))
+        {
+            props.Remove(key);
+            return;
+        }
+
+        props[key] = new Dictionary<string, string>
+        {
+            ["facing"] = facing,
+            ["half"] = "bottom",
+            ["open"] = "true",
+            ["powered"] = "false",
+            ["waterlogged"] = "false",
+        };
     }
 
     // 横に寝たブロックの axis。x と z が入れ替わり、y は変わらない。
