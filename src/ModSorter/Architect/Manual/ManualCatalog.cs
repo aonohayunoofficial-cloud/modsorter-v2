@@ -194,7 +194,7 @@ public static class ManualCatalog
 
         Mid("sail_old", "帆船（中世〜大航海）",
             Todo("cog", "コグ船"),
-            Todo("longship", "ロングシップ"),
+            Impl("longship", "ロングシップ", () => new HullParamsControl("longship")),
             Todo("dhow", "ダウ船"),
             Todo("junk", "ジャンク船"),
             Todo("pinnace", "ピナス"),
