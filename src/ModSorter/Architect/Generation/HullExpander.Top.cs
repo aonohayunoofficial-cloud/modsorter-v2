@@ -125,8 +125,12 @@ public static partial class HullExpander
         //    フルブロックだと厚さ1mの張り出しになって船体が太るため、
         //    トラップドアを開いた状態（厚さ3/16マスの垂直板）で張る。
         //    ゴクスタ船の盾は黄と黒の交互なので、2種を1枚おきに使う。
+        //
+        //    盾を掛ける相手が要る。舷墻は幅3マス以上の station にしか立たないので、
+        //    舷墻があるときは同じ条件に揃える。舷墻なしなら舷縁（甲板の縁）が相手になる。
         if (top.ShieldPerSide > 0)
         {
+            int span = f.Bulwark > 0 ? 2 : 1;
             int z0 = Math.Max(1, f.L / 2 - top.ShieldPerSide / 2);
             for (int i = 0; i < top.ShieldPerSide; i++)
             {
@@ -135,15 +139,18 @@ public static partial class HullExpander
 
                 int dk = f.DeckY(z);
                 f.Span(f.HalfAt(z, dk), out int x0, out int x1);
-                if (x1 - x0 < 1) continue;   // 舷が細るところには掛けない
+                if (x1 - x0 < span) continue;   // 掛ける相手がないところには掛けない
 
                 int y = dk + f.Bulwark;
                 string id = (i & 1) == 0 ? t.Shield : t.ShieldAlt;
 
-                // 開いたトラップドアの板は自分のマスの facing 側の面に立つので、
-                // 船体を向く方角を入れる。回転では RotateFacing が facing を回す。
-                PutShield(cells, props, (x0 - 1, y, z), id, "east");
-                PutShield(cells, props, (x1 + 1, y, z), id, "west");
+                // 開いたトラップドアの板は facing の「反対」側の面に立つ
+                // （facing は開く向きで、蝶番は反対側。バニラの blockstates で
+                //  facing=north,open=true は y 回転なし、開いた模型の要素は z=13〜16=南面）。
+                // 左舷セルは船体が +x 側にあるので facing=west で板が東面＝船体に密着し、
+                // 右舷セルは facing=east で板が西面に立つ。回転では RotateFacing が facing を回す。
+                PutShield(cells, props, (x0 - 1, y, z), id, "west");
+                PutShield(cells, props, (x1 + 1, y, z), id, "east");
             }
         }
 
