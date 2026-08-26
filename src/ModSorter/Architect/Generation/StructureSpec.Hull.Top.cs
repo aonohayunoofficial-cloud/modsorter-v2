@@ -9,7 +9,8 @@ namespace ModSorter.Architect.Generation;
 //   superstructure_block … マスト・帆桁
 //   roof_block           … 帆
 //   tower_block          … 盾（シールドラック）
-//   seat_block           … 舵・舵柄・船首材の飾り
+//   seat_block           … 舵・舵柄・貫通横梁・船首材の飾り
+//   hull_castle_block    … 船楼（未指定なら superstructure_block）
 public sealed partial class StructureSpec
 {
     // マストの本数。0でマストなし。等間隔に立てる。
@@ -39,4 +40,28 @@ public sealed partial class StructureSpec
     // 盾の2枚目の素材。1枚おきにこちらを使う。未指定なら tower_block と同じ＝交互にならない。
     // ゴクスタ船の盾は黄と黒の交互に塗られていた。
     [JsonPropertyName("hull_shield_block_alt")] public string? HullShieldBlockAlt { get; set; }
+
+    // ===== 貫通横梁（through-beam） =====
+    // 梁の間隔（マス）。0でなし。1は2へ丸める。コグ船は外板を貫いて梁の木口が
+    // 舷側の外へ突き出すので、舷の外へ左右1マスずつ出る。
+    [JsonPropertyName("hull_beam_step")] public int? HullBeamStep { get; set; }
+
+    // ===== 舵 =====
+    // 中心線舵（船尾材に付く舵）。1200年頃以降のコグ船以降の標準。
+    // クォーターラダー（hull_steering_oar）とは付く位置が違うので別に持つ。
+    // 船尾材より後ろへ1マス出るので奥行きが1増える。
+    [JsonPropertyName("hull_stern_rudder")] public bool? HullSternRudder { get; set; }
+
+    // ===== 船楼（キャッスル） =====
+    // 船尾楼の高さ（甲板・舷墻の上からのマス数）。0でなし。
+    [JsonPropertyName("hull_castle_aft")] public int? HullCastleAft { get; set; }
+
+    // 船首楼の高さ。0でなし。初期のコグ船は船尾楼だけを持つ。
+    [JsonPropertyName("hull_castle_fore")] public int? HullCastleFore { get; set; }
+
+    // 船楼の前後長（全長に対する%）。船尾楼・船首楼で共通。
+    [JsonPropertyName("hull_castle_length")] public int? HullCastleLength { get; set; }
+
+    // 船楼の素材。未指定なら superstructure_block。
+    [JsonPropertyName("hull_castle_block")] public string? HullCastleBlock { get; set; }
 }
