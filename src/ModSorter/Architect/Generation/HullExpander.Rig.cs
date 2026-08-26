@@ -32,6 +32,11 @@ public static partial class HullExpander
 
     // マスト・帆桁・帆。帆桁と帆を先に置き、最後にマストの列で上書きする。
     // 実船でも帆はマストの後ろを通るので、交差はマストが勝つのが正しい。
+    //
+    // 帆の下端は舷墻の天端より下へ入れない。帆は帆桁から下へ吊るので、
+    // 帆桁の位置（マスト高で決まる）に対して帆の丈が長いと下端が甲板へ食い込む。
+    // 帆桁を上げるのではなく、入りきらないぶんだけ帆の丈を切り詰める。
+    // 実船でも帆の丈はマスト高と舷墻の高さで決まるので、これが正しい向きの丸め。
     private static void BuildRig(
         Dictionary<(int x, int y, int z), string> cells, Props props,
         Form f, Top top, TopPalette t)
@@ -58,7 +63,12 @@ public static partial class HullExpander
                 }
 
                 int sailTop = yardY - 1;
-                int rows = top.Sail == "furled" ? 1 : top.SailH;
+
+                // 帆の下端の下限。舷墻があればその天端の1マス上、なければ舷縁の1マス上。
+                int sailFloor = f.DeckY(z) + f.Bulwark + 1;
+                int room = sailTop - sailFloor + 1;
+                int rows = top.Sail == "furled" ? 1 : Math.Min(top.SailH, room);
+
                 for (int k = 0; k < rows; k++)
                 {
                     int y = sailTop - k;

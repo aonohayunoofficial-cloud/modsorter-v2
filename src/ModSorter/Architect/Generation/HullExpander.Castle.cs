@@ -14,7 +14,12 @@ namespace ModSorter.Architect.Generation;
 public static partial class HullExpander
 {
     // 貫通横梁。甲板のすぐ下に通し、木口を舷側の外へ1マスずつ出す。
-    // 舷が細る船首・船尾の端には通さない。
+    //
+    // 木口の x は「梁を通す高さの半幅」ではなく「甲板の半幅」で決める。
+    // フレアの付いた船（コグ船は14度）では舷側が上へ行くほど外へ開くので、
+    // 梁の高さ dk-1 の半幅は甲板より内側にあり、そこを基準にすると木口が
+    // 外板から離れて空中に浮く。甲板縁の真下へ出せば必ず外板と接する。
+    // 木口だけでなく外板の位置（x0 / x1）も梁材で置き換えて、板を貫いた形にする。
     private static void BuildBeams(
         Dictionary<(int x, int y, int z), string> cells, Form f, Top top, TopPalette t)
     {
@@ -26,9 +31,12 @@ public static partial class HullExpander
             int y = dk - 1;
             if (y < 1) continue;
 
-            f.Span(f.HalfAt(z, y), out int x0, out int x1);
+            // 甲板の縁。ここが外板の外面なので、その1マス外へ木口を出す。
+            f.Span(f.HalfAt(z, dk), out int x0, out int x1);
             if (x1 - x0 < 2) continue;
 
+            cells[(x0, y, z)] = t.Fitting;
+            cells[(x1, y, z)] = t.Fitting;
             cells[(x0 - 1, y, z)] = t.Fitting;
             cells[(x1 + 1, y, z)] = t.Fitting;
         }
@@ -60,12 +68,18 @@ public static partial class HullExpander
     }
 
     // 船楼1基。end は船尾なら 0・船首なら L-1。舷側に沿って壁を立て、天端を張り、
-    // 船体中央を向く妻面を塞ぐ。舷が細って幅3マスを割る station には載せない。
+    // 両端（船体中央を向く妻面・船首尾側の端）を塞いだ閉じた箱にする。
+    //
+    // 壁を左右2列だけにすると、妻面だけが船体を横切る独立した壁に見える。
+    // station ごとに甲板の幅が変わるので、前の station との幅の差ぶんも壁で埋めて
+    // 横方向の隙間を作らない。舷が細って幅3マスを割る station には載せない。
     private static void BuildCastle(
         Dictionary<(int x, int y, int z), string> cells,
         Form f, Top top, TopPalette t, int end, int height)
     {
         bool aft = end == 0;
+        int prevX0 = int.MinValue, prevX1 = int.MinValue;
+
         for (int k = 0; k < top.CastleLen; k++)
         {
             int z = aft ? end + k : end - k;
@@ -73,21 +87,38 @@ public static partial class HullExpander
 
             int dk = f.DeckY(z);
             f.Span(f.HalfAt(z, dk), out int x0, out int x1);
-            if (x1 - x0 < 2) continue;
+            if (x1 - x0 < 2) { prevX0 = int.MinValue; continue; }
 
             int y0 = dk + f.Bulwark + 1;
-            bool gable = k == top.CastleLen - 1;   // 船体中央を向く妻面
+
+            // 端の station（船首尾側の端・船体中央を向く妻面）は全幅を塞ぐ。
+            bool cap = k == 0 || k == top.CastleLen - 1;
+
             for (int j = 0; j < height; j++)
             {
                 int y = y0 + j;
-                if (gable || j == height - 1)
+
+                // 妻面・端・天端は全幅。
+                if (cap || j == height - 1)
                 {
                     for (int x = x0; x <= x1; x++) cells[(x, y, z)] = t.Castle;
                     continue;
                 }
+
                 cells[(x0, y, z)] = t.Castle;
                 cells[(x1, y, z)] = t.Castle;
+
+                // 前の station より幅が広がった／狭まったぶんを塞ぐ。
+                // 塞がないと舷側の壁が段差のところで途切れて穴になる。
+                if (prevX0 == int.MinValue) continue;
+                for (int x = Math.Min(x0, prevX0); x <= Math.Max(x0, prevX0); x++)
+                    cells[(x, y, z)] = t.Castle;
+                for (int x = Math.Min(x1, prevX1); x <= Math.Max(x1, prevX1); x++)
+                    cells[(x, y, z)] = t.Castle;
             }
+
+            prevX0 = x0;
+            prevX1 = x1;
         }
     }
 }
