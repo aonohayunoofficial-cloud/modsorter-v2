@@ -140,7 +140,9 @@ internal static class HullPresets
         Head = "none",
         CastleAft = 3,
         CastleFore = 0,
-        CastleLen = 20,
+        // 船楼の長さは全長の30%。実物の船楼は船体の後ろ3割ほどを占める。20%だと
+        // 範囲内の甲板が幅4マスまでしか広がらず、箱も細いまま船尾に乗る。
+        CastleLen = 30,
         Deck = "minecraft:oak_planks",
         Railb = "minecraft:oak_planks",
         Fitb = "minecraft:stripped_oak_log",
