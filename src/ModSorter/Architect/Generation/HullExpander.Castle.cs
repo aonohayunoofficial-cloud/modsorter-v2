@@ -116,10 +116,14 @@ public static partial class HullExpander
         if (bx1 - bx0 < 2) return;
 
         int last = zs.Count - 1;
+
+        // 箱の下端。船体中央を向く端の甲板の1マス上から積む。
         int baseY = f.DeckY(zs[last]) + 1;
-        int railY = f.DeckY(end) + f.Bulwark + height;   // Top の Extent と同じ式
-        int floorY = railY - 1;
-        if (floorY <= baseY) return;
+
+        // 船楼甲板の高さは下端から数える。Extent 側（CastleY）と同じ式なので
+        // 外寸表示と食い違わない。舷墻の天端より下へは下げない。
+        int floorY = CastleFloorY(f, zs[last], height);
+        int railY = floorY + 1;
 
         int cx0 = (f.B - 1) / 2, cx1 = f.B / 2;
         int tiller = TillerY(f);
@@ -150,7 +154,8 @@ public static partial class HullExpander
                 cells[(bx1, y, z)] = t.Castle;
             }
 
-            // 2) 船楼甲板。箱の全面に張る。
+            // 2) 船楼甲板。箱の全面に張る。上書きで置くので、舷墻や妻面と
+            //    重なっても必ず床が通る。
             for (int x = bx0; x <= bx1; x++) cells[(x, floorY, z)] = t.Castle;
 
             // 3) 手すり。妻面のところは全幅、途中は左右の縁だけ。
@@ -161,5 +166,16 @@ public static partial class HullExpander
         // 4) 巻き上げ機。船楼甲板の中央に立てる。縦の丸太なので軸の指定は要らない。
         int zc = zs[zs.Count / 2];
         for (int x = cx0; x <= cx1; x++) cells[(x, railY, zc)] = t.Fitting;
+    }
+
+    // 船楼甲板の高さ。zInner は船楼のうち船体中央を向く端の station。
+    // 床の下に人の入る空所を必ず1マス残し、舷墻の天端より下へは張らない。
+    // Top の TopY もこれを通すので、UI の外寸と生成物が食い違わない。
+    private static int CastleFloorY(Form f, int zInner, int height)
+    {
+        int baseY = f.DeckY(zInner) + 1;
+        int floorY = baseY + Math.Max(1, height - 1);
+        int minY = f.DeckY(zInner) + f.Bulwark + 1;
+        return Math.Max(floorY, minY);
     }
 }

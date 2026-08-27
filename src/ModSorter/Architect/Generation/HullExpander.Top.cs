@@ -76,14 +76,18 @@ public static partial class HullExpander
                 int y = Math.Max(f.DeckY(0), f.DeckY(f.L - 1)) + HeadHeight;
                 if (y > top) top = y;
             }
+            // 船楼は船体中央を向く端の甲板から高さを取り、その上に手すりが1マス載る。
+            // CastleFloorY と同じ式を通すので、外寸と生成物が食い違わない。
             if (CastleAft > 0)
             {
-                int y = f.DeckY(0) + f.Bulwark + CastleAft;
+                int zi = Math.Min(CastleLen - 1, f.L - 1);
+                int y = CastleFloorY(f, zi, CastleAft) + 1;
                 if (y > top) top = y;
             }
             if (CastleFore > 0)
             {
-                int y = f.DeckY(f.L - 1) + f.Bulwark + CastleFore;
+                int zi = Math.Max(f.L - CastleLen, 0);
+                int y = CastleFloorY(f, zi, CastleFore) + 1;
                 if (y > top) top = y;
             }
             TopY = top;
