@@ -133,8 +133,18 @@ public static partial class HullExpander
         {
             int z = zs[i];
             bool cap = i == 0 || i == last;
+            DeckSpanAt(f, z, out int dx0, out int dx1);
 
-            // 1) 妻面と側壁。船楼甲板より下は操舵手の入る空所で、塞がない。
+            // 1) 張り出しの底。船尾は舷が細って甲板が幅2マスまで縮むので、箱の幅で
+            //    載せると船体の甲板が無いところが下から素通しになる。実船でも張り出しは
+            //    梁の上に床板を張って塞いでいる。船体の甲板が無いぶんだけ底を張る。
+            for (int x = bx0; x <= bx1; x++)
+            {
+                if (x >= dx0 && x <= dx1) continue;   // ここは船体の甲板がある
+                cells[(x, baseY - 1, z)] = t.Castle;
+            }
+
+            // 2) 妻面と側壁。船楼甲板より下は操舵手の入る空所で、塞がない。
             for (int y = baseY; y < floorY; y++)
             {
                 if (cap)
@@ -154,11 +164,11 @@ public static partial class HullExpander
                 cells[(bx1, y, z)] = t.Castle;
             }
 
-            // 2) 船楼甲板。箱の全面に張る。上書きで置くので、舷墻や妻面と
+            // 3) 船楼甲板。箱の全面に張る。上書きで置くので、舷墻や妻面と
             //    重なっても必ず床が通る。
             for (int x = bx0; x <= bx1; x++) cells[(x, floorY, z)] = t.Castle;
 
-            // 3) 手すり。妻面のところは全幅、途中は左右の縁だけ。
+            // 4) 手すり。妻面のところは全幅、途中は左右の縁だけ。
             if (cap) for (int x = bx0; x <= bx1; x++) cells[(x, railY, z)] = t.Castle;
             else { cells[(bx0, railY, z)] = t.Castle; cells[(bx1, railY, z)] = t.Castle; }
         }
