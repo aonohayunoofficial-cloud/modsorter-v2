@@ -102,6 +102,10 @@ internal static class HullPresets
     // トランサムを持たない。外板を貫いて横梁の木口が外へ突き出すのが外見上の要点。
     // 舵は船尾材に付く中心線舵で、帆装は単檣の横帆1枚。船尾に高い船楼を載せる。
     // 帆は舷墻の天端へ食い込まないようマストを16にして帆桁ごと2段持ち上げている。
+    //
+    // 船楼の高さは舷縁より上へ3マス。実物は竜骨から舷縁まで4.26mに対し、船楼と
+    // 巻き上げ機を含めた全高が7.02mなので、舷縁から上は2.7m級。内訳は船室・
+    // 船楼甲板・手すりの3マス。5マスでは実物の倍近くなり塔のように見える。
     private static readonly HullPreset Cog = new()
     {
         Jp = "コグ船",
@@ -134,7 +138,7 @@ internal static class HullPresets
         Oar = false,
         SternRudder = true,
         Head = "none",
-        CastleAft = 5,
+        CastleAft = 3,
         CastleFore = 0,
         CastleLen = 20,
         Deck = "minecraft:oak_planks",
