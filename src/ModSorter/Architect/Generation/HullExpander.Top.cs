@@ -3,9 +3,10 @@ using System.Collections.Generic;
 
 namespace ModSorter.Architect.Generation;
 
-// 上部構造の素材と寸法。組み立ては次の2ファイルへ分ける。
+// 上部構造の素材と寸法。組み立ては次の3ファイルへ分ける。
 //   HullExpander.Rig.cs    … マスト・帆桁・帆・盾掛け・側舵・船首材の飾り
-//   HullExpander.Castle.cs … 貫通横梁・中心線舵・船楼
+//   HullExpander.Beam.cs   … 貫通横梁・中心線舵
+//   HullExpander.Castle.cs … 船楼
 // 1ファイル9KB以下の目安に収めるための分割。船種が増えて部品が増えても、
 // 寸法の解決はこの Top に集まるので Extent と組み立てで値が食い違わない。
 public static partial class HullExpander
@@ -62,13 +63,30 @@ public static partial class HullExpander
             Head = head == "spiral" || head == "dragon" ? head : "none";
             HeadHeight = Head == "dragon" ? 5 : Head == "spiral" ? 3 : 0;
 
+            // マストを立てられる station の範囲。船楼の占める範囲（船尾なら
+            // z = 0〜CastleLen-1）と、その内側の妻面のすぐ前を外す。妻面には
+            // 出入口が開くので、その正面に柱が立つと戸口が塞がる。実船でも
+            // マストは隔壁と戸口を避けて竜骨の上へ据えるので、避けるのが正しい。
+            int lo = CastleAft > 0 ? CastleLen + 1 : 1;
+            int hi = CastleFore > 0 ? f.L - CastleLen - 2 : f.L - 2;
+            lo = Math.Clamp(lo, 1, Math.Max(1, f.L - 2));
+            hi = Math.Clamp(hi, 1, Math.Max(1, f.L - 2));
+            // 前後の船楼で船体が埋まる小舟は避けようがないので、従来どおり全長へ戻す。
+            if (hi < lo) { lo = 1; hi = Math.Max(1, f.L - 2); }
+
             MastZs = new int[MastCount];
             int top = 0;
+            int prev = int.MinValue;
             for (int i = 0; i < MastCount; i++)
             {
                 int z = (int)Math.Round(f.L * (i + 1.0) / (MastCount + 1.0));
-                MastZs[i] = Math.Clamp(z, 1, Math.Max(1, f.L - 2));
-                int y = f.DeckY(MastZs[i]) + MastHeight;
+                z = Math.Clamp(z, lo, hi);
+                // 範囲へ詰めた結果2本が同じ station へ重なると1本ぶん消えるので、
+                // 前のマストより後ろへ1マスずつ送る。
+                if (z <= prev) z = Math.Min(prev + 1, hi);
+                prev = z;
+                MastZs[i] = z;
+                int y = f.DeckY(z) + MastHeight;
                 if (y > top) top = y;
             }
             if (HeadHeight > 0)

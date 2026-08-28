@@ -126,12 +126,15 @@ public static partial class HullExpander
     }
 
     // 船楼甲板の高さ。zInner は船楼のうち船体中央を向く端の station。
-    // 床の下に人の入る空所を必ず1マス残し、舷墻の天端より下へは張らない。
-    // Top の TopY もこれを通すので、UI の外寸と生成物が食い違わない。
+    // 床の下の空所は必ず2マス残す。1マスだと人が入れないうえ、妻面の壁が1段しか
+    // 積まれないので、開けているはずの出入口が1マスの隙間にしかならない。
+    // 実物の船尾楼も甲板の下が船室で、前側の隔壁に戸口が開く。
+    // 舷墻の天端より下へは張らない。Top の TopY もこれを通すので、
+    // UI の外寸と生成物が食い違わない。
     private static int CastleFloorY(Form f, int zInner, int height)
     {
         int baseY = f.DeckY(zInner) + 1;
-        int floorY = baseY + Math.Max(1, height - 1);
+        int floorY = baseY + Math.Max(2, height - 1);
         int minY = f.DeckY(zInner) + f.Bulwark + 1;
         return Math.Max(floorY, minY);
     }
