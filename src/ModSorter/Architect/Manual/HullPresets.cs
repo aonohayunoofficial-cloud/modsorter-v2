@@ -46,11 +46,16 @@ internal sealed class HullPreset
     public string Castleb = "minecraft:oak_planks";
 }
 
-internal static class HullPresets
+// ダウ船・ジャンク船・ピナスの既定値は HullPresets.Sail.cs にある（1ファイル9KBの目安）。
+// 分けたのは値だけで、Of の switch はここ1か所に残す。
+internal static partial class HullPresets
 {
     public static HullPreset Of(string kind) => kind switch
     {
         "cog" => Cog,
+        "dhow" => Dhow,
+        "junk" => Junk,
+        "pinnace" => Pinnace,
         _ => Longship,
     };
 
