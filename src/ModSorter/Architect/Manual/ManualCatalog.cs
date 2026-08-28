@@ -198,9 +198,9 @@ public static class ManualCatalog
             Impl("dhow", "ダウ船", () => new HullParamsControl("dhow")),
             Impl("junk", "ジャンク船", () => new HullParamsControl("junk")),
             Impl("pinnace", "ピナス", () => new HullParamsControl("pinnace")),
-            Todo("caravel", "キャラベル"),
-            Todo("carrack", "キャラック"),
-            Todo("galleon", "ガレオン")),
+            Impl("caravel", "キャラベル", () => new HullParamsControl("caravel")),
+            Impl("carrack", "キャラック", () => new HullParamsControl("carrack")),
+            Impl("galleon", "ガレオン", () => new HullParamsControl("galleon"))),
 
         Mid("sail_modern", "帆船（近代）",
             Todo("sloop", "スループ"),
