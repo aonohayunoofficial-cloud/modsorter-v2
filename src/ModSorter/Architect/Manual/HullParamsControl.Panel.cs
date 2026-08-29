@@ -60,13 +60,18 @@ public sealed partial class HullParamsControl
                "甲板から上へのマス数。帆は帆桁から下へ吊るので、低いと帆が舷墻へ食い込む")
            .Choice("sail", "帆", new[]
            {
-               ("張る", "set"), ("畳む", "furled"), ("なし", "none"),
+               ("横帆を張る", "set"), ("縦帆を張る", "fore"),
+               ("畳む", "furled"), ("なし", "none"),
            }, p.Sail)
-           .BeginChoiceGroup("sail", "set", "furled")
-           .IntSlider("sail_w", "帆の幅", 2, 64, p.SailW, "帆桁の長さを兼ねる")
+           .BeginChoiceGroup("sail", "set", "fore", "furled")
+           .IntSlider("sail_w", "帆の幅", 2, 64, p.SailW,
+               "横帆では帆桁の長さ。縦帆ではブームの長さ（マストから船尾側へ）")
            .IntSlider("sail_h", "帆の丈", 1, 64, p.SailH, "畳んだときは1列だけになる")
            .EndGroup()
-           .Note("横帆1枚。帆桁は横に寝た丸太なので axis を持ち、船首の向きに追従する。");
+           .Note("横帆はマスト1本につき1枚を帆桁から下へ吊る。帆桁は型幅より長くてよい。" +
+                 "縦帆はマストの後ろへ張り、下辺をブーム・上辺をガフが持つ。ブームの後端は" +
+                 "船尾材か後ろのマストの手前で止まり、下は人が通れるよう2マス空く。" +
+                 "帆桁・ブームは寝た丸太なので axis を持ち、船首の向きに追従する。");
 
         _ui.Heading("舵")
            .Toggle("rudder", "クォーターラダーあり", "なし", p.Oar)

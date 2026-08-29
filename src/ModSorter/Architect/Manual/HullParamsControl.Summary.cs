@@ -23,7 +23,8 @@ public sealed partial class HullParamsControl
             : "マストなし";
         string sailNote = spec.HullSail switch
         {
-            "set" => $"帆 {spec.HullSailWidth}×{spec.HullSailHeight}",
+            "set" => $"横帆 {spec.HullSailWidth}×{spec.HullSailHeight}",
+            "fore" => $"縦帆 ブーム{spec.HullSailWidth}×丈{spec.HullSailHeight}",
             "furled" => $"帆を畳む（幅{spec.HullSailWidth}）",
             _ => "帆なし",
         };

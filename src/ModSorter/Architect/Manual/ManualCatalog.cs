@@ -203,9 +203,9 @@ public static class ManualCatalog
             Impl("galleon", "ガレオン", () => new HullParamsControl("galleon"))),
 
         Mid("sail_modern", "帆船（近代）",
-            Todo("sloop", "スループ"),
-            Todo("schooner", "スクーナー"),
-            Todo("clipper", "クリッパー")),
+            Impl("sloop", "スループ", () => new HullParamsControl("sloop")),
+            Impl("schooner", "スクーナー", () => new HullParamsControl("schooner")),
+            Impl("clipper", "クリッパー", () => new HullParamsControl("clipper"))),
 
         Mid("warship_sail", "帆走軍艦",
             Todo("frigate", "フリゲート"),

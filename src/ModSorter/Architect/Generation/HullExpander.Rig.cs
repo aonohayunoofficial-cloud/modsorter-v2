@@ -3,8 +3,9 @@ using System.Collections.Generic;
 
 namespace ModSorter.Architect.Generation;
 
-// 艤装の組み立て。マスト・帆桁・帆・盾掛け・側舵・船首材の飾り。
-// 貫通横梁・中心線舵・船楼は HullExpander.Castle.cs にある。
+// 艤装の組み立て。マスト・盾掛け・側舵・船首材の飾り。
+// 帆と帆桁は HullExpander.Sail.cs、貫通横梁・中心線舵は HullExpander.Beam.cs、
+// 船楼は HullExpander.Castle.cs にある。
 //
 // 実物の根拠（ロングシップ / ゴクスタ船）:
 //   全長23.22m・幅5.18m、外板16列、片舷16の櫂穴で盾は32枚。
@@ -30,52 +31,23 @@ public static partial class HullExpander
         BuildHeads(cells, f, top, t);
     }
 
-    // マスト・帆桁・帆。帆桁と帆を先に置き、最後にマストの列で上書きする。
-    // 実船でも帆はマストの後ろを通るので、交差はマストが勝つのが正しい。
-    //
-    // 帆の下端は舷墻の天端より下へ入れない。帆は帆桁から下へ吊るので、
-    // 帆桁の位置（マスト高で決まる）に対して帆の丈が長いと下端が甲板へ食い込む。
-    // 帆桁を上げるのではなく、入りきらないぶんだけ帆の丈を切り詰める。
-    // 実船でも帆の丈はマスト高と舷墻の高さで決まるので、これが正しい向きの丸め。
+    // マストの柱。帆を先に置き、最後にマストの列で上書きする。実船でも帆は
+    // マストの後ろを通るので、交差はマストが勝つのが正しい。
+    // 帆の形（横帆・縦帆）は HullExpander.Sail.cs が受け持つ。マストの通し番号を
+    // 渡すのは、縦帆のブームを後ろのマストの手前で切るため。
     private static void BuildRig(
         Dictionary<(int x, int y, int z), string> cells, Props props,
         Form f, Top top, TopPalette t)
     {
         int cx0 = (f.B - 1) / 2, cx1 = f.B / 2;
 
-        foreach (int z in top.MastZs)
+        for (int i = 0; i < top.MastZs.Length; i++)
         {
+            int z = top.MastZs[i];
             int baseY = f.DeckY(z) + 1;
             int mastTop = baseY + top.MastHeight - 1;
 
-            if (top.Sail != "none")
-            {
-                int yardY = Math.Max(baseY, mastTop - 1);
-                int xa = cx0 - (top.SailW - 1) / 2;
-                int xb = xa + top.SailW - 1;
-
-                // 帆桁。横に寝た丸太なので axis=x を持たせる。回転で axis も回る。
-                for (int x = xa; x <= xb; x++)
-                {
-                    var key = (x, yardY, z);
-                    cells[key] = t.Mast;
-                    props[key] = new Dictionary<string, string> { ["axis"] = "x" };
-                }
-
-                int sailTop = yardY - 1;
-
-                // 帆の下端の下限。舷墻があればその天端の1マス上、なければ舷縁の1マス上。
-                int sailFloor = f.DeckY(z) + f.Bulwark + 1;
-                int room = sailTop - sailFloor + 1;
-                int rows = top.Sail == "furled" ? 1 : Math.Min(top.SailH, room);
-
-                for (int k = 0; k < rows; k++)
-                {
-                    int y = sailTop - k;
-                    if (y < baseY) break;
-                    for (int x = xa; x <= xb; x++) cells[(x, y, z)] = t.Sail;
-                }
-            }
+            BuildSail(cells, props, f, top, t, i, z, baseY, mastTop);
 
             for (int y = baseY; y <= mastTop; y++)
                 for (int x = cx0; x <= cx1; x++)

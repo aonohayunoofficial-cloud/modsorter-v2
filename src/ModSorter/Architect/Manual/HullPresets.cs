@@ -46,9 +46,10 @@ internal sealed class HullPreset
     public string Castleb = "minecraft:oak_planks";
 }
 
-// 帆船（中世〜大航海）の既定値は2枚に分けてある（1ファイル9KBの目安）。
+// 船種ごとの既定値は3枚に分けてある（1ファイル9KBの目安）。
 //   HullPresets.Sail.cs      … ダウ船・ジャンク船・ピナス
 //   HullPresets.Discovery.cs … キャラベル・キャラック・ガレオン
+//   HullPresets.Modern.cs    … スループ・スクーナー・クリッパー
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -61,6 +62,9 @@ internal static partial class HullPresets
         "caravel" => Caravel,
         "carrack" => Carrack,
         "galleon" => Galleon,
+        "sloop" => Sloop,
+        "schooner" => Schooner,
+        "clipper" => Clipper,
         _ => Longship,
     };
 

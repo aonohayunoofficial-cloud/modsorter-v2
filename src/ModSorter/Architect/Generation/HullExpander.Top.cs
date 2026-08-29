@@ -41,8 +41,9 @@ public static partial class HullExpander
             MastCount = Clamp(spec.HullMastCount ?? 0, 0, 3);
             MastHeight = Clamp(spec.HullMastHeight ?? Math.Max(3, f.L / 2), 2, 64);
 
+            // set=横帆 / fore=縦帆（ガフ帆）/ furled=畳む / none=なし。
             string sail = (spec.HullSail ?? "none").Trim().ToLowerInvariant();
-            Sail = sail == "set" || sail == "furled" ? sail : "none";
+            Sail = sail is "set" or "fore" or "furled" ? sail : "none";
             SailW = Clamp(spec.HullSailWidth ?? MastHeight, 2, 64);
             SailH = Clamp(spec.HullSailHeight ?? Math.Max(1, MastHeight - 1), 1, 64);
 
