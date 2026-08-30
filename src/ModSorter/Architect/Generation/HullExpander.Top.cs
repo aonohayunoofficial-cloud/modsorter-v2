@@ -3,12 +3,21 @@ using System.Collections.Generic;
 
 namespace ModSorter.Architect.Generation;
 
-// 上部構造の素材と寸法。組み立ては次の3ファイルへ分ける。
-//   HullExpander.Rig.cs    … マスト・帆桁・帆・盾掛け・側舵・船首材の飾り
+// 上部構造の素材と寸法。組み立ては次のファイルへ分ける。
+//   HullExpander.Rig.cs    … マスト・盾掛け・側舵・船首材の飾り
+//   HullExpander.Sail.cs   … 横帆・縦帆と帆桁
+//   HullExpander.Gun.cs    … 砲門と砲身
+//   HullExpander.Oar.cs    … 櫂
 //   HullExpander.Beam.cs   … 貫通横梁・中心線舵
 //   HullExpander.Castle.cs … 船楼
+//   HullExpander.House.cs  … デッキハウス・煙突
+//   HullExpander.Cargo.cs  … 貨物艙口・デリック
 // 1ファイル9KB以下の目安に収めるための分割。船種が増えて部品が増えても、
 // 寸法の解決はこの Top に集まるので Extent と組み立てで値が食い違わない。
+//
+// TopPalette と Top はどちらも HullExpander の直下に置く。Top は Rig / Sail /
+// Gun / Oar / Beam / Castle / House / Cargo の各ファイルが引数の型として使うので、
+// TopPalette の中へ入れると（= ネスト型になると）それらから型を解決できない。
 public static partial class HullExpander
 {
     private sealed class TopPalette
@@ -29,10 +38,11 @@ public static partial class HullExpander
             // ガラスを入れていない船種で、窓だけ勝手に別の材が混ざるのを避ける。
             Glass = Pick(spec.GlazingBlock, allowed, Castle);
         }
+    }
 
-        // 上部構造の寸法。Extent と BuildTopside の両方がこれを通るので、
-        // UI に出す外寸と生成物の外寸が食い違わない。
-        private sealed class Top
+    // 上部構造の寸法。Extent と BuildTopside の両方がこれを通るので、
+    // UI に出す外寸と生成物の外寸が食い違わない。
+    private sealed class Top
     {
         public readonly int MastCount, MastHeight, SailW, SailH, ShieldPerSide, HeadHeight, TopY;
         public readonly int BeamStep, CastleAft, CastleFore, CastleLen;
@@ -118,41 +128,44 @@ public static partial class HullExpander
                 int y = f.DeckY(z) + MastHeight;
                 if (y > top) top = y;
             }
+
             if (HeadHeight > 0)
             {
                 int y = Math.Max(f.DeckY(0), f.DeckY(f.L - 1)) + HeadHeight;
                 if (y > top) top = y;
             }
-                // 船楼は船体中央を向く端の甲板から高さを取り、その上に手すりが1マス載る。
-                // CastleFloorY と同じ式を通すので、外寸と生成物が食い違わない。
-                if (CastleAft > 0)
-                {
-                    int zi = Math.Min(CastleLen - 1, f.L - 1);
-                    int y = CastleFloorY(f, zi, CastleAft) + 1;
-                    if (y > top) top = y;
-                }
-                if (CastleFore > 0)
-                {
-                    int zi = Math.Max(f.L - CastleLen, 0);
-                    int y = CastleFloorY(f, zi, CastleFore) + 1;
-                    if (y > top) top = y;
-                }
 
-                // デッキハウスと煙突の天端。BuildDeckHouse と同じ式（甲板の最大＋1を
-                // 下端、1層3マス）を通すので、UI の外寸と生成物が食い違わない。
-                if (HouseDecks > 0)
-                {
-                    int len = Math.Max(3, f.L * HouseLen / 100);
-                    int z0 = Math.Max(1, (f.L - len) / 2 + HouseShift);
-                    int z1 = Math.Min(f.L - 2, z0 + len - 1);
-                    int baseY = f.DeckY(Math.Max(0, z0)) + 1;
-                    for (int z = Math.Max(0, z0); z <= Math.Max(0, z1); z++)
-                        baseY = Math.Max(baseY, f.DeckY(z) + 1);
-
-                    int y = baseY + HouseDecks * 3 - 1 + Funnel;
-                    if (y > top) top = y;
-                }
-
-                TopY = top;
+            // 船楼は船体中央を向く端の甲板から高さを取り、その上に手すりが1マス載る。
+            // CastleFloorY と同じ式を通すので、外寸と生成物が食い違わない。
+            if (CastleAft > 0)
+            {
+                int zi = Math.Min(CastleLen - 1, f.L - 1);
+                int y = CastleFloorY(f, zi, CastleAft) + 1;
+                if (y > top) top = y;
             }
+            if (CastleFore > 0)
+            {
+                int zi = Math.Max(f.L - CastleLen, 0);
+                int y = CastleFloorY(f, zi, CastleFore) + 1;
+                if (y > top) top = y;
+            }
+
+            // デッキハウスと煙突の天端。BuildDeckHouse と同じ式（甲板の最大＋1を
+            // 下端、1層3マス）を通すので、UI の外寸と生成物が食い違わない。
+            if (HouseDecks > 0)
+            {
+                int len = Math.Max(3, f.L * HouseLen / 100);
+                int z0 = Math.Max(1, (f.L - len) / 2 + HouseShift);
+                int z1 = Math.Min(f.L - 2, z0 + len - 1);
+                int baseY = f.DeckY(Math.Max(0, z0)) + 1;
+                for (int z = Math.Max(0, z0); z <= Math.Max(0, z1); z++)
+                    baseY = Math.Max(baseY, f.DeckY(z) + 1);
+
+                int y = baseY + HouseDecks * 3 - 1 + Funnel;
+                if (y > top) top = y;
+            }
+
+            TopY = top;
         }
+    }
+}
