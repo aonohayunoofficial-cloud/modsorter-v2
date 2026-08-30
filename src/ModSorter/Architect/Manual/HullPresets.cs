@@ -32,6 +32,10 @@ internal sealed class HullPreset
     public string Head = "none";
     public int CastleAft = 0, CastleFore = 0, CastleLen = 20;
 
+    // 砲門と櫂。GunStep が0なら段数を入れても開かない。
+    public int GunRows = 0, GunStep = 0, GunBase = 1;
+    public int RowOars = 0;
+
     // 素材。
     public string Shell = "minecraft:oak_planks";
     public string Deck = "minecraft:spruce_planks";
@@ -46,10 +50,11 @@ internal sealed class HullPreset
     public string Castleb = "minecraft:oak_planks";
 }
 
-// 船種ごとの既定値は3枚に分けてある（1ファイル9KBの目安）。
+// 船種ごとの既定値は4枚に分けてある（1ファイル9KBの目安）。
 //   HullPresets.Sail.cs      … ダウ船・ジャンク船・ピナス
 //   HullPresets.Discovery.cs … キャラベル・キャラック・ガレオン
 //   HullPresets.Modern.cs    … スループ・スクーナー・クリッパー
+//   HullPresets.Warship.cs   … フリゲート・戦列艦・軍用ガレー
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -65,6 +70,9 @@ internal static partial class HullPresets
         "sloop" => Sloop,
         "schooner" => Schooner,
         "clipper" => Clipper,
+        "frigate" => Frigate,
+        "ship_of_the_line" => ShipOfTheLine,
+        "war_galley" => WarGalley,
         _ => Longship,
     };
 

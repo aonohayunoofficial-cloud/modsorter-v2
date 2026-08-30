@@ -28,6 +28,12 @@ public sealed partial class HullParamsControl
             "furled" => $"帆を畳む（幅{spec.HullSailWidth}）",
             _ => "帆なし",
         };
+        string gunNote = spec.HullGunRows > 0 && spec.HullGunStep >= 2
+            ? $"砲門{spec.HullGunRows}段・{spec.HullGunStep}間隔・喫水線上{spec.HullGunBase}"
+            : "砲門なし";
+        string oarNote = spec.HullOarPerSide > 0
+            ? $"櫂 片舷{spec.HullOarPerSide}挺・計{spec.HullOarPerSide * 2}挺"
+            : "櫂なし";
         string shieldNote = spec.HullShieldPerSide > 0
             ? $"盾 片舷{spec.HullShieldPerSide}・計{spec.HullShieldPerSide * 2}枚（2種を交互）"
             : "盾掛けなし";
@@ -57,7 +63,7 @@ public sealed partial class HullParamsControl
                $"断面{spec.HullSection} / 入角{spec.HullEntryAngle}度 / {transomNote} / " +
                $"船首材{spec.HullStemRake}度 / シア{spec.HullSheer}% / {frameNote} / " +
                $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {beamNote} / {mastNote} / {sailNote} / " +
-               $"{shieldNote} / {rudderNote} / {castleNote} / {headNote} / " +
+               $"{gunNote} / {oarNote} / {shieldNote} / {rudderNote} / {castleNote} / {headNote} / " +
                $"船首{FaceJp(face)} / 外寸 {spec.Width}×{spec.Depth}×{spec.Height}";
     }
 

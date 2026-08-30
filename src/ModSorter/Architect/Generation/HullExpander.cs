@@ -76,10 +76,14 @@ public static partial class HullExpander
         var (w, h) = f.Bounds();
         var t = new Top(spec, f);
 
-        // 盾掛けと貫通横梁の木口は舷の外へ1マス出るので左右で2マス広がる。
+        // 舷の外へ出る部品のうち、いちばん遠くまで出るものを左右へ足す。
+        // 盾掛けと貫通横梁の木口は1マス、櫂は3マス。
         // 中心線舵は船尾材の後ろへ1マス出るので奥行きが1増える。
         // マスト・船楼・船首材の飾りは甲板より上へ伸びるので、竜骨の張り出しぶんを足して比べる。
-        int width = w + (t.ShieldPerSide > 0 || t.BeamStep >= 2 ? 2 : 0);
+        int side = t.OarPerSide > 0
+            ? 3
+            : (t.ShieldPerSide > 0 || t.BeamStep >= 2 ? 1 : 0);
+        int width = w + side * 2;
         int depth = f.L + (t.SternRudder ? 1 : 0);
         int height = Math.Max(h, t.TopY + f.KeelDepth + 1);
         return (width, depth, height);

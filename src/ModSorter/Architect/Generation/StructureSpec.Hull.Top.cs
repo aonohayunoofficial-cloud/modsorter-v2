@@ -64,4 +64,21 @@ public sealed partial class StructureSpec
 
     // 船楼の素材。未指定なら superstructure_block。
     [JsonPropertyName("hull_castle_block")] public string? HullCastleBlock { get; set; }
+
+    // ===== 砲門 =====
+    // 砲門の段数。0でなし。フリゲートは1段、戦列艦は3段。上へ2マスおきに重ねる。
+    [JsonPropertyName("hull_gun_rows")] public int? HullGunRows { get; set; }
+
+    // 砲門の前後の間隔（マス・中心間）。0でなし。1は2へ丸める。
+    // ヴィクトリーは下甲板片舷15門で12.4ft＝3.8m間隔。
+    [JsonPropertyName("hull_gun_step")] public int? HullGunStep { get; set; }
+
+    // 最下段の砲門の高さ（喫水線から上へのマス数）。
+    // ヴィクトリーの下甲板は水面上4ft9in＝1.4m、フリゲートの砲甲板は2.4m級。
+    [JsonPropertyName("hull_gun_base")] public int? HullGunBase { get; set; }
+
+    // ===== 櫂 =====
+    // 櫂の数（片舷）。0でなし。ガレーは漕ぎ座 片舷24。
+    // 舷縁の外へ3マス出るので幅が左右6マス増える。
+    [JsonPropertyName("hull_oar_per_side")] public int? HullOarPerSide { get; set; }
 }

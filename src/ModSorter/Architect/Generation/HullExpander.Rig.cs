@@ -24,8 +24,10 @@ public static partial class HullExpander
 
         BuildRig(cells, props, f, top, t);
         BuildShields(cells, props, f, top, t);
+        BuildOars(cells, props, f, top, t);
         BuildQuarterRudder(cells, f, top, t);
         BuildBeams(cells, f, top, t);
+        BuildGunPorts(cells, props, f, top, t);
         BuildSternRudder(cells, f, top, t);
         BuildCastles(cells, f, top, t);
         BuildHeads(cells, f, top, t);

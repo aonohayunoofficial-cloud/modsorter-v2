@@ -73,6 +73,18 @@ public sealed partial class HullParamsControl
                  "船尾材か後ろのマストの手前で止まり、下は人が通れるよう2マス空く。" +
                  "帆桁・ブームは寝た丸太なので axis を持ち、船首の向きに追従する。");
 
+        _ui.Heading("砲門")
+           .IntSlider("gun_rows", "砲門の段数", 0, 4, p.GunRows,
+               "0でなし。フリゲートは1段、戦列艦は3段。上へ2マスおきに重ねる")
+           .IntSlider("gun_step", "砲門の間隔", 0, 16, p.GunStep,
+               "前後の中心間。0でなし。ヴィクトリーは下段 片舷15門で12.4ft＝3.8m間隔")
+           .IntSlider("gun_base", "最下段の高さ", 0, 8, p.GunBase,
+               "喫水線から上へのマス数。ヴィクトリーの下段は4ft9in＝1.4m、フリゲートは2.4m級")
+           .Note("外板に1マスの口を開け、その1マス内側へ砲身を寝かせる。" +
+                 "18ポンド砲の砲門は幅0.86m・高さ0.76mなので1マスに収まる。" +
+                 "甲板のすぐ下には外板を1列残すので、深さが足りない段は開かない。" +
+                 "舷が寄る船首・船尾も左右の口がぶつかるので開かない。");
+
         _ui.Heading("舵")
            .Toggle("rudder", "クォーターラダーあり", "なし", p.Oar)
            .Note("船尾の片舷に吊る舵。舵柄が舷内へ伸びる。バイキング船の方式。")
@@ -88,30 +100,21 @@ public sealed partial class HullParamsControl
            .IntSlider("castle_len", "船楼の前後長", 5, 40, p.CastleLen,
                "全長に対する%。船尾楼・船首楼で共通");
 
-        _ui.Heading("盾掛け・飾り")
+        _ui.Heading("盾掛け・櫂・飾り")
            .IntSlider("shields", "盾の枚数（片舷）", 0, 32, p.Shields,
                "ゴクスタ船は片舷16・計32枚。舷縁の外へ1マス出るので幅が左右2マス増える")
            .Note("盾は直径94cm・厚さ2〜3cmの板。トラップドアを選ぶと開いた薄板として" +
                  "舷側の面へ張り付く。1枚おきに2枚目の素材を使うので黄と黒の交互になる。")
+           .IntSlider("row_oars", "櫂の数（片舷）", 0, 32, p.RowOars,
+               "ガレーは漕ぎ座 片舷24。舷縁の外へ3マス出るので幅が左右6マス増える")
+           .Note("櫂は舷縁から1マスごとに1段下げて水面へ向け、水面の手前で止まる。" +
+                 "素材はマストと同じものを使う。")
            .Choice("head", "船首材・船尾材の飾り", new[]
            {
                ("渦巻き", "spiral"), ("竜頭", "dragon"), ("なし", "none"),
            }, p.Head)
            .Note("渦巻きで高さ3、竜頭で高さ5。1マス未満の彫刻は表さない。");
 
-        _ui.Heading("使用ブロック")
-           .BlockPick("shell", "外板", p.Shell)
-           .BlockPick("deck", "甲板・舷縁", p.Deck)
-           .BlockPick("keelb", "竜骨・船首材・船尾材", p.Keelb)
-           .BlockPick("frameb", "フレーム・フロア材", p.Frameb)
-           .BlockPick("railb", "舷墻・手すり", p.Railb)
-           .BlockPick("mastb", "マスト・帆桁", p.Mastb)
-           .BlockPick("sailb", "帆", p.Sailb)
-           .BlockPick("shieldb", "盾（1枚目）", p.Shieldb)
-           .BlockPick("shieldb2", "盾（2枚目）", p.Shieldb2)
-           .BlockPick("fitb", "舵・舵柄・貫通横梁・飾り", p.Fitb)
-           .BlockPick("castleb", "船楼", p.Castleb)
-           .Note("ゴクスタ船は船体がオーク、甲板が松。コグ船はオーク一色。" +
-                 "高さや枚数が0の部品はブロックを使わない。");
+        BuildBlockPanel(p);
     }
 }

@@ -32,6 +32,7 @@ public static partial class HullExpander
     {
         public readonly int MastCount, MastHeight, SailW, SailH, ShieldPerSide, HeadHeight, TopY;
         public readonly int BeamStep, CastleAft, CastleFore, CastleLen;
+        public readonly int GunRows, GunStep, GunBase, OarPerSide;
         public readonly string Sail, Head;
         public readonly bool SteeringOar, SternRudder;
         public readonly int[] MastZs;
@@ -50,6 +51,16 @@ public static partial class HullExpander
             ShieldPerSide = Clamp(spec.HullShieldPerSide ?? 0, 0, 32);
             SteeringOar = spec.HullSteeringOar ?? false;
             SternRudder = spec.HullSternRudder ?? false;
+
+            // 砲門。段数だけ指定しても間隔が0なら開かない。間隔1では口が隣と
+            // つながって切り欠きになるので2へ丸める。
+            GunRows = Clamp(spec.HullGunRows ?? 0, 0, 4);
+            int gs = spec.HullGunStep ?? 0;
+            GunStep = gs <= 0 ? 0 : Clamp(gs, 2, 16);
+            GunBase = Clamp(spec.HullGunBase ?? 1, 0, 8);
+
+            // 櫂。舷の外へ3マス出るので Extent の幅もこれを見る。
+            OarPerSide = Clamp(spec.HullOarPerSide ?? 0, 0, 32);
 
             // 貫通横梁の間隔。1マスおきでは外板と見分けが付かないので2へ丸める。
             int bs = spec.HullBeamStep ?? 0;

@@ -208,9 +208,9 @@ public static class ManualCatalog
             Impl("clipper", "クリッパー", () => new HullParamsControl("clipper"))),
 
         Mid("warship_sail", "帆走軍艦",
-            Todo("frigate", "フリゲート"),
-            Todo("ship_of_the_line", "戦列艦"),
-            Todo("war_galley", "軍用ガレー")),
+            Impl("frigate", "フリゲート", () => new HullParamsControl("frigate")),
+            Impl("ship_of_the_line", "戦列艦", () => new HullParamsControl("ship_of_the_line")),
+            Impl("war_galley", "軍用ガレー", () => new HullParamsControl("war_galley"))),
 
         Mid("merchant", "商船",
             Todo("liner", "客船"),
