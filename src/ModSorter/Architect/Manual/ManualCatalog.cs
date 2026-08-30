@@ -213,8 +213,8 @@ public static class ManualCatalog
             Impl("war_galley", "軍用ガレー", () => new HullParamsControl("war_galley"))),
 
         Mid("merchant", "商船",
-            Todo("liner", "客船"),
-            Todo("cargo", "貨物船")),
+            Impl("liner", "客船", () => new HullParamsControl("liner")),
+            Impl("cargo", "貨物船", () => new HullParamsControl("cargo"))),
 
         Mid("warship_modern", "近代軍艦",
             Todo("destroyer", "駆逐艦"),

@@ -78,6 +78,12 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             HullGunStep = _ui.GetInt("gun_step"),
             HullGunBase = _ui.GetInt("gun_base"),
             HullOarPerSide = _ui.GetInt("row_oars"),
+            HullHouseDecks = _ui.GetInt("house_decks"),
+            HullHouseLength = _ui.GetInt("house_len"),
+            HullHouseShift = _ui.GetInt("house_shift"),
+            HullFunnel = _ui.GetInt("funnel"),
+            HullHolds = _ui.GetInt("holds"),
+            HullDerrick = _ui.GetBool("derrick"),
             HullShieldPerSide = _ui.GetInt("shields"),
             HullSteeringOar = _ui.GetBool("rudder"),
             HullSternRudder = _ui.GetBool("stern_rudder"),
@@ -95,7 +101,9 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             TowerBlock = _ui.GetBlock("shieldb", _p.Shieldb),
             HullShieldBlockAlt = _ui.GetBlock("shieldb2", _p.Shieldb2),
             SeatBlock = _ui.GetBlock("fitb", _p.Fitb),
-            HullCastleBlock = _ui.GetBlock("castleb", _p.Castleb)
+            HullCastleBlock = _ui.GetBlock("castleb", _p.Castleb),
+            HullFunnelBlock = _ui.GetBlock("funnelb", _p.Funnelb),
+            GlazingBlock = _ui.GetBlock("glassb", _p.Glassb)
         };
 
         // 外寸は展開側の Form と Top から取る。UI と生成側で式を二重に持たない。

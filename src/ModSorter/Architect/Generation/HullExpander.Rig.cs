@@ -30,6 +30,12 @@ public static partial class HullExpander
         BuildGunPorts(cells, props, f, top, t);
         BuildSternRudder(cells, f, top, t);
         BuildCastles(cells, f, top, t);
+
+        // 艙口は甲板を抜くので、甲板を置く BuildBareHull と船楼のあとに通す。
+        // デッキハウスは艙口の位置を避けて置くので、艙口より先に位置を決める
+        // 必要はない（どちらも Top の HouseLen / HouseShift から同じ範囲を出す）。
+        BuildHolds(cells, props, f, top, t);
+        BuildDeckHouse(cells, f, top, t);
         BuildHeads(cells, f, top, t);
     }
 

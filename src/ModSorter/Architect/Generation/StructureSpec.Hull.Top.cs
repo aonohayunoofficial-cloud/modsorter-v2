@@ -81,4 +81,27 @@ public sealed partial class StructureSpec
     // 櫂の数（片舷）。0でなし。ガレーは漕ぎ座 片舷24。
     // 舷縁の外へ3マス出るので幅が左右6マス増える。
     [JsonPropertyName("hull_oar_per_side")] public int? HullOarPerSide { get; set; }
+
+    // ===== デッキハウス（船橋楼）と煙突 =====
+    // 船体中央に載る箱の層数。0でなし。リバティ船は3層。1層は床＋内法2マスの3マス。
+    [JsonPropertyName("hull_house_decks")] public int? HullHouseDecks { get; set; }
+
+    // 箱の前後長（全長に対する%）。リバティ船の船橋楼は全長の15%級。
+    [JsonPropertyName("hull_house_length")] public int? HullHouseLength { get; set; }
+
+    // 箱の前後の位置のずらし（マス）。+で船首側。0で船体中央。
+    [JsonPropertyName("hull_house_shift")] public int? HullHouseShift { get; set; }
+
+    // 煙突の高さ（箱の屋根から上へのマス数）。0で煙突なし。3マス角で中が煙路。
+    [JsonPropertyName("hull_funnel")] public int? HullFunnel { get; set; }
+
+    // 煙突の素材。未指定なら hull_castle_block。
+    [JsonPropertyName("hull_funnel_block")] public string? HullFunnelBlock { get; set; }
+
+    // ===== 貨物艙 =====
+    // 貨物艙口の数。0でなし。リバティ船は5。船体を等分した位置へ置く。
+    [JsonPropertyName("hull_holds")] public int? HullHolds { get; set; }
+
+    // 荷役デリック。艙口の前後に柱を立て、腕木を艙口の上へ倒す。
+    [JsonPropertyName("hull_derrick")] public bool? HullDerrick { get; set; }
 }

@@ -15,10 +15,11 @@ public sealed partial class HullParamsControl
 
         _ui.Heading("主要目")
            .Note(p.Note)
-           .IntSlider("len", "全長", 4, 64, p.Len, "LOA")
-           .IntSlider("beam", "型幅", 2, 24, p.Beam, "水線での最大幅")
-           .IntSlider("depth", "深さ", 2, 16, p.Depth, "基線から船体中央の甲板まで")
-           .IntSlider("draft", "喫水", 1, 12, p.Draft, "設計喫水。深さを超える値は深さへ丸める");
+           .IntSlider("len", "全長", 4, 140, p.Len, "LOA。商船は100m級なので上限を140に取る")
+           .IntSlider("beam", "型幅", 2, 32, p.Beam, "水線での最大幅")
+           .IntSlider("depth", "深さ", 2, 24, p.Depth, "基線から船体中央の甲板まで")
+           .IntSlider("draft", "喫水", 1, 20, p.Draft, "設計喫水。深さを超える値は深さへ丸める")
+           .Note("全長100マス級ではブロック数が1万を超え、生成に時間がかかる。");
 
         _ui.Heading("横断面")
            .IntSlider("section", "断面のふくらみ", 0, 100, p.Section,
@@ -84,6 +85,29 @@ public sealed partial class HullParamsControl
                  "18ポンド砲の砲門は幅0.86m・高さ0.76mなので1マスに収まる。" +
                  "甲板のすぐ下には外板を1列残すので、深さが足りない段は開かない。" +
                  "舷が寄る船首・船尾も左右の口がぶつかるので開かない。");
+
+        _ui.Heading("デッキハウス・煙突")
+           .IntSlider("house_decks", "層数", 0, 8, p.HouseDecks,
+               "0でなし。リバティ船の船橋楼は3層。1層は床＋内法2マスの3マス")
+           .IntSlider("house_len", "前後長", 5, 60, p.HouseLen,
+               "全長に対する%。リバティ船は15%級")
+           .IntSlider("house_shift", "前後の位置", -20, 20, p.HouseShift,
+               "0で船体中央。+で船首側へずらす")
+           .IntSlider("funnel", "煙突の高さ", 0, 16, p.Funnel,
+               "屋根から上へのマス数。0でなし。3マス角で中が煙路")
+           .Note("箱は両舷に1マスの通路（サイドデッキ）を残す幅で載る。" +
+                 "上の層は前後を1マスずつ詰めるので、下の層の屋根が甲板になる。" +
+                 "各層の後面に幅1・高さ2の戸口が開き、脇に外舷梯子が付く。" +
+                 "層数が0のときは煙突も立たない（煙突の高さは屋根を基準に取る）。");
+
+        _ui.Heading("貨物艙")
+           .IntSlider("holds", "艙口の数", 0, 8, p.Holds,
+               "0でなし。リバティ船は5。船体を等分した位置へ置く")
+           .Toggle("derrick", "荷役デリックあり", "なし", p.Derrick)
+           .Note("艙口は甲板を抜いて周りに1マスのコーミング（縁の立ち上がり）を立てる。" +
+                 "幅は型幅の1/3級で、両舷に2マス以上の通路が残る幅へ抑える。" +
+                 "デッキハウスと重なる位置の艙口は置かない。" +
+                 "デリックは艙口の前後に高さ8の柱を立て、腕木を艙口の上へ倒す。");
 
         _ui.Heading("舵")
            .Toggle("rudder", "クォーターラダーあり", "なし", p.Oar)

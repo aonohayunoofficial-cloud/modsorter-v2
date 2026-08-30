@@ -36,6 +36,13 @@ internal sealed class HullPreset
     public int GunRows = 0, GunStep = 0, GunBase = 1;
     public int RowOars = 0;
 
+    // デッキハウス（船橋楼）と煙突。層数が0なら煙突も立たない。
+    public int HouseDecks = 0, HouseLen = 15, HouseShift = 0, Funnel = 0;
+
+    // 貨物艙口と荷役デリック。
+    public int Holds = 0;
+    public bool Derrick = false;
+
     // 素材。
     public string Shell = "minecraft:oak_planks";
     public string Deck = "minecraft:spruce_planks";
@@ -47,14 +54,17 @@ internal sealed class HullPreset
     public string Shieldb = "minecraft:birch_trapdoor";
     public string Shieldb2 = "minecraft:dark_oak_trapdoor";
     public string Fitb = "minecraft:stripped_spruce_log";
-    public string Castleb = "minecraft:oak_planks";
+    public string Castleb = "minecraft:spruce_planks";
+    public string Funnelb = "minecraft:spruce_planks";
+    public string Glassb = "minecraft:glass_pane";
 }
 
-// 船種ごとの既定値は4枚に分けてある（1ファイル9KBの目安）。
+// 船種ごとの既定値は5枚に分けてある（1ファイル9KBの目安）。
 //   HullPresets.Sail.cs      … ダウ船・ジャンク船・ピナス
 //   HullPresets.Discovery.cs … キャラベル・キャラック・ガレオン
 //   HullPresets.Modern.cs    … スループ・スクーナー・クリッパー
 //   HullPresets.Warship.cs   … フリゲート・戦列艦・軍用ガレー
+//   HullPresets.Merchant.cs  … 客船・貨物船
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -73,6 +83,8 @@ internal static partial class HullPresets
         "frigate" => Frigate,
         "ship_of_the_line" => ShipOfTheLine,
         "war_galley" => WarGalley,
+        "liner" => Liner,
+        "cargo" => Cargo,
         _ => Longship,
     };
 

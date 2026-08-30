@@ -34,6 +34,13 @@ public sealed partial class HullParamsControl
         string oarNote = spec.HullOarPerSide > 0
             ? $"櫂 片舷{spec.HullOarPerSide}挺・計{spec.HullOarPerSide * 2}挺"
             : "櫂なし";
+        string houseNote = spec.HullHouseDecks > 0
+            ? $"デッキハウス{spec.HullHouseDecks}層・前後長{spec.HullHouseLength}%"
+              + (spec.HullFunnel > 0 ? $"・煙突{spec.HullFunnel}" : "・煙突なし")
+            : "デッキハウスなし";
+        string holdNote = spec.HullHolds > 0
+            ? $"貨物艙口{spec.HullHolds}" + (spec.HullDerrick == true ? "・デリックあり" : "")
+            : "貨物艙口なし";
         string shieldNote = spec.HullShieldPerSide > 0
             ? $"盾 片舷{spec.HullShieldPerSide}・計{spec.HullShieldPerSide * 2}枚（2種を交互）"
             : "盾掛けなし";
@@ -63,7 +70,8 @@ public sealed partial class HullParamsControl
                $"断面{spec.HullSection} / 入角{spec.HullEntryAngle}度 / {transomNote} / " +
                $"船首材{spec.HullStemRake}度 / シア{spec.HullSheer}% / {frameNote} / " +
                $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {beamNote} / {mastNote} / {sailNote} / " +
-               $"{gunNote} / {oarNote} / {shieldNote} / {rudderNote} / {castleNote} / {headNote} / " +
+               $"{gunNote} / {oarNote} / {houseNote} / {holdNote} / {shieldNote} / {rudderNote} / " +
+               $"{castleNote} / {headNote} / " +
                $"船首{FaceJp(face)} / 外寸 {spec.Width}×{spec.Depth}×{spec.Height}";
     }
 

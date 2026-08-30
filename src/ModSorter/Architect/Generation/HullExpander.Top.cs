@@ -13,7 +13,7 @@ public static partial class HullExpander
 {
     private sealed class TopPalette
     {
-        public readonly string Mast, Sail, Shield, ShieldAlt, Fitting, Castle;
+        public readonly string Mast, Sail, Shield, ShieldAlt, Fitting, Castle, Funnel, Glass;
 
         public TopPalette(StructureSpec spec, IReadOnlyList<string> allowed, string fallback)
         {
@@ -23,16 +23,22 @@ public static partial class HullExpander
             ShieldAlt = Pick(spec.HullShieldBlockAlt ?? spec.TowerBlock, allowed, Shield);
             Fitting = Pick(spec.SeatBlock, allowed, Mast);
             Castle = Pick(spec.HullCastleBlock ?? spec.SuperstructureBlock, allowed, Mast);
-        }
-    }
+            Funnel = Pick(spec.HullFunnelBlock ?? spec.HullCastleBlock, allowed, Castle);
 
-    // 上部構造の寸法。Extent と BuildTopside の両方がこれを通るので、
-    // UI に出す外寸と生成物の外寸が食い違わない。
-    private sealed class Top
+            // 窓は allowed に無ければガラスを使わず壁と同じ材にする。素材選択に
+            // ガラスを入れていない船種で、窓だけ勝手に別の材が混ざるのを避ける。
+            Glass = Pick(spec.GlazingBlock, allowed, Castle);
+        }
+
+        // 上部構造の寸法。Extent と BuildTopside の両方がこれを通るので、
+        // UI に出す外寸と生成物の外寸が食い違わない。
+        private sealed class Top
     {
         public readonly int MastCount, MastHeight, SailW, SailH, ShieldPerSide, HeadHeight, TopY;
         public readonly int BeamStep, CastleAft, CastleFore, CastleLen;
         public readonly int GunRows, GunStep, GunBase, OarPerSide;
+        public readonly int HouseDecks, HouseLen, HouseShift, Funnel, Holds;
+        public readonly bool Derrick;
         public readonly string Sail, Head;
         public readonly bool SteeringOar, SternRudder;
         public readonly int[] MastZs;
@@ -61,6 +67,17 @@ public static partial class HullExpander
 
             // 櫂。舷の外へ3マス出るので Extent の幅もこれを見る。
             OarPerSide = Clamp(spec.HullOarPerSide ?? 0, 0, 32);
+
+            // デッキハウスと煙突。層数が0なら煙突も立てない（煙突は箱の屋根を
+            // 基準に高さを取るので、箱が無いと基準が無い）。
+            HouseDecks = Clamp(spec.HullHouseDecks ?? 0, 0, 8);
+            HouseLen = Clamp(spec.HullHouseLength ?? 15, 5, 60);
+            HouseShift = Clamp(spec.HullHouseShift ?? 0, -60, 60);
+            Funnel = HouseDecks > 0 ? Clamp(spec.HullFunnel ?? 0, 0, 16) : 0;
+
+            // 貨物艙口とデリック。
+            Holds = Clamp(spec.HullHolds ?? 0, 0, 8);
+            Derrick = spec.HullDerrick ?? false;
 
             // 貫通横梁の間隔。1マスおきでは外板と見分けが付かないので2へ丸める。
             int bs = spec.HullBeamStep ?? 0;
@@ -106,21 +123,36 @@ public static partial class HullExpander
                 int y = Math.Max(f.DeckY(0), f.DeckY(f.L - 1)) + HeadHeight;
                 if (y > top) top = y;
             }
-            // 船楼は船体中央を向く端の甲板から高さを取り、その上に手すりが1マス載る。
-            // CastleFloorY と同じ式を通すので、外寸と生成物が食い違わない。
-            if (CastleAft > 0)
-            {
-                int zi = Math.Min(CastleLen - 1, f.L - 1);
-                int y = CastleFloorY(f, zi, CastleAft) + 1;
-                if (y > top) top = y;
+                // 船楼は船体中央を向く端の甲板から高さを取り、その上に手すりが1マス載る。
+                // CastleFloorY と同じ式を通すので、外寸と生成物が食い違わない。
+                if (CastleAft > 0)
+                {
+                    int zi = Math.Min(CastleLen - 1, f.L - 1);
+                    int y = CastleFloorY(f, zi, CastleAft) + 1;
+                    if (y > top) top = y;
+                }
+                if (CastleFore > 0)
+                {
+                    int zi = Math.Max(f.L - CastleLen, 0);
+                    int y = CastleFloorY(f, zi, CastleFore) + 1;
+                    if (y > top) top = y;
+                }
+
+                // デッキハウスと煙突の天端。BuildDeckHouse と同じ式（甲板の最大＋1を
+                // 下端、1層3マス）を通すので、UI の外寸と生成物が食い違わない。
+                if (HouseDecks > 0)
+                {
+                    int len = Math.Max(3, f.L * HouseLen / 100);
+                    int z0 = Math.Max(1, (f.L - len) / 2 + HouseShift);
+                    int z1 = Math.Min(f.L - 2, z0 + len - 1);
+                    int baseY = f.DeckY(Math.Max(0, z0)) + 1;
+                    for (int z = Math.Max(0, z0); z <= Math.Max(0, z1); z++)
+                        baseY = Math.Max(baseY, f.DeckY(z) + 1);
+
+                    int y = baseY + HouseDecks * 3 - 1 + Funnel;
+                    if (y > top) top = y;
+                }
+
+                TopY = top;
             }
-            if (CastleFore > 0)
-            {
-                int zi = Math.Max(f.L - CastleLen, 0);
-                int y = CastleFloorY(f, zi, CastleFore) + 1;
-                if (y > top) top = y;
-            }
-            TopY = top;
         }
-    }
-}
