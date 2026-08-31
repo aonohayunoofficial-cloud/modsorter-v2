@@ -3,17 +3,22 @@ using System.Collections.Generic;
 
 namespace ModSorter.Architect.Generation;
 
-// 船楼の組み立て。貫通横梁・中心線舵は HullExpander.Beam.cs、
-// 艤装は HullExpander.Rig.cs にある。もとは横梁・舵もここにあったが
-// 1ファイル9KBの目安を超えたので、船体の構造材（梁と舵）を別ファイルへ移した。
+// 船楼（船尾楼・船首楼）の組み立て。貫通横梁・中心線舵は HullExpander.Beam.cs、
+// 艤装は HullExpander.Rig.cs、船体中央のデッキハウスは HullExpander.House.cs にある。
 //
-// 実物の根拠（コグ船 / ブレーメン・コグ 1380年）:
-//   全長23.23m・最大幅7.62m、船体中央で竜骨から舷縁まで4.26m。喫水2.25mで
-//   残る乾舷2m、貨物84t。
-//   船尾の船楼は「甲板」であって塊ではない。船楼甲板の下が船室（両舷に長椅子）で、
-//   舵柄はその下を通る。操舵手は船楼甲板の下に立つので外が見えず、船長が船楼の
-//   上に立って指示した。船楼と巻き上げ機を含めた全高は7.02m。
-//   初期のコグ船は船首楼を持たない。盾掛けは持たない。
+// 実物の根拠:
+//   コグ船（ブレーメン・コグ 1380年）は全長23.23m・最大幅7.62m、船体中央で竜骨から
+//   舷縁まで4.26m。喫水2.25mで残る乾舷2m、貨物84t。船尾の船楼は「甲板」であって
+//   塊ではない。船楼甲板の下が船室（両舷に長椅子）で、舵柄はその下を通る。操舵手は
+//   船楼甲板の下に立つので外が見えず、船長が船楼の上に立って指示した。船楼と
+//   巻き上げ機を含めた全高は7.02m。初期のコグ船は船首楼を持たない。
+//   リバティ船（EC2型 1941年）の船首楼・船尾楼は三島型の一段高い甲板で、外板が
+//   そのまま船楼甲板まで立ち上がる。
+//
+//   舷側は船体の輪郭に沿う。船首・船尾では甲板が細るので船楼の平面形も細り、
+//   舷から横へ張り出すことはない。コグ船の船尾楼が張り出すのは船尾方向だけ。
+//   範囲内の最大幅で1つの箱を作ると、細る船首・船尾で舷の外へ数マス出て、船体とは
+//   縁の切れた箱が載った形になる。そこで平面形は station ごとの甲板幅で決める。
 public static partial class HullExpander
 {
     // station z の甲板の幅（マス）と左右端。舷墻・貫通横梁は3マス以上にしか載らない。
@@ -22,6 +27,7 @@ public static partial class HullExpander
         f.Span(f.HalfAt(z, f.DeckY(z)), out x0, out x1);
         return x1 - x0 + 1;
     }
+
     private static void BuildCastles(
         Dictionary<(int x, int y, int z), string> cells, Form f, Top top, TopPalette t)
     {
@@ -29,16 +35,15 @@ public static partial class HullExpander
         if (top.CastleFore > 0) BuildCastle(cells, f, top, t, false, top.CastleFore);
     }
 
-    // 船楼1基。船尾（船首）の上へ箱として載せる。
+    // 船楼1基。station ごとの甲板の縁から舷側を船楼甲板の高さまで立ち上げ、
+    // その上に甲板と手すりを張る。
     //
-    // station ごとの甲板幅へ合わせると、舷が細る船尾は幅2マスまで縮むので側壁が
-    // 立たず、柱と床だけの骨組みになる。実船の船楼は船体の細りに追従せず、幅
-    // いっぱいの箱が船尾材の上へ張り出して載る。そこで範囲内でいちばん広い甲板幅を
-    // 箱の平面形として全 station に使い、細るぶんは張り出しにする。張り出しの下は
-    // 塞がないので、そこを舵柄が通り、細い舵板が下へ下りる形になる。
+    // 甲板が4マス未満へ細る station は、側壁の2列のあいだに人の入る空所が残らない
+    // ので、全幅を詰めて船首材・船尾材の塊にする。実船でも舷が合わさる先端は塊で、
+    // 船室の空所はそこまで届かない。
     //
-    // 箱の下端も全長で揃える。station ごとに甲板の高さへ合わせると裾が段々になって
-    // 箱に見えない。範囲の内側の端（船体中央を向く側）の甲板を基準にする。
+    // 船楼甲板の高さだけは全長で揃える。station ごとの甲板へ合わせると天端が
+    // 段々になって甲板に見えない。
     private static void BuildCastle(
         Dictionary<(int x, int y, int z), string> cells,
         Form f, Top top, TopPalette t, bool aft, int height)
@@ -51,24 +56,15 @@ public static partial class HullExpander
         for (int z = end; z >= 0 && z < f.L && zs.Count < top.CastleLen; z += step) zs.Add(z);
         if (zs.Count < 2) return;
 
-        // 箱の平面形。いちばん広い station では側壁が甲板の縁に立ち、
-        // そこから船尾側は張り出しになる。
-        int bx0 = int.MaxValue, bx1 = int.MinValue;
-        foreach (int z in zs)
-        {
-            DeckSpanAt(f, z, out int a, out int b);
-            if (a < bx0) bx0 = a;
-            if (b > bx1) bx1 = b;
-        }
-        if (bx1 - bx0 < 2) return;
+        // 範囲のどこも3マス未満の小舟には船楼が載らない。
+        int widest = 0;
+        foreach (int z in zs) widest = Math.Max(widest, DeckSpanAt(f, z, out _, out _));
+        if (widest < 3) return;
 
         int last = zs.Count - 1;
 
-        // 箱の下端。船体中央を向く端の甲板の1マス上から積む。
-        int baseY = f.DeckY(zs[last]) + 1;
-
-        // 船楼甲板の高さは下端から数える。Extent 側（CastleY）と同じ式なので
-        // 外寸表示と食い違わない。舷墻の天端より下へは下げない。
+        // 船楼甲板と手すりの高さ。Extent 側（Top の TopY）も同じ CastleFloorY を
+        // 通るので、外寸表示と生成物が食い違わない。
         int floorY = CastleFloorY(f, zs[last], height);
         int railY = floorY + 1;
 
@@ -79,63 +75,61 @@ public static partial class HullExpander
         for (int i = 0; i <= last; i++)
         {
             int z = zs[i];
-            bool cap = i == 0 || i == last;
-            DeckSpanAt(f, z, out int dx0, out int dx1);
+            int w = DeckSpanAt(f, z, out int dx0, out int dx1);
+            int baseY = f.DeckY(z) + 1;
 
-            // 1) 張り出しの底。船尾は舷が細って甲板が幅2マスまで縮むので、箱の幅で
-            //    載せると船体の甲板が無いところが下から素通しになる。実船でも張り出しは
-            //    梁の上に床板を張って塞いでいる。船体の甲板が無いぶんだけ底を張る。
-            for (int x = bx0; x <= bx1; x++)
-            {
-                if (x >= dx0 && x <= dx1) continue;   // ここは船体の甲板がある
-                cells[(x, baseY - 1, z)] = t.Castle;
-            }
+            // 全幅を詰める station。船体の端（船首材・船尾材）、船体中央を向く端
+            //（隔壁）、甲板が4マス未満へ細るところ。
+            bool solid = i == 0 || i == last || w < 4;
 
-            // 2) 妻面と側壁。船楼甲板より下は操舵手の入る空所で、塞がない。
             for (int y = baseY; y < floorY; y++)
-            {
-                if (cap)
+                for (int x = dx0; x <= dx1; x++)
                 {
-                    for (int x = bx0; x <= bx1; x++)
-                    {
-                        // 船尾の妻面は舵柄の通る口を開ける。
-                        if (slot && i == 0 && y == tiller && x >= cx0 && x <= cx1) continue;
-                        // 船体中央を向く妻面は甲板から2マスぶんの出入口を開ける。
-                        if (i == last && y <= baseY + 1 && x >= cx0 && x <= cx1) continue;
-                        cells[(x, y, z)] = t.Castle;
-                    }
-                    continue;
+                    if (!solid && x != dx0 && x != dx1) continue;   // 途中は舷側だけ
+
+                    // 舵柄の通る口。舵柄は z=0〜1 を走るので両方の station で開ける。
+                    if (slot && y == tiller && z < 2 && x >= cx0 && x <= cx1) continue;
+
+                    // 船体中央を向く隔壁は甲板から2マスぶんの戸口を開ける。
+                    if (i == last && y <= baseY + 1 && x >= cx0 && x <= cx1) continue;
+
+                    cells[(x, y, z)] = t.Castle;
                 }
 
-                cells[(bx0, y, z)] = t.Castle;
-                cells[(bx1, y, z)] = t.Castle;
-            }
+            // 船楼甲板。上書きで置くので、舷墻や隔壁と重なっても必ず床が通る。
+            for (int x = dx0; x <= dx1; x++) cells[(x, floorY, z)] = t.Castle;
 
-            // 3) 船楼甲板。箱の全面に張る。上書きで置くので、舷墻や妻面と
-            //    重なっても必ず床が通る。
-            for (int x = bx0; x <= bx1; x++) cells[(x, floorY, z)] = t.Castle;
-
-            // 4) 手すり。妻面のところは全幅、途中は左右の縁だけ。
-            if (cap) for (int x = bx0; x <= bx1; x++) cells[(x, railY, z)] = t.Castle;
-            else { cells[(bx0, railY, z)] = t.Castle; cells[(bx1, railY, z)] = t.Castle; }
+            // 手すり。船体中央を向く端は全幅（船楼の切れ目の手すり）、
+            // 途中と船体の端は左右の縁だけ。
+            if (i == last) for (int x = dx0; x <= dx1; x++) cells[(x, railY, z)] = t.Castle;
+            else { cells[(dx0, railY, z)] = t.Castle; cells[(dx1, railY, z)] = t.Castle; }
         }
 
-        // 4) 巻き上げ機。船楼甲板の中央に立てる。縦の丸太なので軸の指定は要らない。
+        // 巻き上げ機。船楼甲板の中央に立てる。縦の丸太なので軸の指定は要らない。
         int zc = zs[zs.Count / 2];
         for (int x = cx0; x <= cx1; x++) cells[(x, railY, zc)] = t.Fitting;
     }
 
     // 船楼甲板の高さ。zInner は船楼のうち船体中央を向く端の station。
-    // 床の下の空所は必ず2マス残す。1マスだと人が入れないうえ、妻面の壁が1段しか
-    // 積まれないので、開けているはずの出入口が1マスの隙間にしかならない。
+    // 床の下の空所は必ず2マス残す。1マスだと人が入れないうえ、隔壁が1段しか
+    // 積まれないので、開けているはずの戸口が1マスの隙間にしかならない。
     // 実物の船尾楼も甲板の下が船室で、前側の隔壁に戸口が開く。
-    // 舷墻の天端より下へは張らない。Top の TopY もこれを通すので、
-    // UI の外寸と生成物が食い違わない。
+    // 舷墻の天端より下へは張らない。
+    //
+    // 船首・船尾はシアで甲板が上がるので、内側の端だけで高さを決めると、シアの
+    // 大きい船種では船楼甲板が船体の甲板より下へ来て埋もれる。範囲内でいちばん高い
+    // 甲板の1マス上までは必ず上げる。範囲は zInner が船体中央より前か後かで決まる
+    // （呼び出し側は船尾なら 0〜zInner、船首なら zInner〜L-1 を組む）。
     private static int CastleFloorY(Form f, int zInner, int height)
     {
-        int baseY = f.DeckY(zInner) + 1;
-        int floorY = baseY + Math.Max(2, height - 1);
-        int minY = f.DeckY(zInner) + f.Bulwark + 1;
-        return Math.Max(floorY, minY);
+        int floorY = f.DeckY(zInner) + 1 + Math.Max(2, height - 1);
+        floorY = Math.Max(floorY, f.DeckY(zInner) + f.Bulwark + 1);
+
+        bool aft = zInner < f.L / 2;
+        int za = Math.Clamp(aft ? 0 : zInner, 0, f.L - 1);
+        int zb = Math.Clamp(aft ? zInner : f.L - 1, 0, f.L - 1);
+        for (int z = za; z <= zb; z++) floorY = Math.Max(floorY, f.DeckY(z) + 1);
+
+        return floorY;
     }
 }
