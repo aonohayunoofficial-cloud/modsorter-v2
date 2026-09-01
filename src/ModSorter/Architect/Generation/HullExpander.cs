@@ -15,11 +15,12 @@ namespace ModSorter.Architect.Generation;
 // 併存させるため接頭辞（"ship" と "hull:"）とプロパティ（ship_* と hull_*）を分ける。
 // ShipExpander には手を入れない。
 //
-// 生成の順番は 竜骨 → フレーム → 外板 → 甲板 → 上部構造。
+// 生成の順番は 竜骨 → フレーム → 外板 → 甲板 → 上部構造 → 開放艇の内部。
 // ファイル分割（partial・1ファイル9KB以下を目安）:
-//   HullExpander.cs       … 入口・素材・回転・正規化・外寸
-//   HullExpander.Form.cs  … 断面生成器（主要目から各station の船底線・甲板高さ・半幅を出す）
-//   HullExpander.Shell.cs … 竜骨・フレーム・外板・甲板・ブルワークの組み立て
+//   HullExpander.cs        … 入口・素材・回転・正規化・外寸
+//   HullExpander.Form.cs   … 断面生成器（主要目から各station の船底線・甲板高さ・半幅を出す）
+//   HullExpander.Shell.cs  … 竜骨・フレーム・外板・甲板・ブルワークの組み立て
+//   HullExpander.Thwart.cs … 開放艇の床板と漕ぎ座
 //
 // canonical は船首が +z（南）。facade_face で回す。写像は IndustryExpander と同じ
 // (x,z)→(-z,x) で、west が1手・north が2手・east が3手。
@@ -56,11 +57,18 @@ public static partial class HullExpander
         var p = new Palette(spec, allowedBlocks, fallback);
         var t = new TopPalette(spec, allowedBlocks, p.Shell);
         var form = new Form(spec);
+        var top = new Top(spec, form);
         var cells = new Dictionary<(int x, int y, int z), string>();
         var props = new Props();
 
-        BuildBareHull(cells, props, form, p);
+        // 開放艇かどうかは甲板を置く前に要るので、素の船体へ渡す。
+        // BuildTopside は自前で Top を作る既存の作りのままにしてある（Rig.cs へ手を
+        // 入れない）。同じコンストラクタを通るので値は食い違わない。
+        BuildBareHull(cells, props, form, p, top.OpenBoat);
         BuildTopside(cells, props, form, spec, t);
+
+        // 床板と漕ぎ座は舷縁の内側なので、外板・甲板・艤装のあとに通す。
+        BuildOpenBoat(cells, form, top, p, t);
 
         Rotate(ref cells, ref props, Face(spec.FacadeFace));
         return Normalize(cells, props);
@@ -77,12 +85,15 @@ public static partial class HullExpander
         var t = new Top(spec, f);
 
         // 舷の外へ出る部品のうち、いちばん遠くまで出るものを左右へ足す。
-        // 盾掛けと貫通横梁の木口は1マス、櫂は3マス。
+        // 盾掛けと貫通横梁の木口は1マス、櫂は Top.OarSide マス（最大3）。
+        // 櫂は水面の手前で止まるので、乾舷が1マスの端艇では1マスしか出ない。
+        // 一律3マスにすると外寸だけが太るため、Top が数えた実際の張り出しを使う。
         // 中心線舵は船尾材の後ろへ1マス出るので奥行きが1増える。
         // マスト・船楼・船首材の飾りは甲板より上へ伸びるので、竜骨の張り出しぶんを足して比べる。
-        int side = t.OarPerSide > 0
-            ? 3
-            : (t.ShieldPerSide > 0 || t.BeamStep >= 2 ? 1 : 0);
+        // 開放艇の床板・漕ぎ座は舷縁の内側なので外寸には効かない。
+        int side = Math.Max(
+            t.OarSide,
+            t.ShieldPerSide > 0 || t.BeamStep >= 2 ? 1 : 0);
         int width = w + side * 2;
         int depth = f.L + (t.SternRudder ? 1 : 0);
         int height = Math.Max(h, t.TopY + f.KeelDepth + 1);

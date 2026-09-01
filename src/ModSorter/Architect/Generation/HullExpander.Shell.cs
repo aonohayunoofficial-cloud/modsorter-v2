@@ -4,10 +4,14 @@ namespace ModSorter.Architect.Generation;
 
 // 素の船体の組み立て。竜骨 → フレーム → 外板 → 甲板 → ブルワークの順で、
 // 上部構造（船楼・操舵室・マスト）はフェーズ6で船種ごとに載せる。
+//
+// 開放艇（甲板を張らない端艇）は最上段の扱いだけが違う。空いた内部へ床板と
+// 漕ぎ座を置くのは HullExpander.Thwart.cs。
 public static partial class HullExpander
 {
     private static void BuildBareHull(
-        Dictionary<(int x, int y, int z), string> cells, Props props, Form f, Palette p)
+        Dictionary<(int x, int y, int z), string> cells, Props props, Form f, Palette p,
+        bool openBoat)
     {
         // 1) 体積を先に決める。外板・甲板・フレームはこの体積の内外判定から拾う。
         //    面ごとに置く条件を書き分けると、船首テーパーや船尾の立ち上がりで
@@ -29,9 +33,21 @@ public static partial class HullExpander
         // 2) 外板と甲板。体積の境界だけを置いて中は空洞にする。
         //    甲板は station ごとの最上段なので、シアに沿って前後で上下する。
         //    舷側の最上列も甲板材で塗るため、実船の舷縁（covering board）と同じ見え方になる。
+        //
+        //    開放艇は甲板を張らない。最上段のうち舷側の1列だけを甲板材で塗って
+        //    舷縁（ガンネル）とし、内側は空ける。実艇の端艇は甲板を持たず床板と
+        //    漕ぎ座だけを持つので、最上段を塞ぐと内部が全部埋まってしまう。
+        //    船首・船尾の端の station は最上段も塗って閉じる（船首材のキャップ・
+        //    トランサムの上端に当たる）。
         foreach (var c in solid)
         {
-            if (c.y == deckY[c.z]) { cells[c] = p.Deck; continue; }
+            if (c.y == deckY[c.z])
+            {
+                bool gunwale =
+                    !solid.Contains((c.x - 1, c.y, c.z)) || !solid.Contains((c.x + 1, c.y, c.z));
+                if (!openBoat || gunwale || c.z == 0 || c.z == f.L - 1) cells[c] = p.Deck;
+                continue;
+            }
             bool edge =
                 !solid.Contains((c.x - 1, c.y, c.z)) || !solid.Contains((c.x + 1, c.y, c.z)) ||
                 !solid.Contains((c.x, c.y - 1, c.z)) || !solid.Contains((c.x, c.y + 1, c.z)) ||

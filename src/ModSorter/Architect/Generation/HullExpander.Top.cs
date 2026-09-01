@@ -46,11 +46,13 @@ public static partial class HullExpander
     {
         public readonly int MastCount, MastHeight, SailW, SailH, ShieldPerSide, HeadHeight, TopY;
         public readonly int BeamStep, CastleAft, CastleFore, CastleLen;
-        public readonly int GunRows, GunStep, GunBase, OarPerSide;
+        public readonly int GunRows, GunStep, GunBase, OarPerSide, OarSide;
         public readonly int HouseDecks, HouseLen, HouseShift, Funnel, Holds;
         public readonly bool Derrick;
         public readonly string Sail, Head;
         public readonly bool SteeringOar, SternRudder;
+        public readonly bool OpenBoat;
+        public readonly int ThwartStep;
         public readonly int[] MastZs;
 
         public Top(StructureSpec spec, Form f)
@@ -75,8 +77,40 @@ public static partial class HullExpander
             GunStep = gs <= 0 ? 0 : Clamp(gs, 2, 16);
             GunBase = Clamp(spec.HullGunBase ?? 1, 0, 8);
 
-            // 櫂。舷の外へ3マス出るので Extent の幅もこれを見る。
+            // 櫂。舷の外へ出るので Extent の幅もこれを見る。
             OarPerSide = Clamp(spec.HullOarPerSide ?? 0, 0, 32);
+
+            // 櫂が実際に何マス外へ出るか。BuildOars と同じ station の選び方（船体中央から
+            // 前後へ振り分け・舷が寄る station は飛ばす）と、同じ止め方（1マスごとに1段
+            // 下げ、水面の手前で止める）で数える。乾舷が1マスしかない端艇では1マスしか
+            // 出ないため、一律3マスとして外寸を取ると生成物と食い違う。
+            int reach = 0;
+            if (OarPerSide > 0)
+            {
+                int oz = Math.Max(1, f.L / 2 - OarPerSide / 2);
+                for (int i = 0; i < OarPerSide; i++)
+                {
+                    int z = oz + i;
+                    if (z >= f.L - 1) break;
+
+                    int dk = f.DeckY(z);
+                    f.Span(f.HalfAt(z, dk), out int a, out int b);
+                    if (b - a < 2) continue;
+
+                    int y = dk + f.Bulwark;
+                    int k = 0;
+                    while (k < OarReach && y - k > f.WL) k++;
+                    if (k > reach) reach = k;
+                }
+            }
+            OarSide = reach;
+
+            // 開放艇と漕ぎ座。座は開放艇のときだけ置く（甲板が塞がっていれば座る場所が
+            // ない）。間隔1では座が連なって甲板と見分けが付かないのでフレームと同じく
+            // 2へ丸める。
+            OpenBoat = spec.HullOpenBoat ?? false;
+            int th = spec.HullThwartStep ?? 0;
+            ThwartStep = OpenBoat && th > 0 ? Clamp(th, 2, 32) : 0;
 
             // デッキハウスと煙突。層数が0なら煙突も立てない（煙突は箱の屋根を
             // 基準に高さを取るので、箱が無いと基準が無い）。
