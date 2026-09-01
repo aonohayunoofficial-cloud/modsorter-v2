@@ -127,7 +127,7 @@ public static class GlossaryService
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder
                     .UnsafeRelaxedJsonEscaping   // 日本語をそのまま書く
             });
-            File.WriteAllText(json is null ? FilePath : FilePath, json, new UTF8Encoding(false));
+            File.WriteAllText(FilePath, json, new UTF8Encoding(false));
         }
         catch { }
     }
