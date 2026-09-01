@@ -182,7 +182,7 @@ public static class ManualCatalog
     private static readonly MiddleCategory[] HullMiddles =
     {
         Mid("small_craft", "小型艇",
-            Todo("rowboat", "手漕ぎボート"),
+            Impl("rowboat", "手漕ぎボート", () => new HullParamsControl("rowboat")),
             Todo("motorboat", "モーターボート"),
             Todo("speedboat", "スピードボート"),
             Todo("yacht", "ヨット"),

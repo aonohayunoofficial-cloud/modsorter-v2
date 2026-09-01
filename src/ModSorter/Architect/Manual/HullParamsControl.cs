@@ -69,6 +69,8 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             HullKeelDepth = _ui.GetInt("keel"),
             HullBulwark = _ui.GetInt("bulwark"),
             HullBeamStep = _ui.GetInt("beam_step"),
+            HullOpenBoat = _ui.GetBool("open_boat"),
+            HullThwartStep = _ui.GetInt("thwart"),
             HullMastCount = _ui.GetInt("masts"),
             HullMastHeight = _ui.GetInt("mast_h"),
             HullSail = _ui.GetChoice("sail", "none"),

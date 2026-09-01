@@ -23,6 +23,11 @@ internal sealed class HullPreset
     // 構造・付帯。
     public int Frame = 4, Keel = 1, Bulwark = 1, BeamStep = 0;
 
+    // 開放艇（甲板を張らない端艇）と漕ぎ座の間隔。ThwartStep は OpenBoat が
+    // true のときだけ効く（甲板が塞がっていれば座る場所がない）。
+    public bool OpenBoat = false;
+    public int ThwartStep = 0;
+
     // 艤装。
     public int Masts = 1, MastH = 12;
     public string Sail = "set";
@@ -59,12 +64,13 @@ internal sealed class HullPreset
     public string Glassb = "minecraft:glass_pane";
 }
 
-// 船種ごとの既定値は5枚に分けてある（1ファイル9KBの目安）。
-//   HullPresets.Sail.cs      … ダウ船・ジャンク船・ピナス
-//   HullPresets.Discovery.cs … キャラベル・キャラック・ガレオン
-//   HullPresets.Modern.cs    … スループ・スクーナー・クリッパー
-//   HullPresets.Warship.cs   … フリゲート・戦列艦・軍用ガレー
-//   HullPresets.Merchant.cs  … 客船・貨物船
+// 船種ごとの既定値は6枚に分けてある（1ファイル9KBの目安）。
+//   HullPresets.Sail.cs       … ダウ船・ジャンク船・ピナス
+//   HullPresets.Discovery.cs  … キャラベル・キャラック・ガレオン
+//   HullPresets.Modern.cs     … スループ・スクーナー・クリッパー
+//   HullPresets.Warship.cs    … フリゲート・戦列艦・軍用ガレー
+//   HullPresets.Merchant.cs   … 客船・貨物船
+//   HullPresets.SmallCraft.cs … 小型艇（手漕ぎボート）
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -85,6 +91,7 @@ internal static partial class HullPresets
         "war_galley" => WarGalley,
         "liner" => Liner,
         "cargo" => Cargo,
+        "rowboat" => Rowboat,
         _ => Longship,
     };
 

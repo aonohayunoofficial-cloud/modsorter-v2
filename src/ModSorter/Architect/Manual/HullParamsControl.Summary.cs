@@ -15,6 +15,11 @@ public sealed partial class HullParamsControl
             ? $"フレーム{Math.Max(2, spec.HullFrameStep!.Value)}間隔"
             : "フレームなし";
         string bulwarkNote = spec.HullBulwark > 0 ? $"舷墻{spec.HullBulwark}" : "舷墻なし";
+        string openNote = spec.HullOpenBoat == true
+            ? "開放艇" + (spec.HullThwartStep > 0
+                ? $"・漕ぎ座{Math.Max(2, spec.HullThwartStep!.Value)}間隔"
+                : "・漕ぎ座なし")
+            : "甲板あり";
         string beamNote = spec.HullBeamStep > 0
             ? $"貫通横梁{Math.Max(2, spec.HullBeamStep!.Value)}間隔"
             : "貫通横梁なし";
@@ -69,7 +74,8 @@ public sealed partial class HullParamsControl
         return $"{_p.Jp} 全長{spec.HullLength}×型幅{spec.HullBeam}×深さ{depth} / 喫水{draft} / " +
                $"断面{spec.HullSection} / 入角{spec.HullEntryAngle}度 / {transomNote} / " +
                $"船首材{spec.HullStemRake}度 / シア{spec.HullSheer}% / {frameNote} / " +
-               $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {beamNote} / {mastNote} / {sailNote} / " +
+               $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {openNote} / {beamNote} / " +
+               $"{mastNote} / {sailNote} / " +
                $"{gunNote} / {oarNote} / {houseNote} / {holdNote} / {shieldNote} / {rudderNote} / " +
                $"{castleNote} / {headNote} / " +
                $"船首{FaceJp(face)} / 外寸 {spec.Width}×{spec.Depth}×{spec.Height}";

@@ -1,6 +1,6 @@
 ﻿# 船体 / 共通事項（`hull`）
 
-親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 16/31
+親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 17/31
 
 ## 共通パラメータ
 
@@ -37,7 +37,9 @@
 
 - `HullExpander.cs` … 入口・素材・回転・正規化・外寸
 - `HullExpander.Form.cs` … 断面生成器
-- `HullExpander.Shell.cs` … 竜骨・フレーム・外板・甲板・ブルワーク
+- `HullExpander.Shell.cs` … 竜骨・フレーム・外板・甲板・ブルワーク。
+  開放艇のときは最上段のうち舷側の1列だけを甲板材で塗って舷縁とし、内側を空ける
+- `HullExpander.Thwart.cs` … 開放艇の床板と漕ぎ座
 - `HullExpander.Top.cs` … 上部構造のパレットと寸法（`TopPalette` / `Top`）
 - `HullExpander.Rig.cs` … マスト・盾掛け・側舵・船首材の飾り
 - `HullExpander.Sail.cs` … 横帆・縦帆と帆桁（Rig.cs が8.9KBになったので帆だけ分離）
@@ -48,7 +50,8 @@
 - `HullExpander.Castle.cs` … 船楼
 - `HullExpander.Beam.cs` … 貫通横梁・中心線舵（Castle.cs が9.5KBになったので分離）
 - `HullParamsControl.cs` … UI の組み立てと `BuildSpec`
-- `HullParamsControl.Panel.cs` … スライダー・選択肢の並び
+- `HullParamsControl.Panel.cs` … スライダー・選択肢の並び（船型まで）
+- `HullParamsControl.Panel.Fit.cs` … 艤装以降の並び（Panel.cs が10,230バイトになったので分離）
 - `HullParamsControl.Blocks.cs` … 使用ブロックの並び（Panel.cs が7.8KBになったので分離）
 - `HullParamsControl.Summary.cs` … 要約文
 - `HullPresets.cs` … 船種ごとの既定値の本体（HullPreset の定義・`Of`・ロングシップ・コグ船）。
@@ -58,6 +61,7 @@
 - `HullPresets.Modern.cs` … 帆船（近代）の既定値（スループ・スクーナー・クリッパー）
 - `HullPresets.Warship.cs` … 帆走軍艦の既定値（フリゲート・戦列艦・軍用ガレー）
 - `HullPresets.Merchant.cs` … 商船の既定値（客船・貨物船）
+- `HullPresets.SmallCraft.cs` … 小型艇の既定値（手漕ぎボート）
 
 ## 全船種にまたがる残課題
 
