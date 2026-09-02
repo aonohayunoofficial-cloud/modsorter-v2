@@ -18,6 +18,13 @@ public static partial class LangPackService
         public int NestedJars;            // 走査した同梱 jar(jar-in-jar)の数
         public int RepairedFiles;         // 厳格解析が落ちたが救済して読めた lang ファイル数
         public int EmptyLangFiles;        // 中身がコメント・空白だけだった lang ファイル数
+        // lang ファイルを1件も持たなかった jar の数。
+        // 開けたが assets/<ns>/lang/ が無い jar は、失敗でも救済でもないため
+        // 従来はログに出ず消えていた。ライブラリ jar のほか、表示名を lang キーではなく
+        // 独自の定義 JSON に持つ形式(Immersive Vehicles のコンテンツパック等)が該当し、
+        // これらはリソースパック方式では翻訳できない。区別できるよう数と名前を残す。
+        public int NoLangJars;
+        public List<string> NoLangJarNames = new();
         // 解析失敗の内訳。「どのファイルがなぜ落ちたか」を残す。
         // 内訳が無いと、救える失敗(壊れた JSON 等)と救えない失敗の区別がつかない。
         public List<string> SkippedDetails = new();
@@ -76,6 +83,13 @@ public static partial class LangPackService
                 RepairDetails.Add($"空   {where} : 中身がコメント・空白のみ(キーなし)");
         }
 
+        // lang ファイルを1件も持たない jar を記録する。
+        internal void NoteNoLang(string jarName)
+        {
+            NoLangJars++;
+            if (NoLangJarNames.Count < 300) NoLangJarNames.Add(jarName);
+        }
+
         // 例外メッセージは長いので内訳表示用に丸める。
         private static string Shorten(string s)
             => string.IsNullOrEmpty(s) ? ""
@@ -97,6 +111,8 @@ public static partial class LangPackService
             NestedJars = src.NestedJars;
             RepairedFiles = src.RepairedFiles;
             EmptyLangFiles = src.EmptyLangFiles;
+            NoLangJars = src.NoLangJars;
+            NoLangJarNames = new List<string>(src.NoLangJarNames);
             ExcludedNamespaces = new List<string>(src.ExcludedNamespaces);
             SkippedDetails = new List<string>(src.SkippedDetails);
             RepairDetails = new List<string>(src.RepairDetails);

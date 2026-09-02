@@ -65,16 +65,19 @@ public partial class MainWindow : Window
     // 解析失敗の表示行。総数だけでは救える失敗(壊れた JSON 等)と
     // 救えない失敗(開けない jar)の区別がつかないため、内訳を添える。
     // 崩れた JSON を救済して読めた件数と、中身が空だった件数も並べる。
+    // lang を1件も持たない jar 数も出す。これが分からないと、
+    // 表示名を独自形式で持つ MOD を「翻訳漏れ」と誤認する。
     private static string FormatSkipLine(LangPackService.LangPackResult r)
         => $"スキップ(解析失敗): {r.SkippedBroken} 件" +
            (r.SkippedBroken > 0
                ? $"(jar {r.SkippedBrokenJars} / langファイル {r.SkippedBrokenEntries})"
                : "") +
            $"\n救済して読めた langファイル: {r.RepairedFiles} 件 / " +
-           $"中身が空だった langファイル: {r.EmptyLangFiles} 件";
+           $"中身が空だった langファイル: {r.EmptyLangFiles} 件" +
+           $"\nlang を持たない jar: {r.NoLangJars} 件（翻訳対象なし）";
 
-    // 解析失敗と救済の内訳をログへ出す。どのファイルがなぜ落ちたか、
-    // どのファイルを何キー救済したかを残す。
+    // 解析失敗と救済の内訳、lang を持たない jar の一覧をログへ出す。
+    // どのファイルがなぜ落ちたか、どのファイルを何キー救済したかを残す。
     // 行頭の種別(救済/空)は LangPackResult 側が持つので、ここでは付け足さない。
     private void LogSkipDetails(LangPackService.LangPackResult r)
     {
@@ -87,6 +90,11 @@ public partial class MainWindow : Window
         {
             Log($"--- 救済 {r.RepairedFiles} 件 / 空 {r.EmptyLangFiles} 件 の内訳 ---");
             foreach (var d in r.RepairDetails) Log("  " + d);
+        }
+        if (r.NoLangJarNames.Count > 0)
+        {
+            Log($"--- lang を持たない jar {r.NoLangJars} 件 ---");
+            foreach (var j in r.NoLangJarNames) Log("  対象なし: " + j);
         }
     }
 

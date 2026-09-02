@@ -36,10 +36,17 @@ public static partial class LangPackService
         foreach (var jar in paths)
         {
             work.ModCount++;
+            // この jar を走査する前の失敗件数。走査後に増えていなければ
+            // 「開けたが lang が無い」と「途中で失敗した」を区別できる。
+            var skipsBefore = work.SkippedBroken;
             try
             {
                 using var zip = ZipFile.OpenRead(jar);
-                ScanArchive(zip, Path.GetFileName(jar), jar, map, jaMap, work, 0);
+                var found = ScanArchive(zip, Path.GetFileName(jar), jar, map, jaMap, work, 0);
+                // lang が1件も無く、かつ失敗も出ていない jar。
+                // 失敗ではないが翻訳対象も無いので、消えずに残るよう記録する。
+                if (found == 0 && work.SkippedBroken == skipsBefore)
+                    work.NoteNoLang(Path.GetFileName(jar));
             }
             catch (Exception ex)
             {
@@ -58,12 +65,18 @@ public static partial class LangPackService
     // 1つの zip を走査する。同梱 jar(jar-in-jar)にも同じ手順で潜る。
     // Forge の META-INF/jarjar 配下に本体を抱える MOD は、潜らないと lang が
     // 1件も見つからず、失敗として数えられないまま丸ごと未翻訳になる。
-    private static void ScanArchive(
+    //
+    // 戻り値は見つかった lang ファイルの数(同梱 jar の中の分も含む)。
+    // 解析に成功したかではなく「対象パスに合致したか」を数える。
+    // 0 なら lang を持たない jar であり、失敗とは別物として扱う。
+    private static int ScanArchive(
         ZipArchive zip, string label, string sourceJar,
         Dictionary<string, NamespaceLang> map,
         Dictionary<string, Dictionary<string, string>> jaMap,
         LangPackResult result, int depth)
     {
+        int found = 0;
+
         foreach (var e in zip.Entries)
         {
             if (e.FullName.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
@@ -78,7 +91,8 @@ public static partial class LangPackService
                     ms.Position = 0;
                     using var inner = new ZipArchive(ms, ZipArchiveMode.Read);
                     result.NestedJars++;
-                    ScanArchive(inner, innerLabel, sourceJar, map, jaMap, result, depth + 1);
+                    found += ScanArchive(
+                        inner, innerLabel, sourceJar, map, jaMap, result, depth + 1);
                 }
                 catch (Exception ex)
                 {
@@ -90,6 +104,8 @@ public static partial class LangPackService
 
             var m = LangEntryRegex.Match(e.FullName);
             if (!m.Success) continue;
+
+            found++;
 
             var ns = m.Groups[1].Value;
             var kind = m.Groups[2].Value.ToLowerInvariant();  // en_us / ja_jp
@@ -138,5 +154,7 @@ public static partial class LangPackService
             // 後勝ちマージ(仕様書9章)
             foreach (var kv in parsed) nl.Entries[kv.Key] = kv.Value;
         }
+
+        return found;
     }
 }
