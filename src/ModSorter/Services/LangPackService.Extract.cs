@@ -94,19 +94,29 @@ public static partial class LangPackService
             var ns = m.Groups[1].Value;
             var kind = m.Groups[2].Value.ToLowerInvariant();  // en_us / ja_jp
             var ext = m.Groups[3].Value.ToLowerInvariant();   // json / lang
+            var where = $"{label}!{e.FullName}";
 
             Dictionary<string, string> parsed;
             try
             {
                 var text = ReadEntry(e);
-                parsed = ext == "json" ? ParseJson(text) : ParseLang(text);
+                if (ext == "json")
+                {
+                    parsed = ParseJsonFlexible(text, out var mode, out var note);
+                    if (mode == LangParseMode.Repaired)
+                        result.NoteRepair(where, $"{parsed.Count} キーを救済 / {note}");
+                    else if (mode == LangParseMode.Empty)
+                        result.NoteEmpty(where);
+                }
+                else parsed = ParseLang(text);
             }
             catch (Exception ex)
             {
-                result.NoteSkip($"{label}!{e.FullName}",
-                    $"{ex.GetType().Name}: {ex.Message}", isJar: false);
+                result.NoteSkip(where, $"{ex.GetType().Name}: {ex.Message}", isJar: false);
                 continue;
             }
+
+            if (parsed.Count == 0) continue;
 
             if (kind == "ja_jp")
             {

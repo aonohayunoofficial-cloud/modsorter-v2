@@ -64,18 +64,29 @@ public partial class MainWindow : Window
 
     // 解析失敗の表示行。総数だけでは救える失敗(壊れた JSON 等)と
     // 救えない失敗(開けない jar)の区別がつかないため、内訳を添える。
+    // 崩れた JSON を救済して読めた件数と、中身が空だった件数も並べる。
     private static string FormatSkipLine(LangPackService.LangPackResult r)
         => $"スキップ(解析失敗): {r.SkippedBroken} 件" +
            (r.SkippedBroken > 0
                ? $"(jar {r.SkippedBrokenJars} / langファイル {r.SkippedBrokenEntries})"
-               : "");
+               : "") +
+           $"\n救済して読めた langファイル: {r.RepairedFiles} 件 / " +
+           $"中身が空だった langファイル: {r.EmptyLangFiles} 件";
 
-    // 解析失敗の内訳をログへ出す。どのファイルがなぜ落ちたかを残す。
+    // 解析失敗と救済の内訳をログへ出す。どのファイルがなぜ落ちたか、
+    // どのファイルを何キー救済したかを残す。
     private void LogSkipDetails(LangPackService.LangPackResult r)
     {
-        if (r.SkippedDetails.Count == 0) return;
-        Log($"--- 解析失敗の内訳 {r.SkippedDetails.Count} 件 ---");
-        foreach (var d in r.SkippedDetails) Log("  失敗: " + d);
+        if (r.SkippedDetails.Count > 0)
+        {
+            Log($"--- 解析失敗の内訳 {r.SkippedDetails.Count} 件 ---");
+            foreach (var d in r.SkippedDetails) Log("  失敗: " + d);
+        }
+        if (r.RepairDetails.Count > 0)
+        {
+            Log($"--- 救済・空判定の内訳 {r.RepairDetails.Count} 件 ---");
+            foreach (var d in r.RepairDetails) Log("  救済: " + d);
+        }
     }
 
     // 中断ボタン

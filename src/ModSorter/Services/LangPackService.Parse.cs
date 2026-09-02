@@ -7,6 +7,12 @@ namespace ModSorter.Services;
 
 public static partial class LangPackService
 {
+    // lang ファイルの読み取り結果の種類。
+    //   Strict   … 厳格な JSON として読めた
+    //   Repaired … 厳格解析は落ちたが寛容な走査で内容を取り出せた
+    //   Empty    … 中身がコメント・空白だけでキーが1つも無い(壊れてはいない)
+    internal enum LangParseMode { Strict, Repaired, Empty }
+
     // MOD の lang JSON には末尾カンマやコメント入りのものが実在する。
     // 既定の厳格な解析だとファイル丸ごと解析失敗になるので緩めて読む。
     private static readonly JsonDocumentOptions LangJsonOptions = new()
@@ -44,8 +50,40 @@ public static partial class LangPackService
         }
     }
 
+    // lang JSON を読む。まず厳格に解析し、落ちたときだけ寛容な走査へ落とす。
+    // 正しいファイルの解釈は緩めず、崩れたファイルだけを救う形にしている。
+    // 救済しても1件も取れず、かつ JSON トークンが存在する場合は本当に読めないので
+    // 元の例外をそのまま投げ、呼び出し側で解析失敗として記録させる。
+    private static Dictionary<string, string> ParseJsonFlexible(
+        string text, out LangParseMode mode, out string note)
+    {
+        mode = LangParseMode.Strict;
+        note = "";
+        try
+        {
+            return ParseJsonStrict(text);
+        }
+        catch (JsonException ex)
+        {
+            var lenient = ParseJsonLenient(text, out int tokens);
+            note = ex.Message;
+
+            if (lenient.Count > 0)
+            {
+                mode = LangParseMode.Repaired;
+                return lenient;
+            }
+            if (tokens == 0)
+            {
+                mode = LangParseMode.Empty;
+                return lenient;
+            }
+            throw;
+        }
+    }
+
     // en_us.json: 文字列値のみ採用。配列/数値/ネストは lang の値ではないので対象外。
-    private static Dictionary<string, string> ParseJson(string text)
+    private static Dictionary<string, string> ParseJsonStrict(string text)
     {
         var dict = new Dictionary<string, string>();
         using var doc = JsonDocument.Parse(text, LangJsonOptions);

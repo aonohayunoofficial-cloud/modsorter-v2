@@ -16,9 +16,13 @@ public static partial class LangPackService
         public int SkippedBrokenJars;     // うち jar 自体が開けなかった件数
         public int SkippedBrokenEntries;  // うち lang ファイル1件の解析に失敗した件数
         public int NestedJars;            // 走査した同梱 jar(jar-in-jar)の数
+        public int RepairedFiles;         // 厳格解析が落ちたが救済して読めた lang ファイル数
+        public int EmptyLangFiles;        // 中身がコメント・空白だけだった lang ファイル数
         // 解析失敗の内訳。「どのファイルがなぜ落ちたか」を残す。
         // 内訳が無いと、救える失敗(壊れた JSON 等)と救えない失敗の区別がつかない。
         public List<string> SkippedDetails = new();
+        // 救済・空判定の内訳。何を直して読めたのかを残す。
+        public List<string> RepairDetails = new();
         public int RestoreWarnings;       // プレースホルダ復元漏れ件数
         // 復元漏れした原文の一覧(どの文でトークンが戻せなかったか)。
         // 原文が分かれば後から名前空間/キーを検索でき、再翻訳の対象も絞れる。
@@ -51,8 +55,28 @@ public static partial class LangPackService
         {
             SkippedBroken++;
             if (isJar) SkippedBrokenJars++; else SkippedBrokenEntries++;
-            if (SkippedDetails.Count < 300) SkippedDetails.Add($"{where} : {reason}");
+            if (SkippedDetails.Count < 300) SkippedDetails.Add($"{where} : {Shorten(reason)}");
         }
+
+        // 厳格解析が落ちたが寛容な走査で読めた1件を記録する。
+        internal void NoteRepair(string where, string what)
+        {
+            RepairedFiles++;
+            if (RepairDetails.Count < 300) RepairDetails.Add($"{where} : {Shorten(what)}");
+        }
+
+        // 中身がコメント・空白だけで翻訳するキーが無かった1件を記録する。
+        internal void NoteEmpty(string where)
+        {
+            EmptyLangFiles++;
+            if (RepairDetails.Count < 300)
+                RepairDetails.Add($"{where} : 中身がコメント・空白のみ(キーなし)");
+        }
+
+        // 例外メッセージは長いので内訳表示用に丸める。
+        private static string Shorten(string s)
+            => string.IsNullOrEmpty(s) ? ""
+             : (s.Length <= 160 ? s : s.Substring(0, 160) + "…");
 
         // 抽出フェーズで確定する集計値だけを写す。
         // 抽出結果を使い回したときも、呼び出し側の result に同じ数字が入るようにする。
@@ -68,8 +92,11 @@ public static partial class LangPackService
             SkippedBrokenJars = src.SkippedBrokenJars;
             SkippedBrokenEntries = src.SkippedBrokenEntries;
             NestedJars = src.NestedJars;
+            RepairedFiles = src.RepairedFiles;
+            EmptyLangFiles = src.EmptyLangFiles;
             ExcludedNamespaces = new List<string>(src.ExcludedNamespaces);
             SkippedDetails = new List<string>(src.SkippedDetails);
+            RepairDetails = new List<string>(src.RepairDetails);
         }
     }
 }
