@@ -59,10 +59,13 @@ public static partial class LangPackService
         }
 
         // 厳格解析が落ちたが寛容な走査で読めた1件を記録する。
+        // 救済と空判定は同じ一覧へ積むため、行頭の種別はここで書く。
+        // 表示側で一律に付けると、キーが無かったファイルまで「救済」と出てしまう。
         internal void NoteRepair(string where, string what)
         {
             RepairedFiles++;
-            if (RepairDetails.Count < 300) RepairDetails.Add($"{where} : {Shorten(what)}");
+            if (RepairDetails.Count < 300)
+                RepairDetails.Add($"救済 {where} : {Shorten(what)}");
         }
 
         // 中身がコメント・空白だけで翻訳するキーが無かった1件を記録する。
@@ -70,7 +73,7 @@ public static partial class LangPackService
         {
             EmptyLangFiles++;
             if (RepairDetails.Count < 300)
-                RepairDetails.Add($"{where} : 中身がコメント・空白のみ(キーなし)");
+                RepairDetails.Add($"空   {where} : 中身がコメント・空白のみ(キーなし)");
         }
 
         // 例外メッセージは長いので内訳表示用に丸める。

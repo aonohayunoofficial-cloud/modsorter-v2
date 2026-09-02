@@ -75,6 +75,7 @@ public partial class MainWindow : Window
 
     // 解析失敗と救済の内訳をログへ出す。どのファイルがなぜ落ちたか、
     // どのファイルを何キー救済したかを残す。
+    // 行頭の種別(救済/空)は LangPackResult 側が持つので、ここでは付け足さない。
     private void LogSkipDetails(LangPackService.LangPackResult r)
     {
         if (r.SkippedDetails.Count > 0)
@@ -84,8 +85,8 @@ public partial class MainWindow : Window
         }
         if (r.RepairDetails.Count > 0)
         {
-            Log($"--- 救済・空判定の内訳 {r.RepairDetails.Count} 件 ---");
-            foreach (var d in r.RepairDetails) Log("  救済: " + d);
+            Log($"--- 救済 {r.RepairedFiles} 件 / 空 {r.EmptyLangFiles} 件 の内訳 ---");
+            foreach (var d in r.RepairDetails) Log("  " + d);
         }
     }
 
