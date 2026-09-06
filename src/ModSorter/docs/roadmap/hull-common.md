@@ -35,12 +35,17 @@
 
 ## ファイル分割（1ファイル9KB以下の目安）
 
-- `HullExpander.cs` … 入口・素材・回転・正規化・外寸
+- `HullExpander.cs` … 入口・素材・組み立ての呼び出し（12,628バイトになったので分割）
+- `HullExpander.Extent.cs` … 外寸。UI と展開側が同じ式を通る1か所
+- `HullExpander.Rotate.cs` … 船首の向きの回転・負座標の正規化
 - `HullExpander.Form.cs` … 断面生成器
 - `HullExpander.Shell.cs` … 竜骨・フレーム・外板・甲板・ブルワーク。
   開放艇のときは最上段のうち舷側の1列だけを甲板材で塗って舷縁とし、内側を空ける
 - `HullExpander.Thwart.cs` … 開放艇の床板と漕ぎ座
 - `HullExpander.Top.cs` … 上部構造のパレットと寸法（`TopPalette` / `Top`）
+- `HullExpander.Top.Fit.cs` … Top の長い計算（櫂の張り出し・マストの station・天端）。
+  Top.cs が10,434バイトになったので分けた。readonly フィールドはコンストラクタでしか
+  代入できないので、計算だけを static メソッドへ出して戻り値を受け取る形にしている
 - `HullExpander.Rig.cs` … マスト・盾掛け・側舵・船首材の飾り
 - `HullExpander.Sail.cs` … 横帆・縦帆と帆桁（Rig.cs が8.9KBになったので帆だけ分離）
 - `HullExpander.Gun.cs` … 砲門と砲身
