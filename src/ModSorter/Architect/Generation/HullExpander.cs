@@ -15,13 +15,14 @@ namespace ModSorter.Architect.Generation;
 // 併存させるため接頭辞（"ship" と "hull:"）とプロパティ（ship_* と hull_*）を分ける。
 // ShipExpander には手を入れない。
 //
-// 生成の順番は 竜骨 → フレーム → 外板 → 甲板 → 上部構造 → 開放艇の内部。
+// 生成の順番は 竜骨 → フレーム → 外板 → 甲板 → 上部構造 → 推進器 → 開放艇の内部。
 // ファイル分割（partial・1ファイル9KB以下を目安）:
 //   HullExpander.cs        … 入口・素材・組み立ての呼び出し
 //   HullExpander.Extent.cs … 外寸（UI と展開側で式を二重に持たないための1か所）
 //   HullExpander.Rotate.cs … 船首の向きの回転と負座標の正規化
 //   HullExpander.Form.cs   … 断面生成器（主要目から各station の船底線・甲板高さ・半幅を出す）
 //   HullExpander.Shell.cs  … 竜骨・フレーム・外板・甲板・ブルワークの組み立て
+//   HullExpander.Screw.cs  … 推進器（プロペラ・軸・舵）。機走船12種の共通部品
 //   HullExpander.Thwart.cs … 開放艇の床板と漕ぎ座
 // このファイルが12,628バイトになったので、外寸と回転・正規化を上の2枚へ移した。
 //
@@ -69,6 +70,11 @@ public static partial class HullExpander
         // 入れない）。同じコンストラクタを通るので値は食い違わない。
         BuildBareHull(cells, props, form, p, top.OpenBoat);
         BuildTopside(cells, props, form, spec, t);
+
+        // 推進器は水線下の船尾。外板・竜骨・中心線舵が置かれたあとに通し、
+        // 既に埋まっているセルへは置かない（座標を奪い合わせない）。
+        // 軸数0が既定なので、指定しない船種の生成物は1ブロックも変わらない。
+        BuildScrew(cells, form, spec, t);
 
         // 床板と漕ぎ座は舷縁の内側なので、外板・甲板・艤装のあとに通す。
         BuildOpenBoat(cells, form, top, p, t);
