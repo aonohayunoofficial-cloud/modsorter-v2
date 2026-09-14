@@ -70,7 +70,7 @@ internal sealed class HullPreset
 //   HullPresets.Modern.cs     … スループ・スクーナー・クリッパー
 //   HullPresets.Warship.cs    … フリゲート・戦列艦・軍用ガレー
 //   HullPresets.Merchant.cs   … 客船・貨物船
-//   HullPresets.SmallCraft.cs … 小型艇（手漕ぎボート）
+//   HullPresets.SmallCraft.cs … 小型艇（手漕ぎボート・モーターボート）
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -92,8 +92,10 @@ internal static partial class HullPresets
         "liner" => Liner,
         "cargo" => Cargo,
         "rowboat" => Rowboat,
+        "motorboat" => Motorboat,
         _ => Longship,
     };
+
 
     // ゴクスタ船は全長23.24m・型幅5.20m・深さ2.02m・喫水0.85m級。外板はクリンカー張りの
     // 16列で、肋骨の間隔は約0.96m（1マス=1mでは表せないので見える最小の2マスへ丸める）。

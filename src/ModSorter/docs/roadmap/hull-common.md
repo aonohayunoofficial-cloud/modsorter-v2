@@ -1,6 +1,6 @@
 ﻿# 船体 / 共通事項（`hull`）
 
-親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 17/31
+親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 18/31
 
 ## 共通パラメータ
 
@@ -66,7 +66,12 @@
 - `HullPresets.Modern.cs` … 帆船（近代）の既定値（スループ・スクーナー・クリッパー）
 - `HullPresets.Warship.cs` … 帆走軍艦の既定値（フリゲート・戦列艦・軍用ガレー）
 - `HullPresets.Merchant.cs` … 商船の既定値（客船・貨物船）
-- `HullPresets.SmallCraft.cs` … 小型艇の既定値（手漕ぎボート）
+- `HullPresets.SmallCraft.cs` … 小型艇の既定値（手漕ぎボート・モーターボート）
+- `ManualCatalog.cs` … 分類表の型定義とヘルパ・`Categories`・`Find*`。
+  14,248バイトになり raw の1回の取得で全文を読めなくなったので大分類ごとに割った
+- `ManualCatalog.Building.cs` … 大分類4 建築物の表（7中分類・50件）
+- `ManualCatalog.Hull.cs` … 大分類3 船体の表（8中分類・31件）。船種追加はここ1行
+- `ManualCatalog.Aero.cs` … 大分類1 プロペラ・大分類2 バルーンの表
 
 ## 全船種にまたがる残課題
 
