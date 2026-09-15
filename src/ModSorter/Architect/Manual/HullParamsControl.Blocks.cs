@@ -17,7 +17,7 @@ public sealed partial class HullParamsControl
            .BlockPick("sailb", "帆", p.Sailb)
            .BlockPick("shieldb", "盾（1枚目）", p.Shieldb)
            .BlockPick("shieldb2", "盾（2枚目）", p.Shieldb2)
-           .BlockPick("fitb", "舵・舵柄・貫通横梁・砲身・コーミング・飾り", p.Fitb)
+           .BlockPick("fitb", "舵・舵柄・貫通横梁・砲身・コーミング・飾り・推進器", p.Fitb)
            .BlockPick("castleb", "船楼・デッキハウス", p.Castleb)
            .BlockPick("funnelb", "煙突", p.Funnelb)
            .BlockPick("glassb", "デッキハウスの窓", p.Glassb)

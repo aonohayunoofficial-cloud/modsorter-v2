@@ -101,7 +101,10 @@ internal static partial class HullPresets
     // 1層3マス固定（HouseFloorH）のため実物の倍近くになるので取らない。
     // 戸口は箱の船尾側の面に開くので、実物と同じくサロンからコックピットへ出る。
     // マスト・帆・砲門・貨物艙・船楼・盾は持たない。
-    // 舵とスクリューは水線下なので未再現（推進器は12船種の共通部品として別に作る）。
+    // 推進器は2軸。実物はデトロイト8V71（435hp）か8V92（570hp）の2基2軸で、
+    // プロペラは28in×34in＝径0.71m。1マス=1mでは径1マスになり、喫水1マスの
+    // 0.65倍として同じ1マスへ落ちる。船底の下へ1マス吊るので全高が1増える。
+    // 舵はプロペラの後ろへ立てる（中心線舵は持たないので z=-1 が空いている）。
     // 外板はゲルコートの白（白コンクリート）、甲板はノンスキッドの薄灰、
     // 金物はステンレス（鉄ブロック）、窓はガラス板。
     private static readonly HullPreset Motorboat = new()
@@ -146,6 +149,7 @@ internal static partial class HullPresets
         GunStep = 0,
         GunBase = 1,
         RowOars = 0,
+        Screws = 2,
         HouseDecks = 1,
         HouseLen = 36,
         HouseShift = 0,

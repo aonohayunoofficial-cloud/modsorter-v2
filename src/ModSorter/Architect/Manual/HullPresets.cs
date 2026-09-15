@@ -41,6 +41,10 @@ internal sealed class HullPreset
     public int GunRows = 0, GunStep = 0, GunBase = 1;
     public int RowOars = 0;
 
+    // 推進器の軸数。0でなし、1で中心線に1軸、2で左右に2軸。
+    // 径・軸の勾配・舵の前後長は主要目から出すので、持つのは軸数だけ。
+    public int Screws = 0;
+
     // デッキハウス（船橋楼）と煙突。層数が0なら煙突も立たない。
     public int HouseDecks = 0, HouseLen = 15, HouseShift = 0, Funnel = 0;
 

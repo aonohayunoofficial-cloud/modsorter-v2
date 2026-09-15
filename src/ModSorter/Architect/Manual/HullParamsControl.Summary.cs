@@ -56,6 +56,10 @@ public sealed partial class HullParamsControl
             (false, true) => "中心線舵",
             _ => "舵なし",
         };
+        string screwNote = spec.HullScrews > 0
+            ? $"スクリュー{spec.HullScrews}軸"
+              + (spec.HullSternRudder == true ? "（舵は中心線舵）" : "＋舵")
+            : "スクリューなし";
         string castleNote = (spec.HullCastleAft > 0, spec.HullCastleFore > 0) switch
         {
             (true, true) =>
@@ -77,6 +81,7 @@ public sealed partial class HullParamsControl
                $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {openNote} / {beamNote} / " +
                $"{mastNote} / {sailNote} / " +
                $"{gunNote} / {oarNote} / {houseNote} / {holdNote} / {shieldNote} / {rudderNote} / " +
+               $"{screwNote} / " +
                $"{castleNote} / {headNote} / " +
                $"船首{FaceJp(face)} / 外寸 {spec.Width}×{spec.Depth}×{spec.Height}";
     }

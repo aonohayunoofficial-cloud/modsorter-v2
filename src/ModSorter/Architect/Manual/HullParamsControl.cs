@@ -89,6 +89,7 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             HullShieldPerSide = _ui.GetInt("shields"),
             HullSteeringOar = _ui.GetBool("rudder"),
             HullSternRudder = _ui.GetBool("stern_rudder"),
+            HullScrews = _ui.GetInt("screws"),
             HullCastleAft = _ui.GetInt("castle_aft"),
             HullCastleFore = _ui.GetInt("castle_fore"),
             HullCastleLength = _ui.GetInt("castle_len"),
