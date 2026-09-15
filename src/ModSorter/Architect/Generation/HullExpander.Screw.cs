@@ -3,16 +3,16 @@ using System.Collections.Generic;
 
 namespace ModSorter.Architect.Generation;
 
-// 推進器。プロペラ・軸・舵を船尾へ置く。機走船（モーターボート・スピードボート・
-// ヨット・タグボート・トロール船・近代軍艦5種ほか計12船種）が共通で使う部品なので、
+// 推進器の寸法とプロペラ。機走船（モーターボート・スピードボート・ヨット・
+// タグボート・トロール船・近代軍艦5種ほか計12船種）が共通で使う部品なので、
 // 船種ごとのビルダーを作らず HullExpander の1枚として持つ。
+// 軸・シャフトストラット・舵は HullExpander.Screw.Shaft.cs にある。
 //
 // 実物の根拠:
 //   プロペラ径は「下端が船体の最下点より下へ出ない・上端が最軽喫水線より下」で
 //   決まる（DMS "Propellers By the Numbers"）。実船の径/喫水は
 //   リバティ船 SS Jeremiah O'Brien が5.5m/8.46m＝0.65、
 //   バートラム46が28in＝0.71m/1.37m＝0.52。ここは0.65を取る。
-//   軸の傾斜は滑走艇で船底に対し10〜13度（Seaboard Marine の据付基準）。
 //   舵面積は水面下側面積 L×T の1.5%級（Wärtsilä Encyclopedia）。
 //   羽根は実物3〜5枚で、振動を避けるため奇数が好まれる（DMS）が、
 //   1マス=1mの格子では90度おきの4枚しか置けないので4枚で表す。
@@ -116,48 +116,15 @@ public static partial class HullExpander
         }
     }
 
-    // 軸。プロペラから船首側へ、4マスで1マス上がる勾配（約14度）で走らせ、
-    // 船底に達したところで止める。そこが船内への貫通口（シャフトログ）になる。
-    // 前端が船体に接するので、軸とプロペラは船体からつながった1本になり、
-    // 空中に浮くブロックにならない。
-    private static void PutShaft(
-        Dictionary<(int x, int y, int z), string> cells,
-        Form f, ScrewFit s, TopPalette t, int xc)
+    // station z・高さ y に船体があるか。船底線（BottomY）だけで見ると、基線で
+    // 船底が竜骨の1列に落ちる深いVの滑走艇で「真上に船体がある」と取り違える。
+    // 外板の実際の位置はその高さでの半幅から出る。
+    private static bool Inside(Form f, int x, int y, int z)
     {
-        int y = s.ShaftY;
-        int lim = Math.Max(1, f.L / 2);
-
-        for (int z = 1; z <= lim; z++)
-        {
-            PutIfEmpty(cells, f, (xc, y, z), t.Fitting);
-            if (y >= f.BottomY(z)) break;
-            if (z % 4 == 0) y++;
-        }
-    }
-
-    // 舵。プロペラの後ろ（z=-1 から前後長ぶん）へ、下端をプロペラの下端へ合わせて立てる。
-    // 上端は船尾の station でその x に外板がある高さまで伸ばして舵頭を船体へ接続する。
-    // 幅の細い船尾では中心から離れた軸の真上に外板が無いので、この探索が要る。
-    private static void PutScrewRudder(
-        Dictionary<(int x, int y, int z), string> cells,
-        Form f, ScrewFit s, TopPalette t, int xc)
-    {
-        int top = RudderTopY(f, xc);
-
-        for (int c = 1; c <= s.Chord; c++)
-            for (int y = s.PropBottom; y <= top; y++)
-                PutIfEmpty(cells, f, (xc, y, -c), t.Fitting);
-    }
-
-    private static int RudderTopY(Form f, int xc)
-    {
-        int b0 = f.BottomY(0), dk = f.DeckY(0);
-        for (int y = b0; y <= dk; y++)
-        {
-            f.Span(f.HalfAt(0, y), out int x0, out int x1);
-            if (xc >= x0 && xc <= x1) return y;
-        }
-        return b0;
+        if (z < 0 || z > f.L - 1) return false;
+        if (y < f.BottomY(z) || y > f.DeckY(z)) return false;
+        f.Span(f.HalfAt(z, y), out int x0, out int x1);
+        return x >= x0 && x <= x1;
     }
 
     // 置かれていないセルにだけ置く。竜骨・外板・中心線舵と座標を奪い合わせない。

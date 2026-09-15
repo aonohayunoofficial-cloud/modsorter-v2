@@ -43,8 +43,12 @@
 - 径は喫水の0.65倍を上限に、船尾のアパーチャ＋1マスへ収める。実船の径/喫水は
   リバティ船 SS Jeremiah O'Brien が5.5m/8.46m＝0.65、バートラム46が0.52
   （DMS "Propellers By the Numbers"）。奇数へ丸めて中心を格子へ合わせる。
-- 軸は4マスで1マス上がる勾配（約14度）で船底まで走らせ、そこが貫通口になる。
-  実艇の軸傾斜は船底に対し10〜13度（Seaboard Marine の据付基準）。
+- 軸は4マスで1マス上がる勾配（約14度）で走らせ、船体へ届いたところが貫通口。
+  実艇の軸傾斜は船底に対し10〜13度（Seaboard Marine の据付基準）。届かないまま
+  前端まで来たら、実艇のシャフトストラットと同じく支柱で船底へつなぐ。
+  深いVの滑走艇は基線で船底が竜骨の1列に落ちるので、船底線だけで止める判定では
+  プロペラと軸が船体から離れて水中に浮く。船体の有無は station と高さでの半幅
+  （`Inside`）で見る。折れ点は同じ station で1マス上げる（斜めは面で接しない）。
 - 舵面積は水面下側面積 L×T の1.5%級（Wärtsilä Encyclopedia）。1マス=1mでは
   丈と前後長しか持てないので前後長を径の半分に取る。
 - 羽根は実物3〜5枚で振動を避けるため奇数が好まれるが、格子では90度おきの
@@ -73,7 +77,9 @@
 - `HullExpander.Cargo.cs` … 貨物艙口・コーミング・荷役デリック
 - `HullExpander.Castle.cs` … 船楼
 - `HullExpander.Beam.cs` … 貫通横梁・中心線舵（Castle.cs が9.5KBになったので分離）
-- `HullExpander.Screw.cs` … 推進器（プロペラ・軸・舵）。機走の12船種が共通で使う
+- `HullExpander.Screw.cs` … 推進器の寸法（`ScrewFit`）とプロペラ。機走の12船種が共通で使う
+- `HullExpander.Screw.Shaft.cs` … 軸・シャフトストラット・舵（Screw.cs が8,319バイトに
+  なったので分離）
 - `HullParamsControl.cs` … UI の組み立てと `BuildSpec`
 - `HullParamsControl.Panel.cs` … スライダー・選択肢の並び（船型まで）
 - `HullParamsControl.Panel.Fit.cs` … 艤装以降の並び（Panel.cs が10,230バイトになったので分離）
