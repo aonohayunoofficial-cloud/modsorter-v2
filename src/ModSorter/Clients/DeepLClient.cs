@@ -13,14 +13,23 @@ public static class DeepLClient
 
     public static void Init(string apiKey)
     {
-        _key = apiKey;
-        // 無料版キーは末尾が :fx
-        var baseUrl = apiKey.TrimEnd().EndsWith(":fx")
+        // キーの前後の空白・改行を落としてから使う。設定画面へ貼り付けたときに
+        // 末尾へ改行が1つ混じるだけで、次の :fx 判定が false になり、無料版キーが
+        // Pro のエンドポイントへ送られる。その組み合わせは認証だけ通って枠が無い
+        // 扱いになり、消費ゼロのアカウントでも HTTP 456（quota exceeded）が返る。
+        _key = (apiKey ?? "").Trim();
+
+        // 無料版キーは末尾が :fx。大文字で貼られる場合があるので大小を区別しない。
+        var baseUrl = _key.EndsWith(":fx", StringComparison.OrdinalIgnoreCase)
             ? "https://api-free.deepl.com/"
             : "https://api.deepl.com/";
         _http = new HttpClient { BaseAddress = new Uri(baseUrl) };
-        _http.DefaultRequestHeaders.Add("Authorization", $"DeepL-Auth-Key {apiKey}");
+        _http.DefaultRequestHeaders.Add("Authorization", $"DeepL-Auth-Key {_key}");
     }
+
+    // 今どちらのエンドポイントへ送っているか。456 が出たときに宛先の取り違えか
+    // 本当の枠切れかを切り分けるため、UI から参照できるようにしておく。
+    public static string BaseUrl => _http?.BaseAddress?.ToString() ?? "(未初期化)";
 
     public static bool IsReady => _http != null && !string.IsNullOrEmpty(_key);
 
