@@ -31,6 +31,13 @@ public static class DeepLClient
     // 本当の枠切れかを切り分けるため、UI から参照できるようにしておく。
     public static string BaseUrl => _http?.BaseAddress?.ToString() ?? "(未初期化)";
 
+    // 使っているキーの末尾4文字。鍵全体を晒さずに、どのキーで動いているかを
+    // 突き合わせる。アカウントを替えたつもりで古いキーが残っている状態を、
+    // 設定画面の表示だけで見分けられるようにするための手がかり。
+    public static string KeyTail =>
+        string.IsNullOrEmpty(_key) ? "" :
+        (_key.Length <= 4 ? _key : _key.Substring(_key.Length - 4));
+
     public static bool IsReady => _http != null && !string.IsNullOrEmpty(_key);
 
     // HTMLを日本語に翻訳(タグ保持)

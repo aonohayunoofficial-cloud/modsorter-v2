@@ -633,10 +633,25 @@
 
                             <TextBlock Text="DeepL APIキー" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <PasswordBox x:Name="DeepLKeyBox" Margin="0,4,0,16"
+                            <PasswordBox x:Name="DeepLKeyBox" Margin="0,4,0,4"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          BorderThickness="0" Padding="6"/>
+
+                            <!-- 当月の消費文字数。v2/usage は文字を消費しないので、
+                                 何度押しても枠は減らない。どのキーで動いているかを
+                                 末尾4文字で示し、キーの取り違えに気づけるようにする。 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <TextBlock x:Name="DeepLUsageText"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource TextDim}"
+                                           FontSize="11" VerticalAlignment="Center"
+                                           TextWrapping="Wrap" Margin="0,0,8,0"
+                                           Text="消費: (未取得)"/>
+                                <Button x:Name="DeepLUsageBtn" Content="残量を確認"
+                                        Style="{StaticResource McButtonGray}"
+                                        Click="DeepLUsage_Click"/>
+                            </StackPanel>
 
                             <Button Content="保存" Style="{StaticResource McButton}"
                                     HorizontalAlignment="Left" Click="SaveSettings_Click"/>
