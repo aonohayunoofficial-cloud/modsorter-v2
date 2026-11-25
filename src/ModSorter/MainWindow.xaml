@@ -607,100 +607,106 @@
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="1" Background="{StaticResource BgDark}" Padding="24">
-                        <StackPanel MaxWidth="560" HorizontalAlignment="Left">
-                            <TextBlock Text=".minecraft フォルダ" Style="{StaticResource PixelText}"
+                        <!-- 項目が増えてウィンドウの高さを超えるため、建築モードのタブと同じく
+                             縦スクロールで包む。横は折り返しで収めるのでスクロールさせない。 -->
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel MaxWidth="560" HorizontalAlignment="Left">
+                                <TextBlock Text=".minecraft フォルダ" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <Grid Margin="0,4,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" x:Name="PathBox" IsReadOnly="True"
+                                <Grid Margin="0,4,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" x:Name="PathBox" IsReadOnly="True"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          BorderThickness="0" Padding="6"
                                          VerticalContentAlignment="Center"/>
-                                <Button Grid.Column="1" Content="選択..."
+                                    <Button Grid.Column="1" Content="選択..."
                                         Style="{StaticResource McButtonGray}"
                                         Margin="8,0,0,0" Click="SelectFolder_Click"/>
-                            </Grid>
+                                </Grid>
 
-                            <TextBlock Text="CurseForge APIキー" Style="{StaticResource PixelText}"
+                                <TextBlock Text="CurseForge APIキー" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <PasswordBox x:Name="CfKeyBox" Margin="0,4,0,16"
+                                <PasswordBox x:Name="CfKeyBox" Margin="0,4,0,16"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          BorderThickness="0" Padding="6"/>
 
-                            <TextBlock Text="DeepL APIキー" Style="{StaticResource PixelText}"
+                                <TextBlock Text="DeepL APIキー" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <PasswordBox x:Name="DeepLKeyBox" Margin="0,4,0,4"
+                                <PasswordBox x:Name="DeepLKeyBox" Margin="0,4,0,4"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          BorderThickness="0" Padding="6"/>
 
-                            <!-- 当月の消費文字数。v2/usage は文字を消費しないので、
+                                <!-- 当月の消費文字数。v2/usage は文字を消費しないので、
                                  何度押しても枠は減らない。どのキーで動いているかを
                                  末尾4文字で示し、キーの取り違えに気づけるようにする。 -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                <TextBlock x:Name="DeepLUsageText"
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <TextBlock x:Name="DeepLUsageText"
                                            Style="{StaticResource PixelText}"
                                            Foreground="{StaticResource TextDim}"
                                            FontSize="11" VerticalAlignment="Center"
                                            TextWrapping="Wrap" Margin="0,0,8,0"
                                            Text="消費: (未取得)"/>
-                                <Button x:Name="DeepLUsageBtn" Content="残量を確認"
+                                    <Button x:Name="DeepLUsageBtn" Content="残量を確認"
                                         Style="{StaticResource McButtonGray}"
                                         Click="DeepLUsage_Click"/>
-                            </StackPanel>
-                            <!-- 日本語化パックの翻訳エンジン。選んだ時点で保存される。
+                                </StackPanel>
+                                <!-- 日本語化パックの翻訳エンジン。選んだ時点で保存される。
                                  MOD 説明文の翻訳とプロンプト英訳は従来どおり DeepL を使う。 -->
-                            <TextBlock Text="日本語化パックの翻訳エンジン"
+                                <TextBlock Text="日本語化パックの翻訳エンジン"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <ComboBox x:Name="TranslatorEngineCombo" Margin="0,4,0,16"
+                                <ComboBox x:Name="TranslatorEngineCombo" Margin="0,4,0,16"
                                       Width="240" HorizontalAlignment="Left"
                                       Style="{StaticResource McComboBox}"
                                       ItemContainerStyle="{StaticResource McComboBoxItem}"
                                       SelectionChanged="TranslatorEngine_SelectionChanged"/>
 
-                            <TextBlock Text="Azure AI Translator キー"
+                                <TextBlock Text="Azure AI Translator キー"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <PasswordBox x:Name="AzureKeyBox" Margin="0,4,0,8"
+                                <PasswordBox x:Name="AzureKeyBox" Margin="0,4,0,8"
                                          Background="{StaticResource BgPanel}"
                                          Foreground="{StaticResource TextMain}"
                                          BorderThickness="0" Padding="6"/>
-                            <TextBlock Text="Azure リージョン(例: japaneast / グローバルなら空欄)"
+                                <TextBlock Text="Azure リージョン(例: japaneast / グローバルなら空欄)"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}"/>
-                            <TextBox x:Name="AzureRegionBox" Margin="0,4,0,4"
+                                <TextBox x:Name="AzureRegionBox" Margin="0,4,0,4"
                                      Background="{StaticResource BgPanel}"
                                      Foreground="{StaticResource TextMain}"
                                      BorderThickness="0" Padding="6"
                                      VerticalContentAlignment="Center"/>
-                            <TextBlock x:Name="AzureStatusText"
+                                <TextBlock x:Name="AzureStatusText"
                                        Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource TextDim}"
                                        FontSize="11" TextWrapping="Wrap"
                                        Margin="0,0,0,16" Text="状態: (未取得)"/>
-                            <Button Content="保存" Style="{StaticResource McButton}"
+                                <Button Content="保存" Style="{StaticResource McButton}"
                                     HorizontalAlignment="Left" Click="SaveSettings_Click"/>
-                            <TextBlock x:Name="SettingsStatus" Style="{StaticResource PixelText}"
-                                       Foreground="{StaticResource TextDim}" Margin="0,10,0,0"/>
+                                <TextBlock x:Name="SettingsStatus" Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}" Margin="0,10,0,0"
+                                       TextWrapping="Wrap"/>
 
-                            <TextBlock Text="キャッシュ管理" Style="{StaticResource PixelText}"
+                                <TextBlock Text="キャッシュ管理" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource GrassGreen}" Margin="0,28,0,0"/>
-                            <TextBlock Style="{StaticResource PixelText}"
+                                <TextBlock Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource TextDim}" FontSize="11"
                                        TextWrapping="Wrap" Margin="0,4,0,8"
                                        Text="MOD情報とアイコンの保存データを全て削除します。次回スキャンで再取得されます。"/>
-                            <Button Content="キャッシュを全削除" Style="{StaticResource McButtonGray}"
+                                <Button Content="キャッシュを全削除" Style="{StaticResource McButtonGray}"
                                     HorizontalAlignment="Left" Click="ClearCache_Click"/>
-                            <TextBlock x:Name="CacheStatus" Style="{StaticResource PixelText}"
+                                <TextBlock x:Name="CacheStatus" Style="{StaticResource PixelText}"
                                        Foreground="{StaticResource TextDim}" Margin="0,8,0,0"/>
-
-                        </StackPanel>
+                                
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </TabItem>
