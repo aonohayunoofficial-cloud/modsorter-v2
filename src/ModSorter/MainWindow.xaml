@@ -114,64 +114,88 @@
                                        FontSize="11" Margin="10,0,10,8"
                                        TextWrapping="Wrap" Text=""/>
 
-                            <!-- ===== 日本語化パック生成パネル(追加) ===== -->
-                            <Border DockPanel.Dock="Top" Margin="10,4,10,8"
-                                    Background="{StaticResource BgPanel}"
-                                    Padding="8">
-                                <StackPanel>
-                                    <TextBlock x:Name="LangPackTitle"
+                            <!-- 日本語化パック欄(上)と MOD ツリー(下)を上下2段にする。
+                                 欄は内側で縦スクロールし、間のつまみで高さの配分を変えられる。
+                                 以前は欄が高さを全部取り、ツリーと欄の下側が見切れていた。 -->
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" MinHeight="60"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*" MinHeight="60"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- ===== 日本語化パック生成パネル(追加) ===== -->
+                                <ScrollViewer Grid.Row="0" Margin="6,4,0,4"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <Border Margin="4,0,4,0"
+                                        Background="{StaticResource BgPanel}"
+                                        Padding="8">
+                                        <StackPanel>
+                                            <TextBlock x:Name="LangPackTitle"
                                                Text="日本語化パック生成"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource GrassGreen}"
-                                               FontSize="12" Margin="0,0,0,6"/>
-                                    <CheckBox x:Name="LangPackSkipJaCheck"
-                                              Content="同梱の日本語を活かし、足りないキーだけ翻訳する"
+                                               FontSize="12" Margin="0,0,0,6"
+                                               TextWrapping="Wrap"/>
+                                            <CheckBox x:Name="LangPackSkipJaCheck"
                                               IsChecked="True"
                                               Foreground="{StaticResource TextMain}"
-                                              FontSize="11" Margin="0,0,0,6"/>
-                                    <TextBlock Text="出力先(空欄=resourcepacks)"
+                                              FontSize="11" Margin="0,0,0,6">
+                                                <TextBlock Text="同梱の日本語を活かし、足りないキーだけ翻訳する"
+                                                   TextWrapping="Wrap"/>
+                                            </CheckBox>
+                                            <TextBlock Text="出力先(空欄=resourcepacks)"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource TextDim}"
                                                FontSize="10" Margin="0,0,0,2"/>
-                                    <TextBox x:Name="LangPackOutPath"
+                                            <TextBox x:Name="LangPackOutPath"
                                              FontSize="11" Margin="0,0,0,6"
                                              Background="{StaticResource StoneDark}"
                                              Foreground="{StaticResource TextMain}"
                                              BorderThickness="0" Padding="4,2"/>
-                                    <TextBlock x:Name="LangPackUsage"
+                                            <TextBlock x:Name="LangPackUsage"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource TextDim}"
                                                FontSize="10" Margin="0,0,0,4"
                                                TextWrapping="Wrap" Text=""/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <Button x:Name="LangPackGenBtn"
+                                            <!-- 生成と中断は2等分。用語辞書は次の行に全幅で置く(列幅240では横1列に収まらない)。 -->
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0" x:Name="LangPackGenBtn"
                                                 Content="生成"
                                                 Style="{StaticResource McButton}"
-                                                Margin="0,0,6,0"
-                                    Click="LangPackGenerate_Click"/>
-                                        <Button x:Name="LangPackCancelBtn"
+                                                Margin="0,0,3,0"
+                                                Click="LangPackGenerate_Click"/>
+                                                <Button Grid.Column="1" x:Name="LangPackCancelBtn"
                                                 Content="中断"
                                                 Style="{StaticResource McButtonGray}"
+                                                Margin="3,0,0,0"
                                                 IsEnabled="False"
                                                 Click="LangPackCancel_Click"/>
-                                        <Button x:Name="LangPackGlossaryBtn"
-                                                Content="用語辞書を開く"
-                                                Style="{StaticResource McButtonGray}"
-                                                ToolTip="Spring→バネ のように、多義語の訳を固定する辞書を編集します"
-                                                Click="LangPackGlossary_Click"/>
-                                    </StackPanel>
-                                    <!-- 進捗メーター。生成ボタンのすぐ下に置き、操作した場所で見えるようにする。
+                                            </Grid>
+                                            <Button x:Name="LangPackGlossaryBtn"
+                                            Content="用語辞書を開く"
+                                            Style="{StaticResource McButtonGray}"
+                                            HorizontalAlignment="Stretch"
+                                            Margin="0,0,0,4"
+                                            ToolTip="Spring→バネ のように、多義語の訳を固定する辞書を編集します"
+                                            Click="LangPackGlossary_Click"/>
+                                            <!-- 進捗メーター。生成ボタンのすぐ下に置き、操作した場所で見えるようにする。
                                          バーの上に % を重ね、下に段階名と、経過・残り目安・応答待ち秒数を
                                          1秒ごとに出す。% の表示/非表示はバーに連動させる
                                          (色コード再翻訳はバーの表示だけを切り替えるため)。 -->
-                                    <Grid Margin="0,0,0,4">
-                                        <ProgressBar x:Name="LangPackProgress"
+                                            <Grid Margin="0,0,0,4">
+                                                <ProgressBar x:Name="LangPackProgress"
                                                      Height="18"
                                                      Minimum="0" Maximum="100" Value="0"
                                                      Foreground="{StaticResource GrassGreen}"
                                                      Background="{StaticResource StoneDark}"
                                                      Visibility="Collapsed"/>
-                                        <TextBlock x:Name="LangPackProgressPct"
+                                                <TextBlock x:Name="LangPackProgressPct"
                                                    Style="{StaticResource PixelText}"
                                                    Foreground="{StaticResource TextMain}"
                                                    FontSize="11"
@@ -179,83 +203,94 @@
                                                    VerticalAlignment="Center"
                                                    Visibility="{Binding Visibility, ElementName=LangPackProgress}"
                                                    Text=""/>
-                                    </Grid>
-                                    <TextBlock x:Name="LangPackStatus"
+                                            </Grid>
+                                            <TextBlock x:Name="LangPackStatus"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource TextDim}"
                                                FontSize="11"
                                                TextWrapping="Wrap" Text=""/>
-                                    <TextBlock x:Name="LangPackProgressDetail"
+                                            <TextBlock x:Name="LangPackProgressDetail"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource TextDim}"
                                                FontSize="10" Margin="0,2,0,4"
                                                TextWrapping="Wrap" Text=""
                                                Visibility="Collapsed"/>
 
-                                    <StackPanel Margin="0,0,0,4">
-                                        <Button x:Name="LangPackRecheckBtn"
+                                            <StackPanel Margin="0,0,0,4">
+                                                <Button x:Name="LangPackRecheckBtn"
                                                 Content="復元漏れ再検査"
                                                 Style="{StaticResource McButtonGray}"
                                                 HorizontalAlignment="Stretch"
                                                 Margin="0,0,0,4"
                                                 Click="LangPackRecheck_Click"/>
-                                        <Button x:Name="LangPackRepairPrintfBtn"
+                                                <Button x:Name="LangPackRepairPrintfBtn"
                                                 Content="printf修復"
                                                 Style="{StaticResource McButtonGray}"
                                                 HorizontalAlignment="Stretch"
                                                 Margin="0,0,0,4"
                                                 Click="LangPackRepairPrintf_Click"/>
-                                        <Button x:Name="LangPackRetranslateBtn"
+                                                <Button x:Name="LangPackRetranslateBtn"
                                                 Content="色コード再翻訳"
                                                 Style="{StaticResource McButtonGray}"
                                                 HorizontalAlignment="Stretch"
                                                 Click="LangPackRetranslate_Click" Cursor=""/>
-                                    </StackPanel>
+                                            </StackPanel>
 
-                                    <!-- ===== 翻訳キャッシュ操作 ===== -->
-                                    <TextBlock Text="翻訳キャッシュ"
+                                            <!-- ===== 翻訳キャッシュ操作 ===== -->
+                                            <TextBlock Text="翻訳キャッシュ"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource GrassGreen}"
                                                FontSize="11" Margin="0,6,0,2"/>
-                                    <TextBlock Style="{StaticResource PixelText}"
+                                            <TextBlock Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource TextDim}"
                                                FontSize="10" TextWrapping="Wrap"
                                                Margin="0,0,0,4"
                                                Text="訳文に含まれる語(例: 春)を入れると、その訳だけ消して再翻訳できます。"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <TextBox x:Name="LangPackCacheWordBox"
-                                                 Width="70" FontSize="11"
+                                            <!-- ボタンを右に固定し、入力欄は残りの幅を使う。
+                                         スクロールバーが出て幅が縮んでもボタンが切れない。 -->
+                                            <DockPanel Margin="0,0,0,4">
+                                                <Button DockPanel.Dock="Right"
+                                                x:Name="LangPackCacheRemoveWordBtn"
+                                                Content="この訳を削除"
+                                                Style="{StaticResource McButtonGray}"
+                                                Click="LangPackCacheRemoveWord_Click"/>
+                                                <TextBox x:Name="LangPackCacheWordBox"
+                                                 FontSize="11"
                                                  Background="{StaticResource StoneDark}"
                                                  Foreground="{StaticResource TextMain}"
                                                  BorderThickness="0" Padding="4,2"
                                                  VerticalContentAlignment="Center"
                                                  Margin="0,0,6,0"/>
-                                        <Button x:Name="LangPackCacheRemoveWordBtn"
-                                                Content="この訳を削除"
-                                                Style="{StaticResource McButtonGray}"
-                                                Click="LangPackCacheRemoveWord_Click"/>
-                                    </StackPanel>
-                                    <Button x:Name="LangPackCachePurgeBtn"
+                                            </DockPanel>
+                                            <Button x:Name="LangPackCachePurgeBtn"
                                             Content="英語のまま固定を解除"
                                             Style="{StaticResource McButtonGray}"
                                             HorizontalAlignment="Stretch"
                                             Margin="0,0,0,4"
                                             ToolTip="訳文が原文と同じまま固定されたキャッシュを消し、再翻訳できるようにします"
                                             Click="LangPackCachePurge_Click"/>
-                                    <Button x:Name="LangPackCacheClearBtn"
+                                            <Button x:Name="LangPackCacheClearBtn"
                                             Content="翻訳キャッシュを全削除"
                                             Style="{StaticResource McButtonRed}"
                                             HorizontalAlignment="Stretch"
                                             Margin="0,0,0,4"
                                             Click="LangPackCacheClear_Click"/>
-                                </StackPanel>
-                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
 
+                                <!-- 上下の高さ配分を変えるつまみ -->
+                                <GridSplitter Grid.Row="1" Height="5"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center"
+                                              ResizeDirection="Rows"
+                                              Background="{StaticResource StoneDark}"/>
 
-                            <TreeView x:Name="ModTree" Background="Transparent"
-                                      BorderThickness="0"
-                                      Foreground="{StaticResource TextMain}"
-                                      SelectedItemChanged="ModTree_SelectedItemChanged"/>
+                                <TreeView Grid.Row="2" x:Name="ModTree" Background="Transparent"
+                                          BorderThickness="0"
+                                          Foreground="{StaticResource TextMain}"
+                                          SelectedItemChanged="ModTree_SelectedItemChanged"/>
+                            </Grid>
                         </DockPanel>
                     </Border>
 
