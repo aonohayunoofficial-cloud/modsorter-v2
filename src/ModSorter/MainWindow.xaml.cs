@@ -13,6 +13,7 @@ using ModSorter.Models;
 
 namespace ModSorter;
 
+// 設定画面(キー保存・DeepL 残量・翻訳エンジン選択・Azure 欄)は MainWindow.Settings.cs。
 public partial class MainWindow : Window
 {
     private string? _instancePath;
@@ -37,12 +38,9 @@ public partial class MainWindow : Window
             PathBox.Text = _instancePath;
         }
 
-        if (!string.IsNullOrEmpty(_settings.CurseForgeKeyEnc))
-        {
-            var cf = string.IsNullOrEmpty(_settings.CurseForgeKeyEnc) ? "未設定" : "保存済み";
-            var dl = string.IsNullOrEmpty(_settings.DeepLKeyEnc) ? "未設定" : "保存済み";
-            SettingsStatus.Text = $"CurseForge: {cf} / DeepL: {dl}(変更する場合のみ再入力)";
-        }
+        // 設定画面の状態表示・翻訳エンジン選択・Azure 欄と、
+        // 日本語化パック欄の見出しを設定値から組み立てる。
+        InitTranslatorSettingsUi();
 
         // 起動時に DeepL の消費を1回だけ取る。v2/usage は文字を消費しない。
         // 起動直後に枠の状態が見えていれば、生成を回してから 456 で気づく事態を避けられる。
@@ -127,7 +125,7 @@ public partial class MainWindow : Window
     private void NavSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 3;
     private void Back_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = 0;
 
-    // ===== フォルダ・設定 =====
+    // ===== フォルダ =====
     private void SelectFolder_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFolderDialog { Title = ".minecraft フォルダを選択" };
@@ -139,69 +137,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveSettings_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.InstancePath = _instancePath ?? "";
-        if (!string.IsNullOrEmpty(CfKeyBox.Password))
-            _settings.CurseForgeKeyEnc = Settings.Encrypt(CfKeyBox.Password.Trim());
-
-        // 入力欄が空のときは既存のキーを残す作りなので、アカウントを替えたつもりで
-        // 「保存」を押していないと古いキーが残る。画面は「保存済み」と出続けるため、
-        // 枠を使い切った旧キーのまま HTTP 456（Quota exceeded）が返り続ける状態に
-        // 気づけない。今回貼り替えたかどうかを表示で区別する。
-        bool dlUpdated = !string.IsNullOrEmpty(DeepLKeyBox.Password);
-        if (dlUpdated)
-            _settings.DeepLKeyEnc = Settings.Encrypt(DeepLKeyBox.Password.Trim());
-        _settings.Save();
-
-        var cfState = string.IsNullOrEmpty(_settings.CurseForgeKeyEnc) ? "未設定" : "保存済み";
-        var dlState = string.IsNullOrEmpty(_settings.DeepLKeyEnc)
-            ? "未設定"
-            : (dlUpdated ? "今回更新" : "保存済み(今回は変更なし)");
-        SettingsStatus.Text = $"保存しました。(CurseForge: {cfState} / DeepL: {dlState})";
-        Log($"設定を保存しました。(DeepL: {dlState})");
-        CfKeyBox.Password = "";
-        DeepLKeyBox.Password = "";
-
-        // 保存したキーで残量を取り直す。キーを替えたのに消費や末尾4文字が動かない
-        // ときは、貼り替えが効いていないか、別のキーが残っている。
-        _ = RefreshDeepLUsageAsync();
-    }
-
-    // 「残量を確認」ボタン。
-    private void DeepLUsage_Click(object sender, RoutedEventArgs e)
-        => _ = RefreshDeepLUsageAsync();
-
-    // DeepL の当月消費を取り直して設定画面へ出す。v2/usage は文字を消費しないので、
-    // 何度呼んでも枠は減らない。どのキーで動いているかを末尾4文字で添える。
-    private async Task RefreshDeepLUsageAsync()
-    {
-        var key = Settings.Decrypt(_settings.DeepLKeyEnc);
-        if (string.IsNullOrEmpty(key))
-        {
-            DeepLUsageText.Text = "消費: (キー未設定)";
-            return;
-        }
-
-        DeepLUsageText.Text = "消費: 取得中...";
-        Clients.DeepLClient.Init(key);
-        var usage = await Clients.DeepLClient.GetUsageAsync();
-
-        if (usage.HasValue)
-        {
-            long used = usage.Value.Count, limit = usage.Value.Limit;
-            int pct = limit <= 0 ? 0 : (int)(used * 100 / limit);
-            DeepLUsageText.Text =
-                $"消費: {used:N0} / {limit:N0} 文字（{pct}%） / キー末尾 …"
-                + Clients.DeepLClient.KeyTail;
-        }
-        else
-        {
-            DeepLUsageText.Text =
-                $"消費: 取得失敗（{Clients.DeepLClient.LastError}） / 宛先 "
-                + Clients.DeepLClient.BaseUrl;
-        }
-    }
     private void ClearCache_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(

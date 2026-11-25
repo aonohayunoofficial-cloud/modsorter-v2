@@ -8,7 +8,7 @@ namespace ModSorter.Services;
 
 // lang翻訳用の「原文→訳文」永続キャッシュ。
 // ModCache と同じく ApplicationData\ModSorter\cache 配下に JSON で保存する。
-// エンジンごとに訳が異なるため、エンジン名でファイルを分ける（今回は "deepl"）。
+// エンジンごとに訳が異なるため、エンジン名でファイルを分ける（"deepl" / "azure"）。
 // キーは原文そのものではなくハッシュにする（原文が長文・特殊文字を含むため）。
 public static class TranslationCache
 {
@@ -16,9 +16,19 @@ public static class TranslationCache
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "ModSorter", "cache");
 
+    // 引き継ぎ元のエンジン。DeepL 以外のエンジンを初めて使うとき、そのエンジンの
+    // キャッシュファイルがまだ無ければ、DeepL の翻訳済み分を一度だけ写して始める。
+    // 写さないと、DeepL で訳し終えた分まで全部送り直すことになり枠と時間を浪費する。
+    // 毎回 DeepL 側を読みに行く作りにはしない。部分削除・再翻訳で消した訳が
+    // DeepL 側から戻ってきて、誤訳を直す操作が効かなくなるため。
+    private const string InheritSource = "deepl";
+
     // 現在ロード中のエンジン名とエントリ。エンジンを切り替えたらロードし直す。
     private static string _engine = "";
     private static Dictionary<string, string> _entries = new();
+
+    // 直近の Load で引き継いだ件数。UI がログに出したら TakeInheritedCount で 0 に戻す。
+    private static int _inheritedCount;
 
     // 保存オプション。既定のエンコーダだと日本語が "\u6625" になり目視できないため、
     // 緩和エンコーダでそのまま書き出す（キャッシュを手で覗くとき用）。
@@ -40,6 +50,12 @@ public static class TranslationCache
         return Convert.ToBase64String(hash);
     }
 
+    private static Dictionary<string, string> ReadFile(string path)
+    {
+        var json = File.ReadAllText(path);
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+    }
+
     // 指定エンジンのキャッシュをロードする。既にロード済みなら何もしない。
     public static void Load(string engine)
     {
@@ -50,14 +66,29 @@ public static class TranslationCache
         try
         {
             var path = FilePathFor(engine);
+            var src = FilePathFor(InheritSource);
             if (File.Exists(path))
             {
-                var json = File.ReadAllText(path);
-                _entries = JsonSerializer.Deserialize<Dictionary<string, string>>(json)
-                           ?? new();
+                _entries = ReadFile(path);
+            }
+            else if (engine != InheritSource && File.Exists(src))
+            {
+                // 写した直後に書き出してファイルを作る。これが「引き継ぎ済み」の印になり、
+                // 以後は独立したキャッシュとして扱われる。
+                _entries = ReadFile(src);
+                _inheritedCount = _entries.Count;
+                Save();
             }
         }
         catch { _entries = new(); }
+    }
+
+    // 直近に引き継いだ件数を返し、0 に戻す（ログを1回だけ出すため）。
+    public static int TakeInheritedCount()
+    {
+        int n = _inheritedCount;
+        _inheritedCount = 0;
+        return n;
     }
 
     public static void Save()
@@ -113,7 +144,7 @@ public static class TranslationCache
 
     // 訳文に needle を含むエントリだけを削除する。戻り値は削除件数。
     // 「春」のような誤訳語を指定すると、その訳になった原文だけが次回再翻訳される。
-    // 全消しと違い DeepL 枠の消費を最小に抑えられる。削除後は即座に永続化する。
+    // 全消しと違い翻訳枠の消費を最小に抑えられる。削除後は即座に永続化する。
     public static int RemoveWhereTranslatedContains(string engine, string needle)
     {
         if (string.IsNullOrEmpty(needle)) return 0;
@@ -130,17 +161,14 @@ public static class TranslationCache
 
     // 指定エンジンのキャッシュを全削除する。
     // 未ロードのエンジンを指定された場合でも件数を正しく返すため、先にロードする。
+    // ファイルは消さずに空で書き出す。消すと DeepL 以外のエンジンでは次回の Load で
+    // DeepL のキャッシュを引き継ぎ直してしまい、全削除が効かなくなる。
     public static int ClearAll(string engine)
     {
         Load(engine);
         int count = _entries.Count;
         _entries = new();
-        try
-        {
-            var path = FilePathFor(engine);
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch { }
+        Save();
         return count;
     }
 }

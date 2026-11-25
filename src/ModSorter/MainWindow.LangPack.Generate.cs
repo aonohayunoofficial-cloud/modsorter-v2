@@ -11,7 +11,8 @@ public partial class MainWindow : Window
     private async void LangPackGenerate_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureModsScanned()) return;
-        if (!EnsureDeepLReady()) return;
+        var translator = EnsureTranslatorReady();
+        if (translator == null) return;
 
         // 用語辞書を読み込む。初回はファイルが無いので既定辞書が書き出される。
         // 生成のたびに読み直すことで、アプリを再起動しなくても編集内容が反映される。
@@ -39,38 +40,29 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 2) 見積もり + DeepL 残量照合
+        // 2) 見積もり + 残量照合
         // unique はキャッシュ済みを含む理論値、send は実際に送信する分。
         // 残量と突き合わせるのは send 側。unique で比べると、2回目以降の生成で
         // 送らない分まで数えて残量超過の警告が出てしまう。
         int unique = LangPackService.EstimateChars(targets);
         int send = await Task.Run(
-            () => LangPackService.EstimateChars(targets, LangPackEngine));
-        var usage = await DeepLClient.GetUsageAsync();
+            () => LangPackService.EstimateChars(targets, translator.Name));
+        int inherited = TranslationCache.TakeInheritedCount();
+        if (inherited > 0)
+            Log($"{translator.DisplayName} のキャッシュが無かったため、" +
+                $"DeepL のキャッシュ {inherited:N0} 件を引き継ぎました。");
 
-        string usageMsg;
-        bool overLimit = false;
-        if (usage.HasValue)
-        {
-            long remaining = usage.Value.Limit - usage.Value.Count;
-            usageMsg = $"DeepL 残り {remaining:N0} / 上限 {usage.Value.Limit:N0} 文字";
-            if (send > remaining) overLimit = true;
-            else if (send > remaining * 0.8) usageMsg += "(残量の80%超の見込み)";
-        }
-        else
-        {
-            usageMsg = "DeepL 残量取得に失敗(続行は可能)";
-        }
-
+        var (usageMsg, overLimit) = await BuildUsageMessageAsync(translator, send);
         LangPackUsage.Text = usageMsg;
 
         var confirm = MessageBox.Show(
+            $"翻訳エンジン: {translator.DisplayName}\n" +
             $"翻訳対象: {result.NamespaceCount} 名前空間 / {result.EntryCount} エントリ\n" +
             $"ユニーク原文: {unique:N0} 文字\n" +
             $"今回送信する分(キャッシュ済みを除く): {send:N0} 文字\n" +
             $"{usageMsg}\n" +
             (overLimit ? "\n⚠ 残量を超える見込みです。続行しますか?" : "\n生成を開始しますか?"),
-            overLimit ? "DeepL 残量超過の警告" : "生成確認",
+            overLimit ? $"{translator.DisplayName} 残量超過の警告" : "生成確認",
             MessageBoxButton.OKCancel,
             overLimit ? MessageBoxImage.Warning : MessageBoxImage.Question);
         if (confirm != MessageBoxResult.OK) return;
@@ -95,7 +87,7 @@ public partial class MainWindow : Window
         try
         {
             var translations = await LangPackService.TranslateAsync(
-                targets, LangPackEngine, result,
+                targets, translator, result,
                 (done, total, msg) => Dispatcher.Invoke(() =>
                 {
                     LangPackProgress.Value = total == 0 ? 100 : done * 100.0 / total;
@@ -115,13 +107,13 @@ public partial class MainWindow : Window
                 ? $"⚠ 送信失敗: {result.FailedEntries} 件({result.FailedBatches} バッチ)\n" +
                   $"　原因: {result.LastApiError}\n" +
                   (result.AbortedByApiError
-                      ? "　連続失敗のため翻訳を打ち切りました。失敗分はキャッシュに書いて\n" +
-                        "　いないので、原因解消後にもう一度生成すれば翻訳されます。\n"
+                      ? "　翻訳を打ち切りました(枠切れ・認証失敗、または連続失敗)。失敗分は\n" +
+                        "　キャッシュに書いていないので、原因解消後に再生成すれば翻訳されます。\n"
                       : "　失敗分はキャッシュに書いていないので、次回生成で再送信されます。\n")
                 : "";
 
             var summary =
-                $"生成完了\n" +
+                $"生成完了({translator.DisplayName})\n" +
                 $"MOD: {result.ModCount} / 名前空間: {result.NamespaceCount} / " +
                 $"翻訳したエントリ: {result.EntryCount}\n" +
                 $"同梱 jar(jar-in-jar)の走査: {result.NestedJars} 件\n" +
@@ -166,5 +158,30 @@ public partial class MainWindow : Window
             _langPackCts?.Dispose();
             _langPackCts = null;
         }
+    }
+
+    // 残量表示の文言と、残量超過の見込みかを返す。
+    // Azure はキーで消費量を取れないので照合はせず、F0 の月間上限と所要目安を添える。
+    private static async Task<(string Msg, bool Over)> BuildUsageMessageAsync(
+        ITranslator tr, int send)
+    {
+        if (!tr.SupportsUsage)
+        {
+            // AzureTranslator は F0 の時間あたり上限に合わせ、毎分約 30,000 文字で送る。
+            int minutes = (int)Math.Ceiling(send / 30000.0);
+            return ($"{tr.DisplayName}: 残量はキーから取得できません" +
+                    "(F0 は月 2,000,000 文字まで。Azure ポータルで確認)\n" +
+                    $"送信ペース調整による所要目安: 約 {minutes} 分", false);
+        }
+
+        var usage = await tr.GetUsageAsync();
+        if (!usage.HasValue)
+            return ($"{tr.DisplayName} 残量取得に失敗(続行は可能): {tr.LastError}", false);
+
+        long remaining = usage.Value.Limit - usage.Value.Count;
+        var msg = $"{tr.DisplayName} 残り {remaining:N0} / 上限 {usage.Value.Limit:N0} 文字";
+        if (send > remaining) return (msg, true);
+        if (send > remaining * 0.8) msg += "(残量の80%超の見込み)";
+        return (msg, false);
     }
 }

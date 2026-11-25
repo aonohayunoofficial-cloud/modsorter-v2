@@ -1,4 +1,6 @@
-﻿namespace ModSorter.Services;
+﻿using ModSorter.Clients;
+
+namespace ModSorter.Services;
 
 public static partial class LangPackService
 {
@@ -6,18 +8,19 @@ public static partial class LangPackService
     // 対象原文をキャッシュから削除してから TranslateAsync を呼ぶことで、
     // その原文だけが未キャッシュ扱いになり、新方式(XMLタグ)で翻訳し直される。
     // 正常な既存キャッシュはヒットするため再翻訳されない(枠消費は対象分のみ)。
+    // キャッシュは translator.Name のファイルを使う（エンジンごとに別）。
     // 戻り値は再翻訳した原文数。
     public static async Task<int> RetranslateAsync(
         IReadOnlyList<string> sourcesToRetranslate,
         IEnumerable<NamespaceLang> targets,
-        string engine,
+        ITranslator translator,
         LangPackResult result,
         ProgressHandler? progress,
         CancellationToken ct)
     {
         if (sourcesToRetranslate == null || sourcesToRetranslate.Count == 0) return 0;
 
-        TranslationCache.Load(engine);
+        TranslationCache.Load(translator.Name);
 
         int removed = 0;
         foreach (var src in sourcesToRetranslate)
@@ -35,7 +38,7 @@ public static partial class LangPackService
             tmp.TranslateKeys.Add(key); // TranslateAsync は翻訳対象キーだけを見るため必須
         }
 
-        await TranslateAsync(new[] { tmp }, engine, result, progress, ct);
+        await TranslateAsync(new[] { tmp }, translator, result, progress, ct);
         return removed;
     }
 }

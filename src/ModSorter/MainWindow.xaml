@@ -119,7 +119,8 @@
                                     Background="{StaticResource BgPanel}"
                                     Padding="8">
                                 <StackPanel>
-                                    <TextBlock Text="日本語化パック生成(DeepL)"
+                                    <TextBlock x:Name="LangPackTitle"
+                                               Text="日本語化パック生成"
                                                Style="{StaticResource PixelText}"
                                                Foreground="{StaticResource GrassGreen}"
                                                FontSize="12" Margin="0,0,0,6"/>
@@ -652,7 +653,37 @@
                                         Style="{StaticResource McButtonGray}"
                                         Click="DeepLUsage_Click"/>
                             </StackPanel>
+                            <!-- 日本語化パックの翻訳エンジン。選んだ時点で保存される。
+                                 MOD 説明文の翻訳とプロンプト英訳は従来どおり DeepL を使う。 -->
+                            <TextBlock Text="日本語化パックの翻訳エンジン"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <ComboBox x:Name="TranslatorEngineCombo" Margin="0,4,0,16"
+                                      Width="240" HorizontalAlignment="Left"
+                                      Style="{StaticResource McComboBox}"
+                                      ItemContainerStyle="{StaticResource McComboBoxItem}"
+                                      SelectionChanged="TranslatorEngine_SelectionChanged"/>
 
+                            <TextBlock Text="Azure AI Translator キー"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <PasswordBox x:Name="AzureKeyBox" Margin="0,4,0,8"
+                                         Background="{StaticResource BgPanel}"
+                                         Foreground="{StaticResource TextMain}"
+                                         BorderThickness="0" Padding="6"/>
+                            <TextBlock Text="Azure リージョン(例: japaneast / グローバルなら空欄)"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource GrassGreen}"/>
+                            <TextBox x:Name="AzureRegionBox" Margin="0,4,0,4"
+                                     Background="{StaticResource BgPanel}"
+                                     Foreground="{StaticResource TextMain}"
+                                     BorderThickness="0" Padding="6"
+                                     VerticalContentAlignment="Center"/>
+                            <TextBlock x:Name="AzureStatusText"
+                                       Style="{StaticResource PixelText}"
+                                       Foreground="{StaticResource TextDim}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Margin="0,0,0,16" Text="状態: (未取得)"/>
                             <Button Content="保存" Style="{StaticResource McButton}"
                                     HorizontalAlignment="Left" Click="SaveSettings_Click"/>
                             <TextBlock x:Name="SettingsStatus" Style="{StaticResource PixelText}"

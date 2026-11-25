@@ -11,12 +11,25 @@ namespace ModSorter;
 //   MainWindow.LangPack.Generate.cs 生成ボタン
 //   MainWindow.LangPack.Repair.cs   復元漏れ再検査・printf修復・再翻訳
 //   MainWindow.LangPack.Cache.cs    翻訳キャッシュの削除・英語固定解除
+// 翻訳エンジンの選択 UI は MainWindow.Settings.cs にある。
 public partial class MainWindow : Window
 {
     private CancellationTokenSource? _langPackCts;
 
-    // 翻訳エンジン名。TranslationCache のファイル名にも使われる。
-    private const string LangPackEngine = "deepl";
+    // 翻訳エンジン名。設定画面の選択値から引く。TranslationCache のファイル名にも
+    // 使われるため、キャッシュはエンジンごとに分かれる(trans_cache_deepl.json 等)。
+    private string LangPackEngine => TranslatorFactory.Normalize(_settings.TranslatorEngine);
+
+    // 画面表示用のエンジン名。
+    private string LangPackEngineLabel
+    {
+        get
+        {
+            foreach (var (id, label) in TranslatorFactory.Engines)
+                if (id == LangPackEngine) return label;
+            return LangPackEngine;
+        }
+    }
 
     // pack.mcmeta に書く pack_format。lang だけのパックは構造がバージョンに依存しないため、
     // LangPackService 側で supported_formats(範囲宣言)も併せて書き出し、
@@ -39,18 +52,17 @@ public partial class MainWindow : Window
         return false;
     }
 
-    // DeepL キーを読み出して初期化する。未設定なら警告して false。
-    private bool EnsureDeepLReady()
+    // 選択中エンジンを設定値から作る。キー未設定なら警告して null。
+    // DeepL を選んでいる場合は、生成時に DeepLClient.Init まで済む(従来の EnsureDeepLReady 相当)。
+    private ITranslator? EnsureTranslatorReady()
     {
-        var key = Settings.Decrypt(_settings.DeepLKeyEnc);
-        if (string.IsNullOrEmpty(key))
-        {
-            MessageBox.Show("設定で DeepL API キーを設定してください。", "ModSorter",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-        DeepLClient.Init(key);
-        return true;
+        var tr = TranslatorFactory.Create(_settings);
+        if (tr.IsReady) return tr;
+        MessageBox.Show(
+            $"設定で {tr.DisplayName} の API キーを設定してください。\n" +
+            "（翻訳エンジンは設定画面で切り替えられます）", "ModSorter",
+            MessageBoxButton.OK, MessageBoxImage.Warning);
+        return null;
     }
 
     // 生成/再翻訳の実行中でないかを確かめる。

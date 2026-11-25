@@ -6,8 +6,9 @@ namespace ModSorter;
 
 public partial class MainWindow : Window
 {
-    // 復元漏れ再検査ボタン(DeepL枠を使わない)。
+    // 復元漏れ再検査ボタン(翻訳枠を使わない)。
     // 既存キャッシュを再検査し、プレースホルダが欠けている原文を洗い出してログに出す。
+    // 対象は選択中エンジンのキャッシュ。
     private async void LangPackRecheck_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureModsScanned()) return;
@@ -16,17 +17,18 @@ public partial class MainWindow : Window
         bool skipIfJa = LangPackSkipIfJa;
         var result = new LangPackService.LangPackResult();
         var jarPaths = LangPackJarPaths();
+        var engine = LangPackEngine;
 
         LangPackStatus.Text = "再検査中(翻訳送信なし)...";
 
         List<string> broken = await Task.Run(() =>
         {
             var targets = LangPackService.ExtractTargets(jarPaths, skipIfJa, result);
-            return LangPackService.RecheckCache(targets, LangPackEngine);
+            return LangPackService.RecheckCache(targets, engine);
         });
 
         LangPackStatus.Text = $"再検査完了: 復元漏れ {broken.Count} 件";
-        Log($"=== 復元漏れ再検査(枠消費なし): {broken.Count} 件 ===");
+        Log($"=== 復元漏れ再検査({LangPackEngineLabel} / 枠消費なし): {broken.Count} 件 ===");
         foreach (var s in broken)
             Log("  復元漏れ: " + s);
         LogSkipDetails(result);
@@ -38,7 +40,7 @@ public partial class MainWindow : Window
             "ModSorter", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    // printf系の復元漏れを原形維持で修復するボタン(DeepL枠を使わない)。
+    // printf系の復元漏れを原形維持で修復するボタン(翻訳枠を使わない)。
     // 再検査で見つかった復元漏れのうち、%s %d %.2f 等を含む原文を原文どおりに上書きする。
     private async void LangPackRepairPrintf_Click(object sender, RoutedEventArgs e)
     {
@@ -48,14 +50,15 @@ public partial class MainWindow : Window
         bool skipIfJa = LangPackSkipIfJa;
         var result = new LangPackService.LangPackResult();
         var jarPaths = LangPackJarPaths();
+        var engine = LangPackEngine;
 
         LangPackStatus.Text = "printf修復中(翻訳送信なし)...";
 
         List<string> repaired = await Task.Run(() =>
         {
             var targets = LangPackService.ExtractTargets(jarPaths, skipIfJa, result);
-            var broken = LangPackService.RecheckCache(targets, LangPackEngine);
-            return LangPackService.RepairPrintfPlaceholders(broken, LangPackEngine);
+            var broken = LangPackService.RecheckCache(targets, engine);
+            return LangPackService.RepairPrintfPlaceholders(broken, engine);
         });
 
         LangPackStatus.Text = $"printf修復完了: {repaired.Count} 件";
@@ -77,7 +80,8 @@ public partial class MainWindow : Window
     {
         if (!EnsureModsScanned()) return;
         if (!EnsureLangPackIdle()) return;
-        if (!EnsureDeepLReady()) return;
+        var translator = EnsureTranslatorReady();
+        if (translator == null) return;
 
         // 再翻訳も ProtectXml を通るので用語辞書が効く。生成と同じく読み直して、
         // 同一セッション中に辞書を編集した場合も新しい訳語が当たるようにする。
@@ -94,7 +98,7 @@ public partial class MainWindow : Window
         var (allTargets, targetsToRe) = await Task.Run(() =>
         {
             var tg = LangPackService.ExtractTargets(jarPaths, skipIfJa, result);
-            var broken = LangPackService.RecheckCache(tg, LangPackEngine);
+            var broken = LangPackService.RecheckCache(tg, translator.Name);
             return (tg, broken.Where(s => !printfRegex.IsMatch(s)).ToList());
         });
 
@@ -110,7 +114,7 @@ public partial class MainWindow : Window
         var confirm = MessageBox.Show(
             $"色コード等の復元漏れを新方式で再翻訳します。\n" +
             $"対象: {targetsToRe.Count} 件 / 約 {estChars:N0} 文字\n" +
-            "DeepL 枠を対象分だけ消費します。続行しますか?",
+            $"{translator.DisplayName} の枠を対象分だけ消費します。続行しますか?",
             "再翻訳の確認", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (confirm != MessageBoxResult.OK) return;
 
@@ -122,7 +126,7 @@ public partial class MainWindow : Window
         try
         {
             int redone = await LangPackService.RetranslateAsync(
-                targetsToRe, allTargets, LangPackEngine, result,
+                targetsToRe, allTargets, translator, result,
                 (done, total, msg) => Dispatcher.Invoke(() =>
                 {
                     LangPackProgress.Value = total == 0 ? 100 : done * 100.0 / total;
@@ -133,9 +137,14 @@ public partial class MainWindow : Window
             LangPackProgress.Value = 100;
             LangPackStatus.Text = $"再翻訳完了: {redone} 件(復元漏れ {result.RestoreWarnings} 件)";
             Log($"=== 色コード再翻訳(新方式): {redone} 件 / 残復元漏れ {result.RestoreWarnings} 件 ===");
+            if (result.FailedEntries > 0)
+                Log($"再翻訳の送信失敗: {result.FailedEntries} 件 / 原因: {result.LastApiError}");
             MessageBox.Show(
                 $"再翻訳完了: {redone} 件\n" +
                 $"再翻訳後の復元漏れ: {result.RestoreWarnings} 件\n" +
+                (result.FailedEntries > 0
+                    ? $"⚠ 送信失敗: {result.FailedEntries} 件 / 原因: {result.LastApiError}\n"
+                    : "") +
                 "この後、生成し直すと反映されます。",
                 "ModSorter", MessageBoxButton.OK, MessageBoxImage.Information);
         }
