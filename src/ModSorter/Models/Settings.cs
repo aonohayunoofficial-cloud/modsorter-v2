@@ -12,6 +12,18 @@ public class Settings
     public string CurseForgeKeyEnc { get; set; } = "";
     public string DeepLKeyEnc { get; set; } = "";
 
+    // 日本語化パックの翻訳エンジン識別子("deepl" / "azure")。
+    // TranslatorFactory.Normalize を通して使う。既存の settings.json にはこの項目が無いが、
+    // その場合は既定値 "deepl" のまま読まれるので従来どおり DeepL で動く。
+    public string TranslatorEngine { get; set; } = "deepl";
+
+    // Azure AI Translator のキー(暗号化済み Base64)。
+    public string AzureTranslatorKeyEnc { get; set; } = "";
+
+    // Azure のリソースのリージョン(例: japaneast)。リソース作成画面で選んだ場所を入れる。
+    // グローバルのリソースなら空でよい。空のときは Ocp-Apim-Subscription-Region を送らない。
+    public string AzureTranslatorRegion { get; set; } = "";
+
     private static string Dir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ModSorter");
     private static string FilePath => Path.Combine(Dir, "settings.json");
