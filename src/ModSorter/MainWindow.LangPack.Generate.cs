@@ -5,6 +5,7 @@ using System.Windows;
 
 namespace ModSorter;
 
+// 生成ボタン。残量の文言と進捗メーターは MainWindow.LangPack.Progress.cs。
 public partial class MainWindow : Window
 {
     // 「日本語化パックを生成」ボタン
@@ -22,10 +23,26 @@ public partial class MainWindow : Window
         var result = new LangPackService.LangPackResult();
         var jarPaths = LangPackJarPaths();
 
-        // 1) 抽出+除外(重いので別スレッド)
-        LangPackStatus.Text = "抽出中...";
-        List<LangPackService.NamespaceLang> targets = await Task.Run(
-            () => LangPackService.ExtractTargets(jarPaths, skipIfJa, result));
+        // 1) 抽出+除外 と 2) 見積もり。jar が多いと数十秒かかるのでメーターを出す。
+        // unique はキャッシュ済みを含む理論値、send は実際に送信する分。
+        // 残量と突き合わせるのは send 側。unique で比べると、2回目以降の生成で
+        // 送らない分まで数えて残量超過の警告が出てしまう。
+        List<LangPackService.NamespaceLang> targets;
+        int unique, send;
+        LangPackProgressStart("抽出中...");
+        try
+        {
+            targets = await Task.Run(
+                () => LangPackService.ExtractTargets(jarPaths, skipIfJa, result));
+            LangPackProgressPhase("送信量を見積もり中...");
+            unique = LangPackService.EstimateChars(targets);
+            send = await Task.Run(
+                () => LangPackService.EstimateChars(targets, translator.Name));
+        }
+        finally
+        {
+            LangPackProgressEnd(); // 確認ダイアログの間は計時しない
+        }
 
         LogSkipDetails(result);
 
@@ -40,13 +57,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 2) 見積もり + 残量照合
-        // unique はキャッシュ済みを含む理論値、send は実際に送信する分。
-        // 残量と突き合わせるのは send 側。unique で比べると、2回目以降の生成で
-        // 送らない分まで数えて残量超過の警告が出てしまう。
-        int unique = LangPackService.EstimateChars(targets);
-        int send = await Task.Run(
-            () => LangPackService.EstimateChars(targets, translator.Name));
         int inherited = TranslationCache.TakeInheritedCount();
         if (inherited > 0)
             Log($"{translator.DisplayName} のキャッシュが無かったため、" +
@@ -54,6 +64,7 @@ public partial class MainWindow : Window
 
         var (usageMsg, overLimit) = await BuildUsageMessageAsync(translator, send);
         LangPackUsage.Text = usageMsg;
+        LangPackStatus.Text = "生成の確認待ち";
 
         var confirm = MessageBox.Show(
             $"翻訳エンジン: {translator.DisplayName}\n" +
@@ -65,7 +76,11 @@ public partial class MainWindow : Window
             overLimit ? $"{translator.DisplayName} 残量超過の警告" : "生成確認",
             MessageBoxButton.OKCancel,
             overLimit ? MessageBoxImage.Warning : MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.OK) return;
+        if (confirm != MessageBoxResult.OK)
+        {
+            LangPackStatus.Text = "生成を取り消しました";
+            return;
+        }
 
         // 出力先を先に確定し、既存ファイルがあれば上書き確認する（翻訳前に確認する）。
         var outPath = ResolveLangPackOutPath();
@@ -74,34 +89,37 @@ public partial class MainWindow : Window
             var ow = MessageBox.Show(
                 $"既存のパックを上書きします。よろしいですか?\n{outPath}",
                 "上書き確認", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-            if (ow != MessageBoxResult.OK) return;
+            if (ow != MessageBoxResult.OK)
+            {
+                LangPackStatus.Text = "生成を取り消しました";
+                return;
+            }
         }
 
         // 3) 翻訳
         _langPackCts = new CancellationTokenSource();
         LangPackGenBtn.IsEnabled = false;
         LangPackCancelBtn.IsEnabled = true;
-        LangPackProgress.Visibility = Visibility.Visible;
-        LangPackProgress.Value = 0;
+        LangPackProgressStart("翻訳中(最初の応答待ち)...");
+        LangPackProgressTranslateBegin(translator.Name == TranslatorFactory.Azure
+            ? "Azure は速度制限に合わせて送信間隔を空けています" : "");
 
         try
         {
             var translations = await LangPackService.TranslateAsync(
                 targets, translator, result,
-                (done, total, msg) => Dispatcher.Invoke(() =>
-                {
-                    LangPackProgress.Value = total == 0 ? 100 : done * 100.0 / total;
-                    LangPackStatus.Text = msg;
-                }),
+                (done, total, msg) => Dispatcher.Invoke(
+                    () => LangPackProgressReport(done, total, msg)),
                 _langPackCts.Token);
 
             // 4) パック生成（出力先は翻訳前に確定済みの outPath を使う）
-            LangPackStatus.Text = "パック生成中...";
+            LangPackProgressPhase("パック生成中...");
             await Task.Run(() => LangPackService.BuildPack(
                 targets, translations, outPath, LangPackFormat, result));
 
-            LangPackProgress.Value = 100;
-            LangPackStatus.Text = "完了";
+            var elapsed = LangPackElapsedText;
+            LangPackProgressEnd();
+            LangPackStatus.Text = $"完了(所要 {elapsed})";
 
             var failMsg = result.FailedEntries > 0
                 ? $"⚠ 送信失敗: {result.FailedEntries} 件({result.FailedBatches} バッチ)\n" +
@@ -114,6 +132,7 @@ public partial class MainWindow : Window
 
             var summary =
                 $"生成完了({translator.DisplayName})\n" +
+                $"所要時間: {elapsed}\n" +
                 $"MOD: {result.ModCount} / 名前空間: {result.NamespaceCount} / " +
                 $"翻訳したエントリ: {result.EntryCount}\n" +
                 $"同梱 jar(jar-in-jar)の走査: {result.NestedJars} 件\n" +
@@ -152,36 +171,11 @@ public partial class MainWindow : Window
         }
         finally
         {
+            LangPackProgressEnd();
             LangPackGenBtn.IsEnabled = true;
             LangPackCancelBtn.IsEnabled = false;
-            LangPackProgress.Visibility = Visibility.Collapsed;
             _langPackCts?.Dispose();
             _langPackCts = null;
         }
-    }
-
-    // 残量表示の文言と、残量超過の見込みかを返す。
-    // Azure はキーで消費量を取れないので照合はせず、F0 の月間上限と所要目安を添える。
-    private static async Task<(string Msg, bool Over)> BuildUsageMessageAsync(
-        ITranslator tr, int send)
-    {
-        if (!tr.SupportsUsage)
-        {
-            // AzureTranslator は F0 の時間あたり上限に合わせ、毎分約 30,000 文字で送る。
-            int minutes = (int)Math.Ceiling(send / 30000.0);
-            return ($"{tr.DisplayName}: 残量はキーから取得できません" +
-                    "(F0 は月 2,000,000 文字まで。Azure ポータルで確認)\n" +
-                    $"送信ペース調整による所要目安: 約 {minutes} 分", false);
-        }
-
-        var usage = await tr.GetUsageAsync();
-        if (!usage.HasValue)
-            return ($"{tr.DisplayName} 残量取得に失敗(続行は可能): {tr.LastError}", false);
-
-        long remaining = usage.Value.Limit - usage.Value.Count;
-        var msg = $"{tr.DisplayName} 残り {remaining:N0} / 上限 {usage.Value.Limit:N0} 文字";
-        if (send > remaining) return (msg, true);
-        if (send > remaining * 0.8) msg += "(残量の80%超の見込み)";
-        return (msg, false);
     }
 }
