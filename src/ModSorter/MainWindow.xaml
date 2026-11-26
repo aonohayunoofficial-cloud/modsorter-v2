@@ -365,6 +365,28 @@
                                          TextChanged="SearchBox_TextChanged"/>
                             </DockPanel>
 
+                            <!-- 配布元で絞り込む。両方チェック=全件。片方だけ=そちらにしか URL が無い MOD。
+                                 両方外す=どちらの URL も無い MOD。ツリーとカードの両方に効く。 -->
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                        Margin="8,0,8,6">
+                                <TextBlock Text="配布元:" Style="{StaticResource PixelText}"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <CheckBox x:Name="SourceCfCheck" Content="CurseForge"
+                                          IsChecked="True" Foreground="#E69138"
+                                          VerticalAlignment="Center" Margin="0,0,12,0"
+                                          Checked="SourceFilter_Changed"
+                                          Unchecked="SourceFilter_Changed"/>
+                                <CheckBox x:Name="SourceMrCheck" Content="Modrinth"
+                                          IsChecked="True" Foreground="#1BD96A"
+                                          VerticalAlignment="Center" Margin="0,0,12,0"
+                                          Checked="SourceFilter_Changed"
+                                          Unchecked="SourceFilter_Changed"/>
+                                <TextBlock x:Name="SourceFilterInfo"
+                                           Style="{StaticResource PixelText}"
+                                           Foreground="{StaticResource TextDim}"
+                                           FontSize="11" VerticalAlignment="Center" Text=""/>
+                            </StackPanel>
+
                             <!-- ===== カバーアート帯（軽量カルーセル） ===== -->
                             <Border DockPanel.Dock="Top" Height="150" Margin="8,0,8,8"
                                     Background="{StaticResource BgCard}"
