@@ -1,6 +1,6 @@
 ﻿# modsorter-v2 パラメトリック生成機能 マスターリスト & ロードマップ（索引）
 
-最終更新: 2026-09-15
+最終更新: 2026-11-26
 対象リポジトリ: aonohayunoofficial-cloud/modsorter-v2
 
 この文書は索引と進捗集計だけを持つ。小分類のチェックリスト・実物研究メモ・残課題は
@@ -27,10 +27,10 @@
 | 大分類 | 中分類 | 小分類 | 実装済み |
 |---|---:|---:|---:|
 | 建築物 | 7 | 50 | 50 |
-| 船体 | 8 | 31 | 18 |
+| 船体 | 8 | 31 | 19 |
 | プロペラ | 3 | 10 | 0 |
 | バルーン | 2 | 8 | 0 |
-| **合計** | **20** | **99** | **68** |
+| **合計** | **20** | **99** | **69** |
 
 ### 大分類1: プロペラ（`propeller`） 0/10
 
@@ -47,7 +47,7 @@
 | 形状 (`envelope_shape`) | 6 | 0 | [balloon.md](roadmap/balloon.md) |
 | 構造形式 (`envelope_frame`) | 2 | 0 | 同上 |
 
-### 大分類3: 船体（`hull`） 18/31
+### 大分類3: 船体（`hull`） 19/31
 
 中分類は用途・帆走/機走・時代で切る。既存資産（`ShipExpander`）11種と createmod 21種、
 追加要望2種を統合し重複を解消した結果が31種。
@@ -57,7 +57,7 @@
 
 | 中分類 | 小分類 | 実装済み | 節ファイル |
 |---|---:|---:|---|
-| 小型艇 (`small_craft`) | 5 | 2 | [hull-small_craft.md](roadmap/hull-small_craft.md) |
+| 小型艇 (`small_craft`) | 5 | 3 | [hull-small_craft.md](roadmap/hull-small_craft.md) |
 | 作業船 (`work_boat`) | 2 | 0 | [hull-work_boat.md](roadmap/hull-work_boat.md) |
 | 帆船・中世〜大航海 (`sail_old`) | 8 | 8 ✅ | [hull-sail_old.md](roadmap/hull-sail_old.md) |
 | 帆船・近代 (`sail_modern`) | 3 | 3 ✅ | [hull-sail_modern.md](roadmap/hull-sail_modern.md) |

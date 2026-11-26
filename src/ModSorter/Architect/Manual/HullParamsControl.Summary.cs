@@ -75,13 +75,22 @@ public sealed partial class HullParamsControl
             _ => "飾りなし",
         };
 
+        // 実際に開いた長さは生成側から取る（上部構造と重なると開かないため）。
+        int cockpitLen = HullExpander.CockpitLength(spec);
+        string cockpitNote = cockpitLen > 0
+            ? $"コックピット{cockpitLen}マス・座席{spec.HullCockpitSeats}列"
+              + (spec.HullWindscreen == true ? "・風防" : "")
+              + (spec.HullSunPad > 0 ? $"・サンパッド{spec.HullSunPad}" : "")
+            : spec.HullCockpitLength > 0 ? "コックピットなし（上部構造・開放艇と重なる）"
+            : "コックピットなし";
+
         return $"{_p.Jp} 全長{spec.HullLength}×型幅{spec.HullBeam}×深さ{depth} / 喫水{draft} / " +
                $"断面{spec.HullSection} / 入角{spec.HullEntryAngle}度 / {transomNote} / " +
                $"船首材{spec.HullStemRake}度 / シア{spec.HullSheer}% / {frameNote} / " +
                $"竜骨{spec.HullKeelDepth} / {bulwarkNote} / {openNote} / {beamNote} / " +
                $"{mastNote} / {sailNote} / " +
                $"{gunNote} / {oarNote} / {houseNote} / {holdNote} / {shieldNote} / {rudderNote} / " +
-               $"{screwNote} / " +
+               $"{screwNote} / {cockpitNote} / " +
                $"{castleNote} / {headNote} / " +
                $"船首{FaceJp(face)} / 外寸 {spec.Width}×{spec.Depth}×{spec.Height}";
     }

@@ -1,12 +1,12 @@
 ﻿# 船体 / 小型艇（`hull` / `small_craft`）
 
-親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 2/5 ← **作業中**
+親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 3/5 ← **作業中**
 
 ## 小分類
 
 - [x] 手漕ぎボート(`rowboat`)
 - [x] モーターボート(`motorboat`)
-- [ ] スピードボート(`speedboat`)
+- [x] スピードボート(`speedboat`) … [hull-small_craft-speedboat.md](hull-small_craft-speedboat.md)
 - [ ] ヨット(`yacht`)
 - [ ] 双胴船(`catamaran`)
 

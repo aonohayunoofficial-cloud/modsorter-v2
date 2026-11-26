@@ -24,6 +24,7 @@ namespace ModSorter.Architect.Generation;
 //   HullExpander.Shell.cs  … 竜骨・フレーム・外板・甲板・ブルワークの組み立て
 //   HullExpander.Screw.cs  … 推進器（プロペラ・軸・舵）。機走船12種の共通部品
 //   HullExpander.Thwart.cs … 開放艇の床板と漕ぎ座
+//   HullExpander.Cockpit.cs … コックピット（甲板の一部を開けた座席の凹み）・風防・サンパッド
 // このファイルが12,628バイトになったので、外寸と回転・正規化を上の2枚へ移した。
 //
 // canonical は船首が +z（南）。facade_face で回す。写像は IndustryExpander と同じ
@@ -65,16 +66,22 @@ public static partial class HullExpander
         var cells = new Dictionary<(int x, int y, int z), string>();
         var props = new Props();
 
-        // 開放艇かどうかは甲板を置く前に要るので、素の船体へ渡す。
+        // 甲板を開ける station（開放艇は全長、コックピットはその範囲）は甲板を置く前に
+        // 要るので、素の船体へ渡す。
         // BuildTopside は自前で Top を作る既存の作りのままにしてある（Rig.cs へ手を
         // 入れない）。同じコンストラクタを通るので値は食い違わない。
-        BuildBareHull(cells, props, form, p, top.OpenBoat);
+        var cockpit = new CockpitFit(spec, form, top);
+        BuildBareHull(cells, props, form, p, z => top.OpenBoat || cockpit.Opens(z));
         BuildTopside(cells, props, form, spec, t);
 
         // 推進器は水線下の船尾。外板・竜骨・中心線舵が置かれたあとに通し、
         // 既に埋まっているセルへは置かない（座標を奪い合わせない）。
         // 軸数0が既定なので、指定しない船種の生成物は1ブロックも変わらない。
         BuildScrew(cells, form, spec, t);
+
+        // コックピットの床・座席・風防・サンパッド。甲板・艤装・推進器のあとに通し、
+        // 空いたセルにだけ置く。前後長0が既定なので、指定しない船種は1ブロックも変わらない。
+        BuildCockpit(cells, form, cockpit, p, t, spec, allowedBlocks);
 
         // 床板と漕ぎ座は舷縁の内側なので、外板・甲板・艤装のあとに通す。
         BuildOpenBoat(cells, form, top, p, t);

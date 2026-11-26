@@ -1,6 +1,6 @@
 ﻿# 船体 / 共通事項（`hull`）
 
-親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 18/31
+親: [../ROADMAP.md](../ROADMAP.md) ｜ 進捗: 19/31
 
 ## 共通パラメータ
 
@@ -65,6 +65,8 @@
 - `HullExpander.Shell.cs` … 竜骨・フレーム・外板・甲板・ブルワーク。
   開放艇のときは最上段のうち舷側の1列だけを甲板材で塗って舷縁とし、内側を空ける
 - `HullExpander.Thwart.cs` … 開放艇の床板と漕ぎ座
+- `HullExpander.Cockpit.cs` … コックピット・風防・サンパッド（プロパティは
+  `StructureSpec.Hull.Cockpit.cs`、UI は `HullParamsControl.Panel.Cockpit.cs`）
 - `HullExpander.Top.cs` … 上部構造のパレットと寸法（`TopPalette` / `Top`）
 - `HullExpander.Top.Fit.cs` … Top の長い計算（櫂の張り出し・マストの station・天端）。
   Top.cs が10,434バイトになったので分けた。readonly フィールドはコンストラクタでしか
@@ -93,6 +95,7 @@
 - `HullPresets.Warship.cs` … 帆走軍艦の既定値（フリゲート・戦列艦・軍用ガレー）
 - `HullPresets.Merchant.cs` … 商船の既定値（客船・貨物船）
 - `HullPresets.SmallCraft.cs` … 小型艇の既定値（手漕ぎボート・モーターボート）
+- `HullPresets.Speedboat.cs` … スピードボートの既定値
 - `ManualCatalog.cs` … 分類表の型定義とヘルパ・`Categories`・`Find*`。
   14,248バイトになり raw の1回の取得で全文を読めなくなったので大分類ごとに割った
 - `ManualCatalog.Building.cs` … 大分類4 建築物の表（7中分類・50件）

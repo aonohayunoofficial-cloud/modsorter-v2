@@ -94,6 +94,11 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             HullCastleFore = _ui.GetInt("castle_fore"),
             HullCastleLength = _ui.GetInt("castle_len"),
             HullStemHead = _ui.GetChoice("head", "none"),
+            HullCockpitLength = _ui.GetInt("cockpit_len"),
+            HullCockpitShift = _ui.GetInt("cockpit_shift"),
+            HullCockpitSeats = _ui.GetInt("cockpit_seats"),
+            HullWindscreen = _ui.GetBool("windscreen"),
+            HullSunPad = _ui.GetInt("sun_pad"),
             HullBlock = shell,
             DeckBlock = _ui.GetBlock("deck", _p.Deck),
             BaseBlock = _ui.GetBlock("keelb", _p.Keelb),
@@ -106,7 +111,9 @@ public sealed partial class HullParamsControl : UserControl, IManualParamControl
             SeatBlock = _ui.GetBlock("fitb", _p.Fitb),
             HullCastleBlock = _ui.GetBlock("castleb", _p.Castleb),
             HullFunnelBlock = _ui.GetBlock("funnelb", _p.Funnelb),
-            GlazingBlock = _ui.GetBlock("glassb", _p.Glassb)
+            GlazingBlock = _ui.GetBlock("glassb", _p.Glassb),
+            HullCockpitSeatBlock = _ui.GetBlock("seatb", _p.Seatb),
+            HullCushionBlock = _ui.GetBlock("padb", _p.Padb)
         };
 
         // 外寸は展開側の Form と Top から取る。UI と生成側で式を二重に持たない。

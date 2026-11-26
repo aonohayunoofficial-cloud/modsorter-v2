@@ -17,7 +17,7 @@ public static partial class ManualCatalog
         Mid("small_craft", "小型艇",
             Impl("rowboat", "手漕ぎボート", () => new HullParamsControl("rowboat")),
             Impl("motorboat", "モーターボート", () => new HullParamsControl("motorboat")),
-            Todo("speedboat", "スピードボート"),
+            Impl("speedboat", "スピードボート", () => new HullParamsControl("speedboat")),
             Todo("yacht", "ヨット"),
             Todo("catamaran", "双胴船")),
 

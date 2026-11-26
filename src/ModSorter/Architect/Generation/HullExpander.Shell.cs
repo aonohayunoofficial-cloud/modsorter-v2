@@ -11,7 +11,7 @@ public static partial class HullExpander
 {
     private static void BuildBareHull(
         Dictionary<(int x, int y, int z), string> cells, Props props, Form f, Palette p,
-        bool openBoat)
+        System.Func<int, bool> openAt)
     {
         // 1) 体積を先に決める。外板・甲板・フレームはこの体積の内外判定から拾う。
         //    面ごとに置く条件を書き分けると、船首テーパーや船尾の立ち上がりで
@@ -39,13 +39,19 @@ public static partial class HullExpander
         //    漕ぎ座だけを持つので、最上段を塞ぐと内部が全部埋まってしまう。
         //    船首・船尾の端の station は最上段も塗って閉じる（船首材のキャップ・
         //    トランサムの上端に当たる）。
+        //    コックピットは openAt が true を返す station だけを同じ扱いで開ける。
+        //
+        //    真下に船体の無い甲板のマスは開けない。フレアで甲板が1段下の断面より
+        //    広い船では、そこを開けると水面へ素通しの穴になる。
         foreach (var c in solid)
         {
             if (c.y == deckY[c.z])
             {
                 bool gunwale =
                     !solid.Contains((c.x - 1, c.y, c.z)) || !solid.Contains((c.x + 1, c.y, c.z));
-                if (!openBoat || gunwale || c.z == 0 || c.z == f.L - 1) cells[c] = p.Deck;
+                bool hullBelow = solid.Contains((c.x, c.y - 1, c.z));
+                if (!openAt(c.z) || gunwale || !hullBelow || c.z == 0 || c.z == f.L - 1)
+                    cells[c] = p.Deck;
                 continue;
             }
             bool edge =

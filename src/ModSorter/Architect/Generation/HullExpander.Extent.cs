@@ -41,7 +41,13 @@ public static partial class HullExpander
         // 竜骨の張り出しより深いぶんだけ高さが増える。径はアパーチャ＋1マスに
         // 収めてあるので、増えるのは最大1マス。
         int below = Math.Max(0, -s.PropBottom - f.KeelDepth);
-        int height = Math.Max(h, t.TopY + f.KeelDepth + 1) + below;
+
+        // コックピットの風防とサンパッドは甲板の1段上へ出る。舷墻0の船では
+        // Bounds の高さに含まれないので、ここで足す。
+        var c = new CockpitFit(spec, f, t);
+        int above = c.TopY >= 0 ? c.TopY + f.KeelDepth + 1 : 0;
+
+        int height = Math.Max(Math.Max(h, t.TopY + f.KeelDepth + 1), above) + below;
         return (width, depth, height);
     }
 }

@@ -61,6 +61,7 @@ public sealed partial class HullParamsControl
                "0でなし。コグ船は横梁の木口が外板を貫いて外へ出るので幅が左右2マス増える");
 
         BuildFitPanel(p);
+        BuildCockpitPanel(p);
         BuildBlockPanel(p);
     }
 }

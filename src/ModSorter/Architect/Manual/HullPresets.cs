@@ -52,6 +52,11 @@ internal sealed class HullPreset
     public int Holds = 0;
     public bool Derrick = false;
 
+    // コックピット（甲板の一部を開けた座席の凹み）・風防・サンパッド。
+    // CockpitLen が0ならなし。デッキハウス・船楼・貨物艙口・開放艇とは併用しない。
+    public int CockpitLen = 0, CockpitShift = 0, CockpitSeats = 0, SunPad = 0;
+    public bool Windscreen = false;
+
     // 素材。
     public string Shell = "minecraft:oak_planks";
     public string Deck = "minecraft:spruce_planks";
@@ -66,15 +71,18 @@ internal sealed class HullPreset
     public string Castleb = "minecraft:spruce_planks";
     public string Funnelb = "minecraft:spruce_planks";
     public string Glassb = "minecraft:glass_pane";
+    public string Seatb = "minecraft:oak_slab";
+    public string Padb = "minecraft:white_carpet";
 }
 
-// 船種ごとの既定値は6枚に分けてある（1ファイル9KBの目安）。
+// 船種ごとの既定値は7枚に分けてある（1ファイル9KBの目安）。
 //   HullPresets.Sail.cs       … ダウ船・ジャンク船・ピナス
 //   HullPresets.Discovery.cs  … キャラベル・キャラック・ガレオン
 //   HullPresets.Modern.cs     … スループ・スクーナー・クリッパー
 //   HullPresets.Warship.cs    … フリゲート・戦列艦・軍用ガレー
 //   HullPresets.Merchant.cs   … 客船・貨物船
 //   HullPresets.SmallCraft.cs … 小型艇（手漕ぎボート・モーターボート）
+//   HullPresets.Speedboat.cs  … 小型艇（スピードボート）
 // 分けたのは値だけで、Of の switch はここ1か所に残す。
 internal static partial class HullPresets
 {
@@ -97,6 +105,7 @@ internal static partial class HullPresets
         "cargo" => Cargo,
         "rowboat" => Rowboat,
         "motorboat" => Motorboat,
+        "speedboat" => Speedboat,
         _ => Longship,
     };
 

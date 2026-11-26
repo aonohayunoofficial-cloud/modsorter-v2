@@ -20,7 +20,9 @@ public sealed partial class HullParamsControl
            .BlockPick("fitb", "舵・舵柄・貫通横梁・砲身・コーミング・飾り・推進器", p.Fitb)
            .BlockPick("castleb", "船楼・デッキハウス", p.Castleb)
            .BlockPick("funnelb", "煙突", p.Funnelb)
-           .BlockPick("glassb", "デッキハウスの窓", p.Glassb)
+           .BlockPick("glassb", "デッキハウスの窓・風防", p.Glassb)
+           .BlockPick("seatb", "コックピットの座席（半ブロック）", p.Seatb)
+           .BlockPick("padb", "サンパッド（カーペット）", p.Padb)
            .Note("ゴクスタ船は船体がオーク、甲板が松。コグ船はオーク一色。" +
                  "軍艦は船体を黒く塗るのでダークオーク、甲板は白木のマツ材に近い白樺。" +
                  "鋼船・鉄船は灰色のコンクリート、船橋楼は白、煙突は黒。" +
